@@ -71,10 +71,8 @@ final class ComposerScenarioRunner
     {
         $command = ['composer', 'update'];
 
-        foreach ($scenario->targets as $target) {
-            if ($target->package !== 'php') {
-                $command[] = $target->package;
-            }
+        foreach ($scenario->targets->packageTargets() as $target) {
+            $command[] = $target->package;
         }
 
         if ($scenario->withAllDependencies) {
@@ -113,17 +111,12 @@ final class ComposerScenarioRunner
         $composerPath = $tempPath . DIRECTORY_SEPARATOR . 'composer.json';
         $data = $this->reader->read($composerPath);
 
-        foreach ($scenario->targets as $target) {
-            if ($target->package === 'php') {
-                $data['config']['platform']['php'] = $target->constraint;
-                continue;
-            }
-
+        foreach ($scenario->targets->packageTargets() as $target) {
             $data['require'][$target->package] = $target->constraint;
         }
 
-        if ($request->targetPhp !== null) {
-            $data['config']['platform']['php'] = $request->targetPhp;
+        if ($scenario->targets->targetPhp() !== null) {
+            $data['config']['platform']['php'] = $scenario->targets->targetPhp();
         }
 
         file_put_contents($composerPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);

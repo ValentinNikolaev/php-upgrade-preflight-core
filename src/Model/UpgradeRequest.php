@@ -7,8 +7,7 @@ namespace PhpUpgradePreflight\Core\Model;
 final class UpgradeRequest
 {
     public string $projectPath;
-    /** @var list<UpgradeTarget> */
-    public array $targets;
+    public UpgradeTargetSet $targets;
     public ?string $fromPhp;
     public ?string $targetPhp;
     /** @var list<string> */
@@ -42,9 +41,9 @@ final class UpgradeRequest
         }
 
         $this->projectPath = $resolved;
-        $this->targets = array_values($targets);
+        $this->targets = new UpgradeTargetSet($targets, $targetPhp);
         $this->fromPhp = $fromPhp;
-        $this->targetPhp = $targetPhp;
+        $this->targetPhp = $this->targets->targetPhp();
         $this->sourcePaths = array_values($sourcePaths);
         $this->frameworks = array_values($frameworks);
         $this->format = ReportFormat::normalize($format);
@@ -56,7 +55,7 @@ final class UpgradeRequest
     {
         return [
             'project_path' => $this->projectPath,
-            'targets' => array_map(static fn (UpgradeTarget $target): array => $target->toArray(), $this->targets),
+            'targets' => $this->targets->toArray(),
             'from_php' => $this->fromPhp,
             'target_php' => $this->targetPhp,
             'source_paths' => $this->sourcePaths,
