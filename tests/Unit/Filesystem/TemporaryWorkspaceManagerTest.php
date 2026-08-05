@@ -12,7 +12,7 @@ final class TemporaryWorkspaceManagerTest extends TestCase
 {
     public function testItLeavesEveryOriginalFixtureFileUnchangedWhenTheWorkspaceIsModified(): void
     {
-        $fixturePath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'laravel-app';
+        $fixturePath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
         $snapshot = FixtureSnapshot::capture($fixturePath);
         $workspaces = new TemporaryWorkspaceManager();
         $workspacePath = $workspaces->createFromProject($fixturePath);

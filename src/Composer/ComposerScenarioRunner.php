@@ -16,11 +16,22 @@ final class ComposerScenarioRunner
 {
     private TemporaryWorkspaceManager $workspaces;
     private JsonFileReader $reader;
+    /** @var \Closure(list<string>, string): array{exit_code: int, stdout: string, stderr: string} */
+    private \Closure $processRunner;
 
-    public function __construct(?TemporaryWorkspaceManager $workspaces = null, ?JsonFileReader $reader = null)
-    {
+    /**
+     * @param null|callable(list<string>, string): array{exit_code: int, stdout: string, stderr: string} $processRunner
+     */
+    public function __construct(
+        ?TemporaryWorkspaceManager $workspaces = null,
+        ?JsonFileReader $reader = null,
+        ?callable $processRunner = null
+    ) {
         $this->workspaces = $workspaces ?? new TemporaryWorkspaceManager();
         $this->reader = $reader ?? new JsonFileReader();
+        $this->processRunner = $processRunner === null
+            ? \Closure::fromCallable([$this, 'runProcess'])
+            : \Closure::fromCallable($processRunner);
     }
 
     public function run(ProjectState $project, UpgradeRequest $request, Scenario $scenario): ScenarioResult
@@ -30,20 +41,19 @@ final class ComposerScenarioRunner
         try {
             $this->applyTemporaryComposerChanges($tempPath, $request, $scenario);
             $command = $this->buildCommand($scenario);
-            $process = new Process($command, $tempPath, ['COMPOSER_NO_INTERACTION' => '1'], null, 300);
-            $process->run();
+            $process = ($this->processRunner)($command, $tempPath);
 
             $lock = null;
             $lockPath = $tempPath . DIRECTORY_SEPARATOR . 'composer.lock';
-            if ($process->getExitCode() === 0 && is_file($lockPath)) {
+            if ($process['exit_code'] === 0 && is_file($lockPath)) {
                 $lock = new ComposerLock($this->reader->read($lockPath));
             }
 
             return new ScenarioResult(
                 $scenario,
-                $process->getExitCode() ?? 1,
-                $process->getOutput(),
-                $process->getErrorOutput(),
+                $process['exit_code'],
+                $process['stdout'],
+                $process['stderr'],
                 $lock,
                 $request->debug ? $tempPath : null
             );
@@ -80,6 +90,22 @@ final class ComposerScenarioRunner
         $command[] = '--no-interaction';
 
         return $command;
+    }
+
+    /**
+     * @param list<string> $command
+     * @return array{exit_code: int, stdout: string, stderr: string}
+     */
+    private function runProcess(array $command, string $workingDirectory): array
+    {
+        $process = new Process($command, $workingDirectory, ['COMPOSER_NO_INTERACTION' => '1'], null, 300);
+        $process->run();
+
+        return [
+            'exit_code' => $process->getExitCode() ?? 1,
+            'stdout' => $process->getOutput(),
+            'stderr' => $process->getErrorOutput(),
+        ];
     }
 
     private function applyTemporaryComposerChanges(string $tempPath, UpgradeRequest $request, Scenario $scenario): void

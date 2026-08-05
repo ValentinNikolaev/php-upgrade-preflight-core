@@ -33,7 +33,7 @@ final class JsonSnapshotNormalizerTest extends TestCase
             'metadata' => (object) [],
         ], JSON_THROW_ON_ERROR);
 
-        self::assertSame(<<<'JSON'
+        $expected = <<<'JSON'
 {
     "request_summary": {
         "project_path": "<PROJECT_PATH>"
@@ -57,8 +57,12 @@ final class JsonSnapshotNormalizerTest extends TestCase
     "class_name": "App\\Http\\Kernel",
     "metadata": {}
 }
-JSON
-            . "\n", JsonSnapshotNormalizer::normalize($json, $projectPath));
+JSON;
+
+        self::assertSame(
+            str_replace(["\r\n", "\r"], "\n", $expected) . "\n",
+            JsonSnapshotNormalizer::normalize($json, $projectPath)
+        );
     }
 
     public function testItNormalizesExplicitTemporaryDirectoriesThatAreOnlyPresentInDiagnostics(): void
