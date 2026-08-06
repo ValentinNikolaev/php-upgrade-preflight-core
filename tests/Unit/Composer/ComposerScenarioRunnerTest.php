@@ -74,6 +74,14 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertSame(hash('sha256', $lockContents), $result->candidateLockEvidence()->sha256());
         self::assertSame('fixture-content-hash', $result->candidateLockEvidence()->contentHash());
         self::assertSame(2, $result->candidateLockEvidence()->packageCount());
+        $lock = $result->lock();
+        self::assertNotNull($lock);
+        $directPackage = $lock->package('fixture/dependency');
+        $transitivePackage = $lock->package('fixture/dev-dependency');
+        self::assertNotNull($directPackage);
+        self::assertNotNull($transitivePackage);
+        self::assertTrue($directPackage->isDirect());
+        self::assertFalse($transitivePackage->isDirect());
     }
 
     public function testBaselineValidationUsesTheUnchangedManifestAndValidationCommand(): void
@@ -155,17 +163,26 @@ final class ComposerScenarioRunnerTest extends TestCase
         $captured = null;
         $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory) use (&$captured): array {
             $captured = json_decode((string) file_get_contents($directory . DIRECTORY_SEPARATOR . 'composer.json'), true, 512, JSON_THROW_ON_ERROR);
+            file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
+                'packages' => [],
+                'packages-dev' => [['name' => 'phpunit/phpunit', 'version' => '10.5.0']],
+            ], JSON_THROW_ON_ERROR));
 
-            return ['exit_code' => 1, 'stdout' => '', 'stderr' => 'Synthetic operational stop.'];
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
         });
         $projectPath = dirname(__DIR__, 5);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('phpunit/phpunit', '^10.0')]);
 
-        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
+        $result = $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
 
         self::assertIsArray($captured);
         self::assertSame('^10.0', $captured['require-dev']['phpunit/phpunit']);
         self::assertArrayNotHasKey('phpunit/phpunit', $captured['require']);
+        $lock = $result->lock();
+        self::assertNotNull($lock);
+        $package = $lock->package('phpunit/phpunit');
+        self::assertNotNull($package);
+        self::assertTrue($package->isDirect());
     }
 
     public function testItRebasesRelativePathRepositoriesAgainstTheOriginalProject(): void

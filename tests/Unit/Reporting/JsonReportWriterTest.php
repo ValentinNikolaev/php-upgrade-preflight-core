@@ -32,7 +32,7 @@ final class JsonReportWriterTest extends TestCase
 
         self::assertStringEndsWith("\n", $json);
         $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('0.3', $decoded['metadata']['schema_version']);
+        self::assertSame('0.4', $decoded['metadata']['schema_version']);
         self::assertSame('php-upgrade-preflight', $decoded['metadata']['tool']['name']);
         self::assertSame('0.1.0', $decoded['metadata']['tool']['version']);
         self::assertSame('evidence-1', $decoded['evidence'][0]['id']);

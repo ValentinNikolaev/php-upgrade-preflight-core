@@ -15,6 +15,7 @@ final class PackageChange
     private ?string $toSourceReference;
     private ?string $fromDistReference;
     private ?string $toDistReference;
+    private bool $direct;
 
     public function __construct(
         string $name,
@@ -25,7 +26,8 @@ final class PackageChange
         ?string $fromSourceReference = null,
         ?string $toSourceReference = null,
         ?string $fromDistReference = null,
-        ?string $toDistReference = null
+        ?string $toDistReference = null,
+        bool $direct = false
     ) {
         $this->name = $name;
         $this->changeType = $changeType;
@@ -36,6 +38,7 @@ final class PackageChange
         $this->toSourceReference = $toSourceReference;
         $this->fromDistReference = $fromDistReference;
         $this->toDistReference = $toDistReference;
+        $this->direct = $direct;
     }
 
     public function name(): string
@@ -61,6 +64,11 @@ final class PackageChange
     public function isMajorChange(): bool
     {
         return $this->majorChange;
+    }
+
+    public function isDirect(): bool
+    {
+        return $this->direct;
     }
 
     public function fromSourceReference(): ?string
@@ -93,7 +101,7 @@ final class PackageChange
         return $this->fromDistReference !== $this->toDistReference;
     }
 
-    /** @return array{name: string, change_type: string, from_version: ?string, to_version: ?string, major_change: bool, from_source_reference: ?string, to_source_reference: ?string, from_dist_reference: ?string, to_dist_reference: ?string} */
+    /** @return array{name: string, change_type: string, from_version: ?string, to_version: ?string, direct: bool, major_change: bool, from_source_reference: ?string, to_source_reference: ?string, from_dist_reference: ?string, to_dist_reference: ?string} */
     public function toArray(): array
     {
         return [
@@ -101,6 +109,7 @@ final class PackageChange
             'change_type' => $this->changeType,
             'from_version' => $this->fromVersion,
             'to_version' => $this->toVersion,
+            'direct' => $this->direct,
             'major_change' => $this->majorChange,
             'from_source_reference' => $this->fromSourceReference,
             'to_source_reference' => $this->toSourceReference,

@@ -40,7 +40,7 @@ final class LockDiffBuilderTest extends TestCase
                 'source' => ['reference' => 'source-before'],
                 'dist' => ['reference' => 'dist-stable'],
             ],
-        ]);
+        ], ['vendor/alpha', 'vendor/removed']);
         $after = $this->lock([
             [
                 'name' => 'vendor/new',
@@ -74,7 +74,7 @@ final class LockDiffBuilderTest extends TestCase
                 'source' => ['reference' => 'source-after'],
                 'dist' => ['reference' => 'dist-stable'],
             ],
-        ]);
+        ], ['vendor/alpha', 'vendor/new']);
 
         $changes = (new LockDiffBuilder())->build($before, $after)->toArray()['package_changes'];
 
@@ -84,6 +84,7 @@ final class LockDiffBuilderTest extends TestCase
                 'change_type' => 'upgraded',
                 'from_version' => 'v1.9.0',
                 'to_version' => 'v2.0.0',
+                'direct' => true,
                 'major_change' => true,
                 'from_source_reference' => 'alpha-source-before',
                 'to_source_reference' => 'alpha-source-after',
@@ -95,6 +96,7 @@ final class LockDiffBuilderTest extends TestCase
                 'change_type' => 'downgraded',
                 'from_version' => '2.4.0',
                 'to_version' => '1.8.0',
+                'direct' => false,
                 'major_change' => true,
                 'from_source_reference' => null,
                 'to_source_reference' => null,
@@ -106,6 +108,7 @@ final class LockDiffBuilderTest extends TestCase
                 'change_type' => 'changed',
                 'from_version' => '1.0.0',
                 'to_version' => '1.0.0',
+                'direct' => false,
                 'major_change' => false,
                 'from_source_reference' => 'source-stable',
                 'to_source_reference' => 'source-stable',
@@ -117,6 +120,7 @@ final class LockDiffBuilderTest extends TestCase
                 'change_type' => 'added',
                 'from_version' => null,
                 'to_version' => '1.0.0',
+                'direct' => true,
                 'major_change' => false,
                 'from_source_reference' => null,
                 'to_source_reference' => 'new-source',
@@ -128,6 +132,7 @@ final class LockDiffBuilderTest extends TestCase
                 'change_type' => 'changed',
                 'from_version' => '1.0.0',
                 'to_version' => '1.0.0',
+                'direct' => false,
                 'major_change' => false,
                 'from_source_reference' => null,
                 'to_source_reference' => 'added-source-ref',
@@ -139,6 +144,7 @@ final class LockDiffBuilderTest extends TestCase
                 'change_type' => 'removed',
                 'from_version' => '3.0.0',
                 'to_version' => null,
+                'direct' => true,
                 'major_change' => false,
                 'from_source_reference' => 'removed-source',
                 'to_source_reference' => null,
@@ -150,6 +156,7 @@ final class LockDiffBuilderTest extends TestCase
                 'change_type' => 'changed',
                 'from_version' => 'dev-main',
                 'to_version' => 'dev-main',
+                'direct' => false,
                 'major_change' => false,
                 'from_source_reference' => 'source-before',
                 'to_source_reference' => 'source-after',
@@ -173,9 +180,23 @@ final class LockDiffBuilderTest extends TestCase
         self::assertSame([], (new LockDiffBuilder())->build($before, $after)->packageChanges());
     }
 
-    /** @param list<array<string, mixed>> $packages */
-    private function lock(array $packages): ComposerLock
+    public function testItDoesNotClaimAMajorJumpWhenEitherVersionHasNoNumericMajor(): void
     {
-        return new ComposerLock(['packages' => $packages, 'packages-dev' => []]);
+        $before = $this->lock([['name' => 'vendor/package', 'version' => 'dev-main']]);
+        $after = $this->lock([['name' => 'vendor/package', 'version' => '2.0.0']]);
+
+        $changes = (new LockDiffBuilder())->build($before, $after)->packageChanges();
+
+        self::assertCount(1, $changes);
+        self::assertFalse($changes[0]->isMajorChange());
+    }
+
+    /**
+     * @param list<array<string, mixed>> $packages
+     * @param list<string> $directPackageNames
+     */
+    private function lock(array $packages, array $directPackageNames = []): ComposerLock
+    {
+        return new ComposerLock(['packages' => $packages, 'packages-dev' => []], $directPackageNames);
     }
 }

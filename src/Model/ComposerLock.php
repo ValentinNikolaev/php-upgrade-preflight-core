@@ -11,11 +11,14 @@ final class ComposerLock
     /** @var array<string, PackageRef> */
     private array $packages;
 
-    /** @param array<string, mixed> $data */
-    public function __construct(array $data)
+    /**
+     * @param array<string, mixed> $data
+     * @param list<string> $directPackageNames
+     */
+    public function __construct(array $data, array $directPackageNames = [])
     {
         $this->data = $data;
-        $this->packages = $this->indexPackages($data);
+        $this->packages = $this->indexPackages($data, $directPackageNames);
     }
 
     /** @return array<string, mixed> */
@@ -35,9 +38,18 @@ final class ComposerLock
         return $this->packages[strtolower($name)] ?? null;
     }
 
-    /** @param array<string, mixed> $data @return array<string, PackageRef> */
-    private function indexPackages(array $data): array
+    /**
+     * @param array<string, mixed> $data
+     * @param list<string> $directPackageNames
+     * @return array<string, PackageRef>
+     */
+    private function indexPackages(array $data, array $directPackageNames): array
     {
+        $directPackages = [];
+        foreach ($directPackageNames as $name) {
+            $directPackages[strtolower($name)] = true;
+        }
+
         $indexed = [];
         foreach (['packages', 'packages-dev'] as $section) {
             $packages = $data[$section] ?? [];
@@ -54,7 +66,7 @@ final class ComposerLock
                 $indexed[$name] = new PackageRef(
                     $name,
                     (string) $package['version'],
-                    false,
+                    isset($directPackages[$name]),
                     $this->packageReference($package, 'source'),
                     $this->packageReference($package, 'dist')
                 );

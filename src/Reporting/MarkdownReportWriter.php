@@ -92,7 +92,17 @@ final class MarkdownReportWriter
             $lines[] = '- No lockfile changes detected.';
         } else {
             foreach ($report->lockDiff()->packageChanges() as $change) {
-                $lines[] = sprintf('- `%s`: %s `%s` -> `%s`', $change->name(), $change->changeType(), $change->fromVersion() ?? '-', $change->toVersion() ?? '-');
+                $classification = $change->isDirect() ? 'direct' : 'transitive';
+                $majorChange = $change->isMajorChange() ? '; major-version jump' : '';
+                $lines[] = sprintf(
+                    '- `%s`: %s `%s` -> `%s` (%s dependency%s)',
+                    $change->name(),
+                    $change->changeType(),
+                    $change->fromVersion() ?? '-',
+                    $change->toVersion() ?? '-',
+                    $classification,
+                    $majorChange
+                );
                 if ($change->hasSourceReferenceChange()) {
                     $lines[] = sprintf('  - source reference: `%s` -> `%s`', $change->fromSourceReference() ?? '-', $change->toSourceReference() ?? '-');
                 }

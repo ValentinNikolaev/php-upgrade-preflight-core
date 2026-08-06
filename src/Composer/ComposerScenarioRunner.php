@@ -9,6 +9,7 @@ use PhpUpgradePreflight\Core\Filesystem\TemporaryWorkspaceManager;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceCleanupException;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceManager;
 use PhpUpgradePreflight\Core\Model\CandidateLockEvidence;
+use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ProjectState;
@@ -98,7 +99,8 @@ final class ComposerScenarioRunner
             $lockPath = $tempPath . DIRECTORY_SEPARATOR . 'composer.lock';
             $phase = 'lockfile';
             if ($process['exit_code'] === 0 && is_file($lockPath)) {
-                $lock = new ComposerLock($this->reader->read($lockPath));
+                $manifest = new ComposerJson($this->reader->read($tempPath . DIRECTORY_SEPARATOR . 'composer.json'));
+                $lock = new ComposerLock($this->reader->read($lockPath), array_keys($manifest->rootRequirements()));
                 $candidateLockEvidence = CandidateLockEvidence::fromFile($lockPath, $lock);
             }
 

@@ -74,17 +74,21 @@ final class MarkdownReportWriterTest extends TestCase
                     250
                 ),
             ],
-            new LockDiff([new PackageChange(
-                'vendor/package',
-                'changed',
-                'dev-main',
-                'dev-main',
-                false,
-                'source-before',
-                'source-after',
-                'dist-before',
-                'dist-after'
-            )]),
+            new LockDiff([
+                new PackageChange(
+                    'vendor/package',
+                    'upgraded',
+                    '1.0.0',
+                    '2.0.0',
+                    true,
+                    'source-before',
+                    'source-after',
+                    'dist-before',
+                    'dist-after',
+                    true
+                ),
+                new PackageChange('vendor/transitive', 'added', null, '1.0.0'),
+            ]),
             [],
             [new SourceUsage('src/Example.php', 'Vendor\\Package\\Client', 'static_call', ['source-1'], 12)],
             [],
@@ -116,6 +120,8 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('fixture/blocker 1.0.0 requires fixture/dependency (^1.0)', $markdown);
         self::assertStringContainsString('candidate lock: SHA-256', $markdown);
         self::assertStringContainsString('content hash `candidate-content`, packages `0`', $markdown);
+        self::assertStringContainsString('(direct dependency; major-version jump)', $markdown);
+        self::assertStringContainsString('`vendor/transitive`: added `-` -> `1.0.0` (transitive dependency)', $markdown);
         self::assertStringContainsString('source reference: `source-before` -> `source-after`', $markdown);
         self::assertStringContainsString('dist reference: `dist-before` -> `dist-after`', $markdown);
         self::assertStringContainsString('## Source Impact', $markdown);

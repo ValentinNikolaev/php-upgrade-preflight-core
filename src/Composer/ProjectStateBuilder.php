@@ -52,8 +52,14 @@ final class ProjectStateBuilder
             );
         }
 
+        $manifest = new ComposerJson($composerJson);
+
         return new ProjectStateLoadResult(
-            new ProjectState($projectPath, new ComposerJson($composerJson), new ComposerLock($composerLock))
+            new ProjectState(
+                $projectPath,
+                $manifest,
+                new ComposerLock($composerLock, array_keys($manifest->rootRequirements()))
+            )
         );
     }
 }

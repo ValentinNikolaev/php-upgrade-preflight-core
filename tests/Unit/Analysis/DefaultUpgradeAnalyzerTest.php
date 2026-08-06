@@ -44,7 +44,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
             self::assertTrue($report->scenarios()[0]->isOperationalFailure());
             self::assertStringContainsString('Invalid JSON', $report->scenarios()[0]->stderr());
             self::assertSame([], $report->planStages());
-            self::assertSame('0.3', $report->metadata()->schemaVersion());
+            self::assertSame('0.4', $report->metadata()->schemaVersion());
         } finally {
             (new Filesystem())->remove($projectPath);
         }
@@ -268,12 +268,15 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
             $version = in_array('--minimal-changes', $command, true) ? '2.0.0' : '3.0.0';
             file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
-                'packages' => [[
-                    'name' => 'fixture/dependency',
-                    'version' => $version,
-                    'source' => ['reference' => 'source-' . $version],
-                    'dist' => ['reference' => 'dist-' . $version],
-                ]],
+                'packages' => [
+                    [
+                        'name' => 'fixture/dependency',
+                        'version' => $version,
+                        'source' => ['reference' => 'source-' . $version],
+                        'dist' => ['reference' => 'dist-' . $version],
+                    ],
+                    ['name' => 'fixture/transitive', 'version' => '1.0.0'],
+                ],
                 'packages-dev' => [],
             ], JSON_THROW_ON_ERROR));
 
@@ -287,16 +290,23 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('feasible_with_changes', $report->resolutionStatus());
         self::assertSame([], $report->blockers());
         self::assertSame('low', $report->risk()->level());
-        self::assertCount(1, $report->lockDiff()->packageChanges());
+        self::assertCount(2, $report->lockDiff()->packageChanges());
         self::assertSame('2.0.0', $report->lockDiff()->packageChanges()[0]->toVersion());
+        self::assertTrue($report->lockDiff()->packageChanges()[0]->isDirect());
+        self::assertTrue($report->lockDiff()->packageChanges()[0]->isMajorChange());
         self::assertSame('source-2.0.0', $report->lockDiff()->packageChanges()[0]->toSourceReference());
         self::assertSame('dist-2.0.0', $report->lockDiff()->packageChanges()[0]->toDistReference());
+        self::assertSame('fixture/transitive', $report->lockDiff()->packageChanges()[1]->name());
+        self::assertFalse($report->lockDiff()->packageChanges()[1]->isDirect());
+        self::assertFalse($report->lockDiff()->packageChanges()[1]->isMajorChange());
 
         /** @var array<string, mixed> $json */
         $json = json_decode((new JsonReportWriter())->render($report), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('0.3', $json['metadata']['schema_version']);
+        self::assertSame('0.4', $json['metadata']['schema_version']);
+        self::assertTrue($json['transition']['package_changes'][0]['direct']);
         self::assertSame('source-2.0.0', $json['transition']['package_changes'][0]['to_source_reference']);
         self::assertSame('dist-2.0.0', $json['transition']['package_changes'][0]['to_dist_reference']);
+        self::assertFalse($json['transition']['package_changes'][1]['direct']);
     }
 
     public function testOperationalFailuresProduceUnknownResolutionAndUncertainties(): void

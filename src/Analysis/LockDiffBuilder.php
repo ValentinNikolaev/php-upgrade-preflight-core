@@ -33,7 +33,8 @@ final class LockDiffBuilder
                     null,
                     $to->sourceReference(),
                     null,
-                    $to->distReference()
+                    $to->distReference(),
+                    $to->isDirect()
                 );
                 continue;
             }
@@ -48,7 +49,8 @@ final class LockDiffBuilder
                     $from->sourceReference(),
                     null,
                     $from->distReference(),
-                    null
+                    null,
+                    $from->isDirect()
                 );
                 continue;
             }
@@ -61,11 +63,12 @@ final class LockDiffBuilder
                         : $this->compareVersions($from->version(), $to->version()),
                     $from->version(),
                     $to->version(),
-                    $this->majorVersion($from->version()) !== $this->majorVersion($to->version()),
+                    $this->isMajorVersionChange($from->version(), $to->version()),
                     $from->sourceReference(),
                     $to->sourceReference(),
                     $from->distReference(),
-                    $to->distReference()
+                    $to->distReference(),
+                    $to->isDirect()
                 );
             }
         }
@@ -103,5 +106,13 @@ final class LockDiffBuilder
         }
 
         return (int) $matches[1];
+    }
+
+    private function isMajorVersionChange(string $from, string $to): bool
+    {
+        $fromMajor = $this->majorVersion($from);
+        $toMajor = $this->majorVersion($to);
+
+        return $fromMajor !== null && $toMajor !== null && $fromMajor !== $toMajor;
     }
 }
