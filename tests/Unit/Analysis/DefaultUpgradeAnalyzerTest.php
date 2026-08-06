@@ -6,6 +6,13 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Analysis;
 
 use PhpUpgradePreflight\Core\Analysis\DefaultUpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
+use PhpUpgradePreflight\Core\Framework\CompatibilityRule;
+use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
+use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
+use PhpUpgradePreflight\Core\Model\Evidence;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PHPUnit\Framework\TestCase;
@@ -99,5 +106,67 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         $this->expectExceptionMessage('missing-framework');
 
         (new DefaultUpgradeAnalyzer())->analyzeUpgrade($request);
+    }
+
+    public function testDetectedFrameworkFindingAndEvidenceReachTheAssembledReport(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (): array {
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+        $framework = new AnalyzerFixtureFrameworkIntegration();
+
+        $report = (new DefaultUpgradeAnalyzer([$framework], null, $runner))->analyzeUpgrade($request);
+
+        self::assertSame(1, $framework->detectionCount);
+        self::assertCount(1, $report->frameworkFindings);
+        self::assertSame('Detected framework requires review.', $report->frameworkFindings[0]->summary);
+        self::assertSame(['framework-1'], $report->frameworkFindings[0]->evidence);
+        self::assertCount(1, $report->evidence);
+        self::assertSame('framework-1', $report->evidence[0]->id);
+        self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence[0]->class);
+        self::assertSame(['framework-1'], $report->toArray()['framework_findings'][0]['evidence']);
+    }
+}
+
+final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration
+{
+    public int $detectionCount = 0;
+
+    public function name(): string
+    {
+        return 'fixture';
+    }
+
+    public function detect(ProjectState $project): FrameworkDetection
+    {
+        ++$this->detectionCount;
+
+        return new FrameworkDetection($this->name(), true, '1.0.0');
+    }
+
+    public function rules(): iterable
+    {
+        yield new AnalyzerFixtureCompatibilityRule();
+    }
+
+    public function defaultSourcePaths(ProjectState $project): array
+    {
+        return ['src'];
+    }
+}
+
+final class AnalyzerFixtureCompatibilityRule implements CompatibilityRule
+{
+    public function evaluate(ProjectState $project, UpgradeRequest $request, EvidenceLedger $evidence): CompatibilityFinding
+    {
+        $evidenceId = $evidence->add(
+            'framework',
+            Evidence::E2_PACKAGE_METADATA,
+            'Detected fixture framework metadata.'
+        )->id;
+
+        return new CompatibilityFinding('fixture', 'medium', 'Detected framework requires review.', [$evidenceId]);
     }
 }
