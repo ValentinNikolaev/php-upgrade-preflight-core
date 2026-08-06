@@ -7,12 +7,18 @@ namespace PhpUpgradePreflight\Core\Model;
 final class ComposerJson
 {
     /** @var array<string, mixed> */
-    public array $data;
+    private array $data;
 
     /** @param array<string, mixed> $data */
     public function __construct(array $data)
     {
         $this->data = $data;
+    }
+
+    /** @return array<string, mixed> */
+    public function data(): array
+    {
+        return $this->data;
     }
 
     /** @return array<string, string> */
@@ -32,7 +38,7 @@ final class ComposerJson
     }
 
     /** @param mixed $value @return array<string, string> */
-    private function stringMap($value): array
+    private function stringMap(mixed $value): array
     {
         if (!is_array($value)) {
             return [];

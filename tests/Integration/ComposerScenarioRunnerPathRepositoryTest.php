@@ -25,10 +25,10 @@ final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
         $project = (new ProjectStateBuilder())->build($projectPath);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^1.0')]);
 
-        $result = (new ComposerScenarioRunner())->run($project, $request, new Scenario('path-repository', $request->targets, false));
+        $result = (new ComposerScenarioRunner())->run($project, $request, new Scenario('path-repository', $request->targets(), false));
 
-        self::assertTrue($result->succeeded(), $result->stderr);
-        self::assertNull($result->failureType);
+        self::assertTrue($result->succeeded(), $result->stderr());
+        self::assertNull($result->failureType());
         $snapshot->assertUnchanged($this);
     }
 

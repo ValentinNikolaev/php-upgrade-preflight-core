@@ -41,8 +41,8 @@ final class ComposerScenarioRunner
         $tempPath = null;
 
         try {
-            $tempPath = $this->workspaces->createFromProject($project->path);
-            $this->applyTemporaryComposerChanges($tempPath, $project->path, $scenario);
+            $tempPath = $this->workspaces->createFromProject($project->path());
+            $this->applyTemporaryComposerChanges($tempPath, $project->path(), $scenario);
             $command = $this->buildCommand($scenario);
             $process = ($this->processRunner)($command, $tempPath);
 
@@ -67,7 +67,7 @@ final class ComposerScenarioRunner
                 $process['stdout'],
                 $process['stderr'],
                 $lock,
-                $request->debug ? $tempPath : null,
+                $request->debug() ? $tempPath : null,
                 $failureType
             );
         } catch (\Throwable $exception) {
@@ -77,20 +77,20 @@ final class ComposerScenarioRunner
                 '',
                 $exception->getMessage(),
                 null,
-                $request->debug ? $tempPath : null,
+                $request->debug() ? $tempPath : null,
                 ScenarioResult::FAILURE_OPERATIONAL
             );
         }
 
-        if (!$request->debug && $tempPath !== null) {
+        if (!$request->debug() && $tempPath !== null) {
             try {
                 $this->workspaces->remove($tempPath);
             } catch (\Throwable $exception) {
                 return new ScenarioResult(
                     $scenario,
                     1,
-                    $result->stdout,
-                    trim($result->stderr . PHP_EOL . sprintf('Temporary workspace cleanup failed: %s', $exception->getMessage())),
+                    $result->stdout(),
+                    trim($result->stderr() . PHP_EOL . sprintf('Temporary workspace cleanup failed: %s', $exception->getMessage())),
                     null,
                     $tempPath,
                     ScenarioResult::FAILURE_OPERATIONAL
@@ -106,15 +106,15 @@ final class ComposerScenarioRunner
     {
         $command = ['composer', 'update'];
 
-        foreach ($scenario->targets->packageTargets() as $target) {
-            $command[] = $target->package;
+        foreach ($scenario->targets()->packageTargets() as $target) {
+            $command[] = $target->package();
         }
 
-        if ($scenario->withAllDependencies) {
+        if ($scenario->withAllDependencies()) {
             $command[] = '--with-all-dependencies';
         }
 
-        if ($scenario->minimalChanges) {
+        if ($scenario->minimalChanges()) {
             $command[] = '--minimal-changes';
         }
 
@@ -149,10 +149,10 @@ final class ComposerScenarioRunner
 
         $data = $this->absolutePathRepositories($data, $projectPath);
 
-        foreach ($scenario->targets->packageTargets() as $target) {
-            if (isset($data['require-dev']) && is_array($data['require-dev']) && array_key_exists($target->package, $data['require-dev'])
-                && (!isset($data['require']) || !is_array($data['require']) || !array_key_exists($target->package, $data['require']))) {
-                $data['require-dev'][$target->package] = $target->constraint;
+        foreach ($scenario->targets()->packageTargets() as $target) {
+            if (isset($data['require-dev']) && is_array($data['require-dev']) && array_key_exists($target->package(), $data['require-dev'])
+                && (!isset($data['require']) || !is_array($data['require']) || !array_key_exists($target->package(), $data['require']))) {
+                $data['require-dev'][$target->package()] = $target->constraint();
                 continue;
             }
 
@@ -160,11 +160,11 @@ final class ComposerScenarioRunner
                 $data['require'] = [];
             }
 
-            $data['require'][$target->package] = $target->constraint;
+            $data['require'][$target->package()] = $target->constraint();
         }
 
-        if ($scenario->targets->targetPhp() !== null) {
-            $data['config']['platform']['php'] = $scenario->targets->targetPhp();
+        if ($scenario->targets()->targetPhp() !== null) {
+            $data['config']['platform']['php'] = $scenario->targets()->targetPhp();
         }
 
         $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;

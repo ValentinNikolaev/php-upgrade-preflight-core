@@ -88,8 +88,8 @@ PHP);
         try {
             $project = (new ProjectStateBuilder())->build($projectPath);
             $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
-            $symbols = array_map(static fn ($usage): string => $usage->symbol, $usages);
-            $usagePairs = array_map(static fn ($usage): array => [$usage->symbol, $usage->usageType], $usages);
+            $symbols = array_map(static fn ($usage): string => $usage->symbol(), $usages);
+            $usagePairs = array_map(static fn ($usage): array => [$usage->symbol(), $usage->usageType()], $usages);
 
             self::assertContains('Vendor\\Package\\Client', $symbols);
             self::assertContains('Vendor\\Package\\BaseClass', $symbols);
@@ -109,7 +109,7 @@ PHP);
             self::assertContains(['Vendor\\Package\\helper', 'function_call'], $usagePairs);
             self::assertSame([], $uncertainties);
             self::assertNotEmpty($evidence->all());
-            self::assertContainsOnly('int', array_map(static fn ($usage): ?int => $usage->line, $usages));
+            self::assertContainsOnly('int', array_map(static fn ($usage): ?int => $usage->line(), $usages));
         } finally {
             (new Filesystem())->remove($projectPath);
         }
@@ -127,7 +127,7 @@ PHP);
 
             self::assertSame([], $usages);
             self::assertCount(1, $evidence->all());
-            self::assertSame('source-1', $evidence->all()[0]->id);
+            self::assertSame('source-1', $evidence->all()[0]->id());
             self::assertStringContainsString('could not be parsed', $uncertainties[0]);
             self::assertStringContainsString('source-1', $uncertainties[0]);
         } finally {

@@ -6,17 +6,17 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class UpgradeRequest
 {
-    public string $projectPath;
-    public UpgradeTargetSet $targets;
-    public ?string $fromPhp;
-    public ?string $targetPhp;
+    private string $projectPath;
+    private UpgradeTargetSet $targets;
+    private ?string $fromPhp;
+    private ?string $targetPhp;
     /** @var list<string> */
-    public array $sourcePaths;
+    private array $sourcePaths;
     /** @var list<string> */
-    public array $frameworks;
-    public string $format;
-    public ?string $outputPath;
-    public bool $debug;
+    private array $frameworks;
+    private string $format;
+    private ?string $outputPath;
+    private bool $debug;
 
     /**
      * @param list<UpgradeTarget> $targets
@@ -51,6 +51,54 @@ final class UpgradeRequest
         $this->debug = $debug;
     }
 
+    public function projectPath(): string
+    {
+        return $this->projectPath;
+    }
+
+    public function targets(): UpgradeTargetSet
+    {
+        return $this->targets;
+    }
+
+    public function fromPhp(): ?string
+    {
+        return $this->fromPhp;
+    }
+
+    public function targetPhp(): ?string
+    {
+        return $this->targetPhp;
+    }
+
+    /** @return list<string> */
+    public function sourcePaths(): array
+    {
+        return $this->sourcePaths;
+    }
+
+    /** @return list<string> */
+    public function frameworks(): array
+    {
+        return $this->frameworks;
+    }
+
+    public function format(): string
+    {
+        return $this->format;
+    }
+
+    public function outputPath(): ?string
+    {
+        return $this->outputPath;
+    }
+
+    public function debug(): bool
+    {
+        return $this->debug;
+    }
+
+    /** @return array{project_path: string, targets: list<array{package: string, constraint: string}>, from_php: ?string, target_php: ?string, source_paths: list<string>, frameworks: list<string>, format: string, output_path: ?string} */
     public function toArray(): array
     {
         return [

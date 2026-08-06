@@ -6,11 +6,11 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class PackageChange
 {
-    public string $name;
-    public string $changeType;
-    public ?string $fromVersion;
-    public ?string $toVersion;
-    public bool $majorChange;
+    private string $name;
+    private string $changeType;
+    private ?string $fromVersion;
+    private ?string $toVersion;
+    private bool $majorChange;
 
     public function __construct(string $name, string $changeType, ?string $fromVersion, ?string $toVersion, bool $majorChange = false)
     {
@@ -21,6 +21,32 @@ final class PackageChange
         $this->majorChange = $majorChange;
     }
 
+    public function name(): string
+    {
+        return $this->name;
+    }
+
+    public function changeType(): string
+    {
+        return $this->changeType;
+    }
+
+    public function fromVersion(): ?string
+    {
+        return $this->fromVersion;
+    }
+
+    public function toVersion(): ?string
+    {
+        return $this->toVersion;
+    }
+
+    public function isMajorChange(): bool
+    {
+        return $this->majorChange;
+    }
+
+    /** @return array{name: string, change_type: string, from_version: ?string, to_version: ?string, major_change: bool} */
     public function toArray(): array
     {
         return [

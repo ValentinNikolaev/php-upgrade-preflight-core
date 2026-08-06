@@ -6,12 +6,12 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class SourceUsage
 {
-    public string $file;
-    public string $symbol;
-    public string $usageType;
-    public ?int $line;
+    private string $file;
+    private string $symbol;
+    private string $usageType;
+    private ?int $line;
     /** @var list<string> */
-    public array $evidence;
+    private array $evidence;
 
     /** @param list<string> $evidence */
     public function __construct(string $file, string $symbol, string $usageType, array $evidence, ?int $line = null)
@@ -23,6 +23,33 @@ final class SourceUsage
         $this->evidence = array_values($evidence);
     }
 
+    public function file(): string
+    {
+        return $this->file;
+    }
+
+    public function symbol(): string
+    {
+        return $this->symbol;
+    }
+
+    public function usageType(): string
+    {
+        return $this->usageType;
+    }
+
+    public function line(): ?int
+    {
+        return $this->line;
+    }
+
+    /** @return list<string> */
+    public function evidence(): array
+    {
+        return $this->evidence;
+    }
+
+    /** @return array{file: string, symbol: string, usage_type: string, line: ?int, evidence: list<string>} */
     public function toArray(): array
     {
         return [

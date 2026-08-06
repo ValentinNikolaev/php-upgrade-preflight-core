@@ -52,8 +52,8 @@ final class DefaultUpgradeAnalyzerIsolationTest extends TestCase
         $report = $analyzer->analyzeUpgrade($request);
 
         $snapshot->assertUnchanged($this);
-        self::assertCount(3, $report->scenarios);
-        self::assertCount(1, $report->lockDiff->packageChanges);
+        self::assertCount(3, $report->scenarios());
+        self::assertCount(1, $report->lockDiff()->packageChanges());
         self::assertCount(3, $workingDirectories);
         self::assertCount(3, array_unique($workingDirectories));
 

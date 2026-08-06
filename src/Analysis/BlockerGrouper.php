@@ -30,11 +30,11 @@ final class BlockerGrouper
                 continue;
             }
 
-            $output = trim($result->stdout . "\n" . $result->stderr);
-            $evidenceId = $evidence->add('solver', Evidence::E1_SOLVER, sprintf('Composer scenario "%s" failed.', $result->scenario->name), 'high', [
-                'exit_code' => $result->exitCode,
+            $output = trim($result->stdout() . "\n" . $result->stderr());
+            $evidenceId = $evidence->add('solver', Evidence::E1_SOLVER, sprintf('Composer scenario "%s" failed.', $result->scenario()->name()), 'high', [
+                'exit_code' => $result->exitCode(),
                 'output_excerpt' => substr($output, 0, 2000),
-            ])->id;
+            ])->id();
 
             $blockers[] = $this->fromOutput($output, $evidenceId);
         }

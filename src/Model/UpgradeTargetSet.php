@@ -24,8 +24,8 @@ final class UpgradeTargetSet implements \Countable, \IteratorAggregate
                 throw new \InvalidArgumentException(sprintf('Upgrade target at index %d must be an UpgradeTarget.', $index));
             }
 
-            $package = strtolower(trim($target->package));
-            $constraint = trim($target->constraint);
+            $package = strtolower(trim($target->package()));
+            $constraint = trim($target->constraint());
 
             $this->validatePackage($package);
 
@@ -37,11 +37,11 @@ final class UpgradeTargetSet implements \Countable, \IteratorAggregate
             $this->validateConstraint($package, $constraint);
 
             if (isset($normalized[$package])) {
-                if ($normalized[$package]->constraint !== $constraint) {
+                if ($normalized[$package]->constraint() !== $constraint) {
                     throw new \InvalidArgumentException(sprintf(
                         'Conflicting constraints for target "%s": "%s" and "%s".',
                         $package,
-                        $normalized[$package]->constraint,
+                        $normalized[$package]->constraint(),
                         $constraint
                     ));
                 }
@@ -131,7 +131,7 @@ final class UpgradeTargetSet implements \Countable, \IteratorAggregate
     private function copyTargets(): array
     {
         return array_map(
-            static fn (UpgradeTarget $target): UpgradeTarget => new UpgradeTarget($target->package, $target->constraint),
+            static fn (UpgradeTarget $target): UpgradeTarget => new UpgradeTarget($target->package(), $target->constraint()),
             $this->targets
         );
     }

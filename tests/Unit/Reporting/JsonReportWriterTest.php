@@ -55,7 +55,7 @@ final class JsonReportWriterTest extends TestCase
             new LockDiff([]),
             [],
             array_map(
-                static fn (Evidence $item): SourceUsage => new SourceUsage('src/Example.php', 'Fixture\\Example', 'class_reference', [$item->id]),
+                static fn (Evidence $item): SourceUsage => new SourceUsage('src/Example.php', 'Fixture\\Example', 'class_reference', [$item->id()]),
                 $evidence
             ),
             [],

@@ -7,7 +7,7 @@ namespace PhpUpgradePreflight\Core\Model;
 final class ComposerLock
 {
     /** @var array<string, mixed> */
-    public array $data;
+    private array $data;
     /** @var array<string, PackageRef> */
     private array $packages;
 
@@ -16,6 +16,12 @@ final class ComposerLock
     {
         $this->data = $data;
         $this->packages = $this->indexPackages($data);
+    }
+
+    /** @return array<string, mixed> */
+    public function data(): array
+    {
+        return $this->data;
     }
 
     /** @return array<string, PackageRef> */

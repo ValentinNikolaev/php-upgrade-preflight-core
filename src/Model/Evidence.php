@@ -12,12 +12,12 @@ final class Evidence
     public const E4_MAINTAINER_DOCUMENTATION = 'E4';
     public const E5_HEURISTIC = 'E5';
 
-    public string $id;
-    public string $class;
-    public string $summary;
-    public string $confidence;
+    private string $id;
+    private string $class;
+    private string $summary;
+    private string $confidence;
     /** @var array<string, mixed> */
-    public array $context;
+    private array $context;
 
     /** @param array<string, mixed> $context */
     public function __construct(string $id, string $class, string $summary, string $confidence = 'high', array $context = [])
@@ -29,6 +29,33 @@ final class Evidence
         $this->context = $context;
     }
 
+    public function id(): string
+    {
+        return $this->id;
+    }
+
+    public function evidenceClass(): string
+    {
+        return $this->class;
+    }
+
+    public function summary(): string
+    {
+        return $this->summary;
+    }
+
+    public function confidence(): string
+    {
+        return $this->confidence;
+    }
+
+    /** @return array<string, mixed> */
+    public function context(): array
+    {
+        return $this->context;
+    }
+
+    /** @return array{id: string, class: string, summary: string, confidence: string, context: array<string, mixed>} */
     public function toArray(): array
     {
         return [

@@ -9,13 +9,13 @@ final class ScenarioResult
     public const FAILURE_SOLVER = 'solver';
     public const FAILURE_OPERATIONAL = 'operational';
 
-    public Scenario $scenario;
-    public int $exitCode;
-    public string $stdout;
-    public string $stderr;
-    public ?ComposerLock $lock;
-    public ?string $tempPath;
-    public ?string $failureType;
+    private Scenario $scenario;
+    private int $exitCode;
+    private string $stdout;
+    private string $stderr;
+    private ?ComposerLock $lock;
+    private ?string $tempPath;
+    private ?string $failureType;
 
     public function __construct(
         Scenario $scenario,
@@ -39,6 +39,41 @@ final class ScenarioResult
         $this->failureType = $failureType;
     }
 
+    public function scenario(): Scenario
+    {
+        return $this->scenario;
+    }
+
+    public function exitCode(): int
+    {
+        return $this->exitCode;
+    }
+
+    public function stdout(): string
+    {
+        return $this->stdout;
+    }
+
+    public function stderr(): string
+    {
+        return $this->stderr;
+    }
+
+    public function lock(): ?ComposerLock
+    {
+        return $this->lock;
+    }
+
+    public function tempPath(): ?string
+    {
+        return $this->tempPath;
+    }
+
+    public function failureType(): ?string
+    {
+        return $this->failureType;
+    }
+
     public function succeeded(): bool
     {
         return $this->exitCode === 0 && $this->lock !== null;
@@ -54,10 +89,11 @@ final class ScenarioResult
         return !$this->succeeded() && $this->failureType === self::FAILURE_OPERATIONAL;
     }
 
+    /** @return array{name: string, exit_code: int, succeeded: bool, failure_type: ?string, stdout_excerpt: string, stderr_excerpt: string, temp_path: ?string} */
     public function toArray(): array
     {
         return [
-            'name' => $this->scenario->name,
+            'name' => $this->scenario->name(),
             'exit_code' => $this->exitCode,
             'succeeded' => $this->succeeded(),
             'failure_type' => $this->failureType,

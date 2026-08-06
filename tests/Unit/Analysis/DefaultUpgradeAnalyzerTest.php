@@ -44,10 +44,10 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
 
         self::assertSame('feasible_with_changes', $report->resolutionStatus());
-        self::assertSame([], $report->blockers);
-        self::assertSame('low', $report->risk->level);
-        self::assertCount(1, $report->lockDiff->packageChanges);
-        self::assertSame('2.0.0', $report->lockDiff->packageChanges[0]->toVersion);
+        self::assertSame([], $report->blockers());
+        self::assertSame('low', $report->risk()->level());
+        self::assertCount(1, $report->lockDiff()->packageChanges());
+        self::assertSame('2.0.0', $report->lockDiff()->packageChanges()[0]->toVersion());
     }
 
     public function testOperationalFailuresProduceUnknownResolutionAndUncertainties(): void
@@ -61,10 +61,10 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
 
         self::assertSame('unknown', $report->resolutionStatus());
-        self::assertSame([], $report->blockers);
-        self::assertSame('low', $report->risk->level);
-        self::assertCount(3, $report->uncertainties);
-        self::assertStringContainsString('analysis-environment failure', $report->uncertainties[0]);
+        self::assertSame([], $report->blockers());
+        self::assertSame('low', $report->risk()->level());
+        self::assertCount(3, $report->uncertainties());
+        self::assertStringContainsString('analysis-environment failure', $report->uncertainties()[0]);
     }
 
     public function testOperationalFallbackFailuresKeepTheOverallResolutionUnknown(): void
@@ -86,8 +86,8 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
 
         self::assertSame('unknown', $report->resolutionStatus());
-        self::assertCount(1, $report->blockers);
-        self::assertCount(2, $report->uncertainties);
+        self::assertCount(1, $report->blockers());
+        self::assertCount(2, $report->uncertainties());
     }
 
     public function testUnavailableRequestedFrameworkIsRejected(): void
@@ -120,12 +120,12 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         $report = (new DefaultUpgradeAnalyzer([$framework], null, $runner))->analyzeUpgrade($request);
 
         self::assertSame(1, $framework->detectionCount);
-        self::assertCount(1, $report->frameworkFindings);
-        self::assertSame('Detected framework requires review.', $report->frameworkFindings[0]->summary);
-        self::assertSame(['framework-1'], $report->frameworkFindings[0]->evidence);
-        self::assertCount(1, $report->evidence);
-        self::assertSame('framework-1', $report->evidence[0]->id);
-        self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence[0]->class);
+        self::assertCount(1, $report->frameworkFindings());
+        self::assertSame('Detected framework requires review.', $report->frameworkFindings()[0]->summary());
+        self::assertSame(['framework-1'], $report->frameworkFindings()[0]->evidence());
+        self::assertCount(1, $report->evidence());
+        self::assertSame('framework-1', $report->evidence()[0]->id());
+        self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence()[0]->evidenceClass());
         self::assertSame(['framework-1'], $report->toArray()['framework_findings'][0]['evidence']);
     }
 }
@@ -165,7 +165,7 @@ final class AnalyzerFixtureCompatibilityRule implements CompatibilityRule
             'framework',
             Evidence::E2_PACKAGE_METADATA,
             'Detected fixture framework metadata.'
-        )->id;
+        )->id();
 
         return new CompatibilityFinding('fixture', 'medium', 'Detected framework requires review.', [$evidenceId]);
     }

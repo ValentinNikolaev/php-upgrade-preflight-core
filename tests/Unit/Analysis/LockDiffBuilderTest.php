@@ -70,7 +70,7 @@ final class LockDiffBuilderTest extends TestCase
             'packages' => [['name' => 'vendor/runtime', 'version' => '1.0.0']],
         ]);
 
-        self::assertSame([], (new LockDiffBuilder())->build($before, $after)->packageChanges);
+        self::assertSame([], (new LockDiffBuilder())->build($before, $after)->packageChanges());
     }
 
     /** @param list<array{name: string, version: string}> $packages */

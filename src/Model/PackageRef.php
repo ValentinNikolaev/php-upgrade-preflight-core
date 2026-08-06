@@ -6,9 +6,9 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class PackageRef
 {
-    public string $name;
-    public string $version;
-    public bool $direct;
+    private string $name;
+    private string $version;
+    private bool $direct;
 
     public function __construct(string $name, string $version, bool $direct = false)
     {
@@ -17,6 +17,22 @@ final class PackageRef
         $this->direct = $direct;
     }
 
+    public function name(): string
+    {
+        return $this->name;
+    }
+
+    public function version(): string
+    {
+        return $this->version;
+    }
+
+    public function isDirect(): bool
+    {
+        return $this->direct;
+    }
+
+    /** @return array{name: string, version: string, direct: bool} */
     public function toArray(): array
     {
         return [

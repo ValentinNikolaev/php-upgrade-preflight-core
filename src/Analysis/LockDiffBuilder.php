@@ -24,22 +24,22 @@ final class LockDiffBuilder
             $to = $afterPackages[$name] ?? null;
 
             if ($from === null && $to !== null) {
-                $changes[] = new PackageChange($name, 'added', null, $to->version, false);
+                $changes[] = new PackageChange($name, 'added', null, $to->version(), false);
                 continue;
             }
 
             if ($from !== null && $to === null) {
-                $changes[] = new PackageChange($name, 'removed', $from->version, null, false);
+                $changes[] = new PackageChange($name, 'removed', $from->version(), null, false);
                 continue;
             }
 
-            if ($from instanceof PackageRef && $to instanceof PackageRef && $from->version !== $to->version) {
+            if ($from instanceof PackageRef && $to instanceof PackageRef && $from->version() !== $to->version()) {
                 $changes[] = new PackageChange(
                     $name,
-                    $this->compareVersions($from->version, $to->version),
-                    $from->version,
-                    $to->version,
-                    $this->majorVersion($from->version) !== $this->majorVersion($to->version)
+                    $this->compareVersions($from->version(), $to->version()),
+                    $from->version(),
+                    $to->version(),
+                    $this->majorVersion($from->version()) !== $this->majorVersion($to->version())
                 );
             }
         }

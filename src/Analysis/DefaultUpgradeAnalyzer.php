@@ -57,8 +57,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     public function analyzeUpgrade(UpgradeRequest $request): UpgradeReport
     {
         $evidence = new EvidenceLedger();
-        $project = $this->projectStateBuilder->build($request->projectPath);
-        $targets = $this->targetNormalizer->normalize($request->targets->packageTargets(), $request->targetPhp);
+        $project = $this->projectStateBuilder->build($request->projectPath());
+        $targets = $this->targetNormalizer->normalize($request->targets()->packageTargets(), $request->targetPhp());
         $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
         $sourcePaths = $this->frameworkRuleEngine->sourcePaths($project, $request, $activeFrameworks);
         $scenarios = $this->candidateScenarios($targets);
@@ -68,10 +68,10 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario);
         }
 
-        $bestResult = $this->bestSuccessfulResult($project->composerLock, $scenarioResults);
-        $bestLock = $bestResult === null ? null : $bestResult->lock;
+        $bestResult = $this->bestSuccessfulResult($project->composerLock(), $scenarioResults);
+        $bestLock = $bestResult === null ? null : $bestResult->lock();
 
-        $lockDiff = $bestLock === null ? new LockDiff([]) : $this->lockDiffBuilder->build($project->composerLock, $bestLock);
+        $lockDiff = $bestLock === null ? new LockDiff([]) : $this->lockDiffBuilder->build($project->composerLock(), $bestLock);
         $blockers = $this->blockerGrouper->group($scenarioResults, $evidence);
         $sourceUncertainties = [];
         $sourceImpact = $this->sourceUsageScanner->scan(
@@ -79,11 +79,11 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $sourcePaths,
             $evidence,
             $sourceUncertainties,
-            $request->sourcePaths !== []
+            $request->sourcePaths() !== []
         );
         $frameworkFindings = $this->frameworkRuleEngine->evaluate($activeFrameworks, $project, $request, $evidence);
-        $risk = $this->riskAndEffortEstimator->estimateRisk($blockers, $lockDiff->packageChanges, $frameworkFindings);
-        $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges, $sourceImpact, $frameworkFindings);
+        $risk = $this->riskAndEffortEstimator->estimateRisk($blockers, $lockDiff->packageChanges(), $frameworkFindings);
+        $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges(), $sourceImpact, $frameworkFindings);
 
         return $this->reportAssembler->assemble(
             $request,
@@ -117,12 +117,12 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $candidates = [];
 
         foreach ($scenarioResults as $index => $result) {
-            if (!$result->succeeded() || $result->lock === null) {
+            if (!$result->succeeded() || $result->lock() === null) {
                 continue;
             }
 
-            $changeCount = count($this->lockDiffBuilder->build($baseline, $result->lock)->packageChanges);
-            $strategyRank = $result->scenario->minimalChanges ? 1 : ($result->scenario->withAllDependencies ? 2 : 0);
+            $changeCount = count($this->lockDiffBuilder->build($baseline, $result->lock())->packageChanges());
+            $strategyRank = $result->scenario()->minimalChanges() ? 1 : ($result->scenario()->withAllDependencies() ? 2 : 0);
             $candidates[] = [$changeCount, $strategyRank, $index, $result];
         }
 

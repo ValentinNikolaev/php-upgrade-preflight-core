@@ -20,23 +20,23 @@ final class MarkdownReportWriter
             '## Composer Scenarios',
         ];
 
-        if ($report->scenarios === []) {
+        if ($report->scenarios() === []) {
             $lines[] = '- None executed.';
         } else {
-            foreach ($report->scenarios as $scenario) {
+            foreach ($report->scenarios() as $scenario) {
                 $lines[] = sprintf(
                     '- `%s`: %s (exit `%d`, failure type `%s`)',
-                    $this->inline($scenario->scenario->name),
+                    $this->inline($scenario->scenario()->name()),
                     $scenario->succeeded() ? 'succeeded' : 'failed',
-                    $scenario->exitCode,
-                    $scenario->failureType ?? 'none'
+                    $scenario->exitCode(),
+                    $scenario->failureType() ?? 'none'
                 );
 
-                if (trim($scenario->stdout) !== '') {
-                    $lines[] = sprintf('  - stdout: `%s`', $this->inline($this->excerpt($scenario->stdout)));
+                if (trim($scenario->stdout()) !== '') {
+                    $lines[] = sprintf('  - stdout: `%s`', $this->inline($this->excerpt($scenario->stdout())));
                 }
-                if (trim($scenario->stderr) !== '') {
-                    $lines[] = sprintf('  - stderr: `%s`', $this->inline($this->excerpt($scenario->stderr)));
+                if (trim($scenario->stderr()) !== '') {
+                    $lines[] = sprintf('  - stderr: `%s`', $this->inline($this->excerpt($scenario->stderr())));
                 }
             }
         }
@@ -44,39 +44,39 @@ final class MarkdownReportWriter
         $lines[] = '';
         $lines[] = '## Blockers';
 
-        if ($report->blockers === []) {
+        if ($report->blockers() === []) {
             $lines[] = '- None detected.';
         } else {
-            foreach ($report->blockers as $blocker) {
-                $lines[] = sprintf('- `%s` %s (%s)', $blocker->type, $blocker->summary, implode(', ', $blocker->evidence));
+            foreach ($report->blockers() as $blocker) {
+                $lines[] = sprintf('- `%s` %s (%s)', $blocker->type(), $blocker->summary(), implode(', ', $blocker->evidence()));
             }
         }
 
         $lines[] = '';
         $lines[] = '## Package Changes';
 
-        if ($report->lockDiff->packageChanges === []) {
+        if ($report->lockDiff()->packageChanges() === []) {
             $lines[] = '- No lockfile changes detected.';
         } else {
-            foreach ($report->lockDiff->packageChanges as $change) {
-                $lines[] = sprintf('- `%s`: %s `%s` -> `%s`', $change->name, $change->changeType, $change->fromVersion ?? '-', $change->toVersion ?? '-');
+            foreach ($report->lockDiff()->packageChanges() as $change) {
+                $lines[] = sprintf('- `%s`: %s `%s` -> `%s`', $change->name(), $change->changeType(), $change->fromVersion() ?? '-', $change->toVersion() ?? '-');
             }
         }
 
         $lines[] = '';
         $lines[] = '## Source Impact';
 
-        if ($report->sourceImpact === []) {
+        if ($report->sourceImpact() === []) {
             $lines[] = '- None detected.';
         } else {
-            foreach ($report->sourceImpact as $usage) {
-                $location = $usage->line === null ? $usage->file : sprintf('%s:%d', $usage->file, $usage->line);
+            foreach ($report->sourceImpact() as $usage) {
+                $location = $usage->line() === null ? $usage->file() : sprintf('%s:%d', $usage->file(), $usage->line());
                 $lines[] = sprintf(
                     '- `%s` `%s` in `%s` (%s)',
-                    $this->inline($usage->usageType),
-                    $this->inline($usage->symbol),
+                    $this->inline($usage->usageType()),
+                    $this->inline($usage->symbol()),
                     $this->inline($location),
-                    implode(', ', $usage->evidence)
+                    implode(', ', $usage->evidence())
                 );
             }
         }
@@ -84,26 +84,27 @@ final class MarkdownReportWriter
         $lines[] = '';
         $lines[] = '## Framework Findings';
 
-        if ($report->frameworkFindings === []) {
+        if ($report->frameworkFindings() === []) {
             $lines[] = '- None detected.';
         } else {
-            foreach ($report->frameworkFindings as $finding) {
-                $lines[] = sprintf('- `%s` %s (%s)', $finding->severity, $finding->summary, implode(', ', $finding->evidence));
+            foreach ($report->frameworkFindings() as $finding) {
+                $lines[] = sprintf('- `%s` %s (%s)', $finding->severity(), $finding->summary(), implode(', ', $finding->evidence()));
             }
         }
 
         $lines[] = '';
         $lines[] = '## Risk And Effort';
-        $lines[] = sprintf('- Risk: `%s`', $report->risk->level);
-        $lines[] = sprintf('- Effort: `%d-%d` hours (%s confidence)', $report->effort->rangeHours[0], $report->effort->rangeHours[1], $report->effort->confidence);
+        $lines[] = sprintf('- Risk: `%s`', $report->risk()->level());
+        $rangeHours = $report->effort()->rangeHours();
+        $lines[] = sprintf('- Effort: `%d-%d` hours (%s confidence)', $rangeHours[0], $rangeHours[1], $report->effort()->confidence());
 
         $lines[] = '';
         $lines[] = '## Uncertainties';
 
-        if ($report->uncertainties === []) {
+        if ($report->uncertainties() === []) {
             $lines[] = '- None recorded.';
         } else {
-            foreach ($report->uncertainties as $uncertainty) {
+            foreach ($report->uncertainties() as $uncertainty) {
                 $lines[] = '- ' . $this->singleLine($uncertainty);
             }
         }
@@ -111,17 +112,17 @@ final class MarkdownReportWriter
         $lines[] = '';
         $lines[] = '## Evidence';
 
-        if ($report->evidence === []) {
+        if ($report->evidence() === []) {
             $lines[] = '- None recorded.';
         } else {
-            foreach ($report->evidence as $evidence) {
-                $context = json_encode($evidence->context, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            foreach ($report->evidence() as $evidence) {
+                $context = json_encode($evidence->context(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
                 $lines[] = sprintf(
                     '- `%s` (`%s`, %s confidence): %s Context: `%s`',
-                    $this->inline($evidence->id),
-                    $this->inline($evidence->class),
-                    $this->singleLine($evidence->confidence),
-                    $this->singleLine($evidence->summary),
+                    $this->inline($evidence->id()),
+                    $this->inline($evidence->evidenceClass()),
+                    $this->singleLine($evidence->confidence()),
+                    $this->singleLine($evidence->summary()),
                     $this->inline($context)
                 );
             }

@@ -50,15 +50,15 @@ final class EvidenceLedger
 
     public function register(Evidence $evidence): void
     {
-        if (trim($evidence->id) === '') {
+        if (trim($evidence->id()) === '') {
             throw new \InvalidArgumentException('Evidence IDs must not be empty.');
         }
 
-        if (isset($this->evidence[$evidence->id])) {
-            throw new \InvalidArgumentException(sprintf('Evidence ID "%s" is already registered.', $evidence->id));
+        if (isset($this->evidence[$evidence->id()])) {
+            throw new \InvalidArgumentException(sprintf('Evidence ID "%s" is already registered.', $evidence->id()));
         }
 
-        $this->evidence[$evidence->id] = $evidence;
+        $this->evidence[$evidence->id()] = $evidence;
     }
 
     public function has(string $id): bool

@@ -55,7 +55,7 @@ final class UpgradeReportEvidenceTest extends TestCase
             new Evidence('source-1', Evidence::E3_PROJECT_SOURCE, 'Parse failure.'),
         ], ['Source could not be parsed (source-1).']);
 
-        self::assertSame('source-1', $report->evidence[0]->id);
+        self::assertSame('source-1', $report->evidence()[0]->id());
     }
 
     /** @param list<Blocker> $blockers @param list<Evidence> $evidence @param list<string> $uncertainties */

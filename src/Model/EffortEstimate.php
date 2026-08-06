@@ -7,12 +7,12 @@ namespace PhpUpgradePreflight\Core\Model;
 final class EffortEstimate
 {
     /** @var array{0:int,1:int} */
-    public array $rangeHours;
-    public string $confidence;
+    private array $rangeHours;
+    private string $confidence;
     /** @var array<string, array{0:int,1:int}> */
-    public array $components;
+    private array $components;
     /** @var list<string> */
-    public array $assumptions;
+    private array $assumptions;
 
     /**
      * @param array{0:int,1:int} $rangeHours
@@ -27,6 +27,30 @@ final class EffortEstimate
         $this->assumptions = array_values($assumptions);
     }
 
+    /** @return array{0:int,1:int} */
+    public function rangeHours(): array
+    {
+        return $this->rangeHours;
+    }
+
+    public function confidence(): string
+    {
+        return $this->confidence;
+    }
+
+    /** @return array<string, array{0:int,1:int}> */
+    public function components(): array
+    {
+        return $this->components;
+    }
+
+    /** @return list<string> */
+    public function assumptions(): array
+    {
+        return $this->assumptions;
+    }
+
+    /** @return array{range_hours: array{0:int,1:int}, confidence: string, components: array<string, array{0:int,1:int}>, assumptions: list<string>} */
     public function toArray(): array
     {
         return [

@@ -27,14 +27,14 @@ final class RiskAndEffortEstimatorTest extends TestCase
         $risk = $estimator->estimateRisk($blockers, $changes, $findings);
         $effort = $estimator->estimateEffort($blockers, $changes, $sourceImpact, $findings);
 
-        self::assertSame('high', $risk->level);
+        self::assertSame('high', $risk->level());
         self::assertSame([
             'Composer resolution is blocked.',
             'Framework compatibility findings require review.',
-        ], $risk->drivers);
-        self::assertSame([6, 20], $effort->rangeHours);
-        self::assertSame([3, 8], $effort->components['dependency_resolution']);
-        self::assertSame([1, 4], $effort->components['source_changes']);
+        ], $risk->drivers());
+        self::assertSame([6, 20], $effort->rangeHours());
+        self::assertSame([3, 8], $effort->components()['dependency_resolution']);
+        self::assertSame([1, 4], $effort->components()['source_changes']);
     }
 
     public function testALargerTransitionProducesMediumRiskWithoutBlockers(): void
@@ -46,8 +46,8 @@ final class RiskAndEffortEstimatorTest extends TestCase
 
         $risk = (new RiskAndEffortEstimator())->estimateRisk([], $changes, []);
 
-        self::assertSame('medium', $risk->level);
-        self::assertSame([], $risk->drivers);
+        self::assertSame('medium', $risk->level());
+        self::assertSame([], $risk->drivers());
     }
 
     public function testMoreThanTwentyPackageChangesAddTheLargeTransitionDriver(): void
@@ -59,7 +59,7 @@ final class RiskAndEffortEstimatorTest extends TestCase
 
         $risk = (new RiskAndEffortEstimator())->estimateRisk([], $changes, []);
 
-        self::assertSame('medium', $risk->level);
-        self::assertSame(['Large lockfile transition.'], $risk->drivers);
+        self::assertSame('medium', $risk->level());
+        self::assertSame(['Large lockfile transition.'], $risk->drivers());
     }
 }

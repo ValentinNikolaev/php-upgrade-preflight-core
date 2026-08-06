@@ -7,7 +7,7 @@ namespace PhpUpgradePreflight\Core\Model;
 final class LockDiff
 {
     /** @var list<PackageChange> */
-    public array $packageChanges;
+    private array $packageChanges;
 
     /** @param list<PackageChange> $packageChanges */
     public function __construct(array $packageChanges)
@@ -15,6 +15,13 @@ final class LockDiff
         $this->packageChanges = array_values($packageChanges);
     }
 
+    /** @return list<PackageChange> */
+    public function packageChanges(): array
+    {
+        return $this->packageChanges;
+    }
+
+    /** @return array{package_changes: list<array{name: string, change_type: string, from_version: ?string, to_version: ?string, major_change: bool}>} */
     public function toArray(): array
     {
         return [

@@ -6,12 +6,12 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class Blocker
 {
-    public string $type;
-    public string $subject;
-    public string $summary;
-    public string $confidence;
+    private string $type;
+    private string $subject;
+    private string $summary;
+    private string $confidence;
     /** @var list<string> */
-    public array $evidence;
+    private array $evidence;
 
     /** @param list<string> $evidence */
     public function __construct(string $type, string $subject, string $summary, string $confidence, array $evidence)
@@ -23,6 +23,33 @@ final class Blocker
         $this->evidence = array_values($evidence);
     }
 
+    public function type(): string
+    {
+        return $this->type;
+    }
+
+    public function subject(): string
+    {
+        return $this->subject;
+    }
+
+    public function summary(): string
+    {
+        return $this->summary;
+    }
+
+    public function confidence(): string
+    {
+        return $this->confidence;
+    }
+
+    /** @return list<string> */
+    public function evidence(): array
+    {
+        return $this->evidence;
+    }
+
+    /** @return array{type: string, subject: string, summary: string, confidence: string, evidence: list<string>} */
     public function toArray(): array
     {
         return [

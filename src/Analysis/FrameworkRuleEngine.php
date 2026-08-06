@@ -24,7 +24,7 @@ final class FrameworkRuleEngine
     /** @return list<FrameworkIntegration> */
     public function activeIntegrations(ProjectState $project, UpgradeRequest $request): array
     {
-        $requested = array_values(array_unique(array_map('strtolower', $request->frameworks)));
+        $requested = array_values(array_unique(array_map('strtolower', $request->frameworks())));
         $available = array_map(static fn (FrameworkIntegration $framework): string => strtolower($framework->name()), $this->frameworks);
         $unavailable = array_values(array_diff($requested, $available));
 
@@ -43,7 +43,7 @@ final class FrameworkRuleEngine
                 continue;
             }
 
-            if ($requested !== [] || $framework->detect($project)->detected) {
+            if ($requested !== [] || $framework->detect($project)->isDetected()) {
                 $active[] = $framework;
             }
         }
@@ -54,8 +54,8 @@ final class FrameworkRuleEngine
     /** @param list<FrameworkIntegration> $frameworks @return list<string> */
     public function sourcePaths(ProjectState $project, UpgradeRequest $request, array $frameworks): array
     {
-        if ($request->sourcePaths !== []) {
-            return $request->sourcePaths;
+        if ($request->sourcePaths() !== []) {
+            return $request->sourcePaths();
         }
 
         $paths = [];

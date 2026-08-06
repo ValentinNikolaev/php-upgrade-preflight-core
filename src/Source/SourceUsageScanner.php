@@ -42,7 +42,7 @@ final class SourceUsageScanner
         bool $reportMissingPaths = true
     ): array {
         $usages = [];
-        $files = $this->phpFiles($project->path, $paths, $uncertainties, $reportMissingPaths);
+        $files = $this->phpFiles($project->path(), $paths, $uncertainties, $reportMissingPaths);
 
         if ($files === []) {
             $uncertainties[] = 'No PHP source files were scanned.';
@@ -51,11 +51,11 @@ final class SourceUsageScanner
         foreach ($files as $file) {
             $contents = file_get_contents($file);
             if ($contents === false) {
-                $uncertainties[] = sprintf('Source file "%s" could not be read and was not scanned.', $this->relativePath($project->path, $file));
+                $uncertainties[] = sprintf('Source file "%s" could not be read and was not scanned.', $this->relativePath($project->path(), $file));
                 continue;
             }
 
-            $relative = $this->relativePath($project->path, $file);
+            $relative = $this->relativePath($project->path(), $file);
 
             try {
                 $detectedUsages = $this->extractSymbols($contents);
@@ -64,7 +64,7 @@ final class SourceUsageScanner
                     'file' => $relative,
                     'line' => $exception->getStartLine(),
                     'error' => $exception->getMessage(),
-                ])->id;
+                ])->id();
                 $uncertainties[] = sprintf('Source file "%s" could not be parsed and was not scanned (%s).', $relative, $id);
                 continue;
             }
@@ -74,7 +74,7 @@ final class SourceUsageScanner
                     'file' => $relative,
                     'line' => $detectedUsage['line'],
                     'usage_type' => $detectedUsage['usage_type'],
-                ])->id;
+                ])->id();
                 $usages[] = new SourceUsage(
                     $relative,
                     $detectedUsage['symbol'],

@@ -29,7 +29,7 @@ final class ComposerScenarioRunnerTest extends TestCase
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
 
-        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets));
+        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
 
         self::assertIsArray($capturedCommand);
         self::assertContains('--no-install', $capturedCommand);
@@ -46,7 +46,7 @@ final class ComposerScenarioRunnerTest extends TestCase
         $projectPath = dirname(__DIR__, 5);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('phpunit/phpunit', '^10.0')]);
 
-        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets));
+        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
 
         self::assertIsArray($captured);
         self::assertSame('^10.0', $captured['require-dev']['phpunit/phpunit']);
@@ -65,7 +65,7 @@ final class ComposerScenarioRunnerTest extends TestCase
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'path-repository' . DIRECTORY_SEPARATOR . 'project';
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^1.0')]);
 
-        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets));
+        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
 
         self::assertIsString($capturedUrl);
         self::assertTrue(Path::isAbsolute($capturedUrl));
@@ -89,7 +89,7 @@ final class ComposerScenarioRunnerTest extends TestCase
             $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^1.0')]);
 
             try {
-                $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets));
+                $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
 
                 self::assertSame($url, $capturedUrl);
             } finally {
@@ -103,7 +103,7 @@ final class ComposerScenarioRunnerTest extends TestCase
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
         $project = (new ProjectStateBuilder())->build($projectPath);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
-        $scenario = new Scenario('test', $request->targets);
+        $scenario = new Scenario('test', $request->targets());
 
         $solverRunner = new ComposerScenarioRunner(null, null, static fn (): array => [
             'exit_code' => 2,
@@ -114,8 +114,8 @@ final class ComposerScenarioRunnerTest extends TestCase
             throw new \RuntimeException('Composer executable was unavailable.');
         });
 
-        self::assertSame(ScenarioResult::FAILURE_SOLVER, $solverRunner->run($project, $request, $scenario)->failureType);
-        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalRunner->run($project, $request, $scenario)->failureType);
+        self::assertSame(ScenarioResult::FAILURE_SOLVER, $solverRunner->run($project, $request, $scenario)->failureType());
+        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalRunner->run($project, $request, $scenario)->failureType());
     }
 
     public function testWorkspaceCreationFailureBecomesAnOperationalResult(): void
@@ -128,10 +128,10 @@ final class ComposerScenarioRunnerTest extends TestCase
         $project = (new ProjectStateBuilder())->build($projectPath);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
 
-        $result = $runner->run($project, $request, new Scenario('test', $request->targets));
+        $result = $runner->run($project, $request, new Scenario('test', $request->targets()));
 
-        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType);
-        self::assertStringContainsString('Unable to create test workspace', $result->stderr);
+        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+        self::assertStringContainsString('Unable to create test workspace', $result->stderr());
         self::assertSame(0, $workspaceManager->removeCalls);
     }
 
@@ -151,12 +151,12 @@ final class ComposerScenarioRunnerTest extends TestCase
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
 
         try {
-            $result = $runner->run($project, $request, new Scenario('test', $request->targets));
+            $result = $runner->run($project, $request, new Scenario('test', $request->targets()));
 
             self::assertFalse($result->succeeded());
-            self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType);
-            self::assertStringContainsString('cleanup failed', $result->stderr);
-            self::assertNotNull($result->tempPath);
+            self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+            self::assertStringContainsString('cleanup failed', $result->stderr());
+            self::assertNotNull($result->tempPath());
         } finally {
             $workspaceManager->forceCleanup();
         }

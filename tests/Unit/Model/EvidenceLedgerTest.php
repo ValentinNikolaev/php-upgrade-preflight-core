@@ -18,9 +18,9 @@ final class EvidenceLedgerTest extends TestCase
         $source = $ledger->add('source', Evidence::E3_PROJECT_SOURCE, 'Source match.');
         $secondSolver = $ledger->add('solver', Evidence::E1_SOLVER, 'Second solver result.');
 
-        self::assertSame('solver-1', $firstSolver->id);
-        self::assertSame('source-1', $source->id);
-        self::assertSame('solver-2', $secondSolver->id);
+        self::assertSame('solver-1', $firstSolver->id());
+        self::assertSame('source-1', $source->id());
+        self::assertSame('solver-2', $secondSolver->id());
         self::assertSame([$firstSolver, $source, $secondSolver], $ledger->all());
     }
 
@@ -30,7 +30,7 @@ final class EvidenceLedgerTest extends TestCase
             new Evidence('solver-1', Evidence::E1_SOLVER, 'Imported result.'),
         ]);
 
-        self::assertSame('solver-2', $ledger->add('solver', Evidence::E1_SOLVER, 'New result.')->id);
+        self::assertSame('solver-2', $ledger->add('solver', Evidence::E1_SOLVER, 'New result.')->id());
     }
 
     public function testItRejectsDuplicateRegisteredIds(): void

@@ -14,8 +14,8 @@ final class UpgradeTargetTest extends TestCase
     {
         $target = UpgradeTarget::fromString('laravel/framework:^9.0');
 
-        self::assertSame('laravel/framework', $target->package);
-        self::assertSame('^9.0', $target->constraint);
+        self::assertSame('laravel/framework', $target->package());
+        self::assertSame('^9.0', $target->constraint());
         self::assertSame([
             'package' => 'laravel/framework',
             'constraint' => '^9.0',

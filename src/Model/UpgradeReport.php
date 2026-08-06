@@ -6,23 +6,23 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class UpgradeReport
 {
-    public UpgradeRequest $request;
-    public ProjectState $projectState;
+    private UpgradeRequest $request;
+    private ProjectState $projectState;
     /** @var list<ScenarioResult> */
-    public array $scenarios;
-    public LockDiff $lockDiff;
+    private array $scenarios;
+    private LockDiff $lockDiff;
     /** @var list<Blocker> */
-    public array $blockers;
+    private array $blockers;
     /** @var list<SourceUsage> */
-    public array $sourceImpact;
+    private array $sourceImpact;
     /** @var list<CompatibilityFinding> */
-    public array $frameworkFindings;
-    public RiskSummary $risk;
-    public EffortEstimate $effort;
+    private array $frameworkFindings;
+    private RiskSummary $risk;
+    private EffortEstimate $effort;
     /** @var list<string> */
-    public array $uncertainties;
+    private array $uncertainties;
     /** @var list<Evidence> */
-    public array $evidence;
+    private array $evidence;
 
     /**
      * @param list<ScenarioResult> $scenarios
@@ -61,11 +61,72 @@ final class UpgradeReport
         $ledger->validateReferences($this->evidenceReferences());
     }
 
+    public function request(): UpgradeRequest
+    {
+        return $this->request;
+    }
+
+    public function projectState(): ProjectState
+    {
+        return $this->projectState;
+    }
+
+    /** @return list<ScenarioResult> */
+    public function scenarios(): array
+    {
+        return $this->scenarios;
+    }
+
+    public function lockDiff(): LockDiff
+    {
+        return $this->lockDiff;
+    }
+
+    /** @return list<Blocker> */
+    public function blockers(): array
+    {
+        return $this->blockers;
+    }
+
+    /** @return list<SourceUsage> */
+    public function sourceImpact(): array
+    {
+        return $this->sourceImpact;
+    }
+
+    /** @return list<CompatibilityFinding> */
+    public function frameworkFindings(): array
+    {
+        return $this->frameworkFindings;
+    }
+
+    public function risk(): RiskSummary
+    {
+        return $this->risk;
+    }
+
+    public function effort(): EffortEstimate
+    {
+        return $this->effort;
+    }
+
+    /** @return list<string> */
+    public function uncertainties(): array
+    {
+        return $this->uncertainties;
+    }
+
+    /** @return list<Evidence> */
+    public function evidence(): array
+    {
+        return $this->evidence;
+    }
+
     public function resolutionStatus(): string
     {
         foreach ($this->scenarios as $scenario) {
             if ($scenario->succeeded()) {
-                return count($this->lockDiff->packageChanges) > 0 ? 'feasible_with_changes' : 'feasible';
+                return count($this->lockDiff->packageChanges()) > 0 ? 'feasible_with_changes' : 'feasible';
             }
         }
 
@@ -78,6 +139,7 @@ final class UpgradeReport
         return count($this->blockers) > 0 ? 'blocked' : 'unknown';
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [
@@ -88,7 +150,7 @@ final class UpgradeReport
                 'scenarios' => array_map(static fn (ScenarioResult $scenario): array => $scenario->toArray(), $this->scenarios),
             ],
             'transition' => [
-                'package_changes' => array_map(static fn (PackageChange $change): array => $change->toArray(), $this->lockDiff->packageChanges),
+                'package_changes' => array_map(static fn (PackageChange $change): array => $change->toArray(), $this->lockDiff->packageChanges()),
                 'root_constraint_changes' => [],
             ],
             'blockers' => array_map(static fn (Blocker $blocker): array => $blocker->toArray(), $this->blockers),
@@ -111,21 +173,21 @@ final class UpgradeReport
         $references = [];
 
         foreach ($this->blockers as $index => $blocker) {
-            $references = $this->appendFindingReferences($references, $blocker->evidence, sprintf('Blocker at index %d', $index));
+            $references = $this->appendFindingReferences($references, $blocker->evidence(), sprintf('Blocker at index %d', $index));
         }
 
         foreach ($this->sourceImpact as $index => $usage) {
-            $references = $this->appendFindingReferences($references, $usage->evidence, sprintf('Source usage at index %d', $index));
+            $references = $this->appendFindingReferences($references, $usage->evidence(), sprintf('Source usage at index %d', $index));
         }
 
         foreach ($this->frameworkFindings as $index => $finding) {
-            $references = $this->appendFindingReferences($references, $finding->evidence, sprintf('Framework finding at index %d', $index));
+            $references = $this->appendFindingReferences($references, $finding->evidence(), sprintf('Framework finding at index %d', $index));
         }
 
         foreach ($this->evidence as $evidence) {
             foreach ($this->uncertainties as $uncertainty) {
-                if ($this->containsEvidenceReference($uncertainty, $evidence->id)) {
-                    $references[] = $evidence->id;
+                if ($this->containsEvidenceReference($uncertainty, $evidence->id())) {
+                    $references[] = $evidence->id();
                     break;
                 }
             }

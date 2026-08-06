@@ -26,13 +26,13 @@ final class BlockerGrouperTest extends TestCase
         ], $evidence);
 
         self::assertCount(1, $blockers);
-        self::assertSame($expectedType, $blockers[0]->type);
-        self::assertSame($expectedSubject, $blockers[0]->subject);
-        self::assertSame(['solver-1'], $blockers[0]->evidence);
+        self::assertSame($expectedType, $blockers[0]->type());
+        self::assertSame($expectedSubject, $blockers[0]->subject());
+        self::assertSame(['solver-1'], $blockers[0]->evidence());
         self::assertCount(1, $evidence->all());
-        self::assertSame('solver-1', $evidence->all()[0]->id);
-        self::assertSame(2, $evidence->all()[0]->context['exit_code']);
-        self::assertSame($output, $evidence->all()[0]->context['output_excerpt']);
+        self::assertSame('solver-1', $evidence->all()[0]->id());
+        self::assertSame(2, $evidence->all()[0]->context()['exit_code']);
+        self::assertSame($output, $evidence->all()[0]->context()['output_excerpt']);
     }
 
     /** @return list<array{string, string, string}> */

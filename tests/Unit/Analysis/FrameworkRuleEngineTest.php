@@ -40,8 +40,8 @@ final class FrameworkRuleEngineTest extends TestCase
         self::assertSame([$detected], $active);
         self::assertSame(['app', 'config'], $engine->sourcePaths($project, $request, $active));
         self::assertCount(1, $findings);
-        self::assertSame('Review detected framework.', $findings[0]->summary);
-        self::assertSame(['framework-1'], $findings[0]->evidence);
+        self::assertSame('Review detected framework.', $findings[0]->summary());
+        self::assertSame(['framework-1'], $findings[0]->evidence());
         self::assertCount(1, $evidence->all());
     }
 
@@ -146,7 +146,7 @@ final class FixtureCompatibilityRule implements CompatibilityRule
             return null;
         }
 
-        $evidenceId = $evidence->add('framework', Evidence::E2_PACKAGE_METADATA, 'Framework metadata matched.')->id;
+        $evidenceId = $evidence->add('framework', Evidence::E2_PACKAGE_METADATA, 'Framework metadata matched.')->id();
 
         return new CompatibilityFinding('fixture', 'medium', $this->summary, [$evidenceId]);
     }

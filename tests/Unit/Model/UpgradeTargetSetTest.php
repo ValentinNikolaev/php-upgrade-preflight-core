@@ -28,7 +28,7 @@ final class UpgradeTargetSetTest extends TestCase
         ], $targets->toArray());
         self::assertSame(
             ['alpha/package', 'vendor/package'],
-            array_map(static fn (UpgradeTarget $target): string => $target->package, $targets->packageTargets())
+            array_map(static fn (UpgradeTarget $target): string => $target->package(), $targets->packageTargets())
         );
         self::assertCount(3, $targets);
     }
@@ -45,13 +45,13 @@ final class UpgradeTargetSetTest extends TestCase
         $input = new UpgradeTarget('vendor/package', '^1.0');
         $targets = new UpgradeTargetSet([$input]);
 
-        $input->constraint = '^2.0';
         $returned = $targets->packageTargets();
-        $returned[0]->constraint = '^3.0';
+        array_pop($returned);
 
         self::assertSame([
             ['package' => 'vendor/package', 'constraint' => '^1.0'],
         ], $targets->toArray());
+        self::assertFalse((new \ReflectionProperty($input, 'constraint'))->isPublic());
     }
 
     public function testItRejectsConflictingPackageDuplicates(): void
@@ -107,7 +107,7 @@ final class UpgradeTargetSetTest extends TestCase
 
         self::assertSame(
             ['alpha/package', 'php', 'zeta/package'],
-            array_map(static fn (UpgradeTarget $target): string => $target->package, iterator_to_array($targets))
+            array_map(static fn (UpgradeTarget $target): string => $target->package(), iterator_to_array($targets))
         );
     }
 }

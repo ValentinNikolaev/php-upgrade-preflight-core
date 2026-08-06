@@ -26,7 +26,7 @@ final class ReportAssemblerTest extends TestCase
     {
         $request = new UpgradeRequest(__DIR__, [new UpgradeTarget('vendor/package', '^2.0')]);
         $project = new ProjectState(__DIR__, new ComposerJson([]), new ComposerLock([]));
-        $scenario = new Scenario('exact-target', $request->targets);
+        $scenario = new Scenario('exact-target', $request->targets());
         $scenarioResult = new ScenarioResult(
             $scenario,
             1,
@@ -37,7 +37,7 @@ final class ReportAssemblerTest extends TestCase
             ScenarioResult::FAILURE_OPERATIONAL
         );
         $evidence = new EvidenceLedger();
-        $evidenceId = $evidence->add('solver', Evidence::E1_SOLVER, 'Solver conflict.')->id;
+        $evidenceId = $evidence->add('solver', Evidence::E1_SOLVER, 'Solver conflict.')->id();
 
         $report = (new ReportAssembler())->assemble(
             $request,
@@ -53,12 +53,12 @@ final class ReportAssemblerTest extends TestCase
             $evidence
         );
 
-        self::assertSame($request, $report->request);
-        self::assertSame($project, $report->projectState);
+        self::assertSame($request, $report->request());
+        self::assertSame($project, $report->projectState());
         self::assertSame([
             'Source path was unavailable.',
             'Composer scenario "exact-target" could not complete because of an analysis-environment failure.',
-        ], $report->uncertainties);
-        self::assertSame($evidenceId, $report->evidence[0]->id);
+        ], $report->uncertainties());
+        self::assertSame($evidenceId, $report->evidence()[0]->id());
     }
 }

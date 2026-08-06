@@ -26,7 +26,7 @@ final class MarkdownReportWriterTest extends TestCase
     {
         $projectPath = dirname(__DIR__, 5);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
-        $scenario = new Scenario('exact-target', $request->targets);
+        $scenario = new Scenario('exact-target', $request->targets());
         $evidence = new Evidence('source-1', Evidence::E3_PROJECT_SOURCE, 'Detected Vendor\\Package\\Client.', 'high', [
             'file' => 'src/Example.php',
             'line' => 12,

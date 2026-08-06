@@ -6,13 +6,23 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class UpgradeTarget
 {
-    public string $package;
-    public string $constraint;
+    private string $package;
+    private string $constraint;
 
     public function __construct(string $package, string $constraint)
     {
         $this->package = $package;
         $this->constraint = $constraint;
+    }
+
+    public function package(): string
+    {
+        return $this->package;
+    }
+
+    public function constraint(): string
+    {
+        return $this->constraint;
     }
 
     public static function fromString(string $target): self
@@ -26,6 +36,7 @@ final class UpgradeTarget
         return new self(substr($target, 0, $position), substr($target, $position + 1));
     }
 
+    /** @return array{package: string, constraint: string} */
     public function toArray(): array
     {
         return [

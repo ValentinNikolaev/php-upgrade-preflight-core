@@ -6,9 +6,9 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class ProjectState
 {
-    public string $path;
-    public ComposerJson $composerJson;
-    public ComposerLock $composerLock;
+    private string $path;
+    private ComposerJson $composerJson;
+    private ComposerLock $composerLock;
 
     public function __construct(string $path, ComposerJson $composerJson, ComposerLock $composerLock)
     {
@@ -17,6 +17,22 @@ final class ProjectState
         $this->composerLock = $composerLock;
     }
 
+    public function path(): string
+    {
+        return $this->path;
+    }
+
+    public function composerJson(): ComposerJson
+    {
+        return $this->composerJson;
+    }
+
+    public function composerLock(): ComposerLock
+    {
+        return $this->composerLock;
+    }
+
+    /** @return array{path: string, platform_php: ?string, root_requirements: array<string, string>, locked_packages: int} */
     public function toArray(): array
     {
         return [

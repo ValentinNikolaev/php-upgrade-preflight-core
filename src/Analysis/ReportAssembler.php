@@ -61,7 +61,7 @@ final class ReportAssembler
             if ($result->isOperationalFailure()) {
                 $uncertainties[] = sprintf(
                     'Composer scenario "%s" could not complete because of an analysis-environment failure.',
-                    $result->scenario->name
+                    $result->scenario()->name()
                 );
             }
         }
