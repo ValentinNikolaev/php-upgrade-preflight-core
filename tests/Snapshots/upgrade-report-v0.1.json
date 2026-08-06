@@ -1,0 +1,171 @@
+{
+    "metadata": {
+        "schema_version": "0.1",
+        "tool": {
+            "name": "php-upgrade-preflight",
+            "version": "0.1.0"
+        }
+    },
+    "request_summary": {
+        "project_path": "<PROJECT_PATH>",
+        "targets": [
+            {
+                "package": "laravel/framework",
+                "constraint": "^9.0"
+            },
+            {
+                "package": "php",
+                "constraint": "8.1.0"
+            }
+        ],
+        "from_php": "7.4",
+        "target_php": "8.1.0",
+        "source_paths": [
+            "app"
+        ],
+        "frameworks": [
+            "laravel"
+        ],
+        "format": "json",
+        "output_path": null
+    },
+    "project_state": {
+        "path": "<PROJECT_PATH>",
+        "platform_php": "7.4.33",
+        "root_requirements": {
+            "php": "^7.4",
+            "laravel/framework": "^7.0",
+            "phpunit/phpunit": "^8.5"
+        },
+        "locked_packages": 2
+    },
+    "resolution": {
+        "status": "feasible_with_changes",
+        "scenarios": [
+            {
+                "name": "all-dependencies",
+                "exit_code": 0,
+                "succeeded": true,
+                "failure_type": null,
+                "stdout_excerpt": "Composer resolved the requested target.",
+                "stderr_excerpt": "",
+                "temp_path": null
+            }
+        ]
+    },
+    "transition": {
+        "package_changes": [
+            {
+                "name": "laravel/framework",
+                "change_type": "upgraded",
+                "from_version": "v7.30.6",
+                "to_version": "v9.52.16",
+                "major_change": true
+            }
+        ],
+        "root_constraint_changes": []
+    },
+    "blockers": [
+        {
+            "type": "root-constraint-conflict",
+            "subject": "legacy/package",
+            "summary": "A legacy root constraint must be reviewed.",
+            "confidence": "high",
+            "evidence": [
+                "solver-1"
+            ]
+        }
+    ],
+    "source_impact": [
+        {
+            "file": "app/Example.php",
+            "symbol": "Legacy\\Facade",
+            "usage_type": "static_call",
+            "line": 17,
+            "evidence": [
+                "source-1"
+            ]
+        }
+    ],
+    "framework_findings": [
+        {
+            "framework": "laravel",
+            "severity": "medium",
+            "summary": "Legacy package requires review.",
+            "evidence": [
+                "package-1"
+            ]
+        }
+    ],
+    "plan": {
+        "stages": []
+    },
+    "risk": {
+        "level": "high",
+        "drivers": [
+            "A root dependency constraint conflicts with the requested target.",
+            "A framework compatibility finding requires review."
+        ]
+    },
+    "effort": {
+        "range_hours": [
+            8,
+            20
+        ],
+        "confidence": "low",
+        "components": {
+            "dependency_resolution": [
+                3,
+                8
+            ],
+            "source_changes": [
+                2,
+                4
+            ],
+            "tests_and_debugging": [
+                3,
+                8
+            ]
+        },
+        "assumptions": [
+            "The project test suite is available and representative."
+        ]
+    },
+    "tests": [],
+    "uncertainties": [
+        "Runtime compatibility is not proven by dependency resolution alone."
+    ],
+    "evidence": [
+        {
+            "id": "solver-1",
+            "class": "E1",
+            "summary": "Composer reported a root constraint conflict.",
+            "confidence": "high",
+            "context": {
+                "scenario": "strict-target",
+                "package": "legacy/package"
+            }
+        },
+        {
+            "id": "source-1",
+            "class": "E3",
+            "summary": "Detected a legacy facade call.",
+            "confidence": "high",
+            "context": {
+                "file": "app/Example.php",
+                "line": 17,
+                "usage_type": "static_call"
+            }
+        },
+        {
+            "id": "package-1",
+            "class": "E2",
+            "summary": "Legacy package metadata requires review.",
+            "confidence": "medium",
+            "context": {
+                "package": "legacy/package",
+                "locked_version": "1.0.0"
+            }
+        }
+    ]
+}

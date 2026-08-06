@@ -45,7 +45,7 @@ final class UpgradeRequest
         $this->fromPhp = $fromPhp;
         $this->targetPhp = $this->targets->targetPhp();
         $this->sourcePaths = array_values($sourcePaths);
-        $this->frameworks = array_values($frameworks);
+        $this->frameworks = $this->normalizeFrameworks($frameworks);
         $this->format = ReportFormat::normalize($format);
         $this->outputPath = $outputPath;
         $this->debug = $debug;
@@ -111,5 +111,29 @@ final class UpgradeRequest
             'format' => $this->format,
             'output_path' => $this->outputPath,
         ];
+    }
+
+    /** @param list<string> $frameworks @return list<string> */
+    private function normalizeFrameworks(array $frameworks): array
+    {
+        $normalized = [];
+
+        foreach ($frameworks as $index => $framework) {
+            if (!is_string($framework)) {
+                throw new \InvalidArgumentException(sprintf('Framework at index %d must be a string.', $index));
+            }
+
+            $framework = strtolower(trim($framework));
+            if ($framework === '') {
+                throw new \InvalidArgumentException(sprintf('Framework at index %d must not be empty.', $index));
+            }
+
+            $normalized[$framework] = true;
+        }
+
+        $frameworks = array_keys($normalized);
+        sort($frameworks, SORT_STRING);
+
+        return $frameworks;
     }
 }

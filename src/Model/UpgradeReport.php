@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class UpgradeReport
 {
+    private ReportMetadata $metadata;
     private UpgradeRequest $request;
     private ProjectState $projectState;
     /** @var list<ScenarioResult> */
@@ -45,6 +46,7 @@ final class UpgradeReport
         array $uncertainties,
         array $evidence
     ) {
+        $this->metadata = new ReportMetadata();
         $this->request = $request;
         $this->projectState = $projectState;
         $this->scenarios = array_values($scenarios);
@@ -59,6 +61,11 @@ final class UpgradeReport
 
         $ledger = new EvidenceLedger($this->evidence);
         $ledger->validateReferences($this->evidenceReferences());
+    }
+
+    public function metadata(): ReportMetadata
+    {
+        return $this->metadata;
     }
 
     public function request(): UpgradeRequest
@@ -143,6 +150,7 @@ final class UpgradeReport
     public function toArray(): array
     {
         return [
+            'metadata' => $this->metadata->toArray(),
             'request_summary' => $this->request->toArray(),
             'project_state' => $this->projectState->toArray(),
             'resolution' => [

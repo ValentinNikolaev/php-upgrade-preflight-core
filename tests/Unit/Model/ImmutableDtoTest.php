@@ -15,6 +15,7 @@ use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\PackageRef;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\ReportMetadata;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
@@ -51,6 +52,7 @@ final class ImmutableDtoTest extends TestCase
             [PackageChange::class],
             [PackageRef::class],
             [ProjectState::class],
+            [ReportMetadata::class],
             [RiskSummary::class],
             [Scenario::class],
             [ScenarioResult::class],
