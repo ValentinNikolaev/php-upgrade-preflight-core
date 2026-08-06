@@ -44,11 +44,28 @@
         "scenarios": [
             {
                 "name": "all-dependencies",
+                "composer_version": "2.8.12",
+                "command": [
+                    "composer",
+                    "update",
+                    "laravel/framework",
+                    "--with-all-dependencies",
+                    "--no-scripts",
+                    "--no-plugins",
+                    "--no-install",
+                    "--no-interaction"
+                ],
+                "duration_ms": 125,
                 "exit_code": 0,
                 "succeeded": true,
                 "failure_type": null,
                 "stdout_excerpt": "Composer resolved the requested target.",
                 "stderr_excerpt": "",
+                "candidate_lock": {
+                    "sha256": "ae4c031e1bebb7f828571cbafc40aae68a849aa8de835da994134f6bf4215aa3",
+                    "content_hash": null,
+                    "package_count": 1
+                },
                 "temp_path": null
             }
         ]

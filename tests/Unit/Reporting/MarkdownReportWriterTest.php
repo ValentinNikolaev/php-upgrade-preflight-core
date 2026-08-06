@@ -37,7 +37,32 @@ final class MarkdownReportWriterTest extends TestCase
         $report = new UpgradeReport(
             $request,
             new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([])),
-            [new ScenarioResult($scenario, 1, '', 'Composer executable unavailable.', null, null, ScenarioResult::FAILURE_OPERATIONAL)],
+            [
+                new ScenarioResult(
+                    $scenario,
+                    1,
+                    '',
+                    'Composer executable unavailable.',
+                    null,
+                    null,
+                    ScenarioResult::FAILURE_OPERATIONAL,
+                    '2.8.12',
+                    ['composer', 'update', 'fixture/dependency:^2.0'],
+                    125
+                ),
+                new ScenarioResult(
+                    $scenario,
+                    0,
+                    'Resolved.',
+                    '',
+                    new ComposerLock(['content-hash' => 'candidate-content', 'packages' => []]),
+                    null,
+                    null,
+                    '2.8.12',
+                    ['composer', 'update', 'fixture/dependency'],
+                    250
+                ),
+            ],
             new LockDiff([]),
             [],
             [new SourceUsage('src/Example.php', 'Vendor\\Package\\Client', 'static_call', ['source-1'], 12)],
@@ -62,6 +87,10 @@ final class MarkdownReportWriterTest extends TestCase
 
         self::assertStringContainsString('## Composer Scenarios', $markdown);
         self::assertStringContainsString('Composer executable unavailable.', $markdown);
+        self::assertStringContainsString('Composer `2.8.12`, duration `125 ms`, exit `1`', $markdown);
+        self::assertStringContainsString('command argv: `["composer","update","fixture/dependency:^2.0"]`', $markdown);
+        self::assertStringContainsString('candidate lock: SHA-256', $markdown);
+        self::assertStringContainsString('content hash `candidate-content`, packages `0`', $markdown);
         self::assertStringContainsString('## Source Impact', $markdown);
         self::assertStringContainsString('src/Example.php:12', $markdown);
         self::assertStringContainsString('## Root Constraint Changes', $markdown);

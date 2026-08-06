@@ -25,18 +25,33 @@ final class MarkdownReportWriter
         } else {
             foreach ($report->scenarios() as $scenario) {
                 $lines[] = sprintf(
-                    '- `%s`: %s (exit `%d`, failure type `%s`)',
+                    '- `%s`: %s (Composer `%s`, duration `%d ms`, exit `%d`, failure type `%s`)',
                     $this->inline($scenario->scenario()->name()),
                     $scenario->succeeded() ? 'succeeded' : 'failed',
+                    $this->inline($scenario->composerVersion() ?? 'unknown'),
+                    $scenario->durationMs(),
                     $scenario->exitCode(),
                     $scenario->failureType() ?? 'none'
                 );
 
+                $command = json_encode($scenario->command(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                $lines[] = sprintf('  - command argv: `%s`', $this->inline($command));
+
                 if (trim($scenario->stdout()) !== '') {
-                    $lines[] = sprintf('  - stdout: `%s`', $this->inline($this->excerpt($scenario->stdout())));
+                    $lines[] = sprintf('  - stdout excerpt: `%s`', $this->inline($this->excerpt($scenario->stdout())));
                 }
                 if (trim($scenario->stderr()) !== '') {
-                    $lines[] = sprintf('  - stderr: `%s`', $this->inline($this->excerpt($scenario->stderr())));
+                    $lines[] = sprintf('  - stderr excerpt: `%s`', $this->inline($this->excerpt($scenario->stderr())));
+                }
+
+                $candidateLock = $scenario->candidateLockEvidence();
+                if ($candidateLock !== null) {
+                    $lines[] = sprintf(
+                        '  - candidate lock: SHA-256 `%s`, content hash `%s`, packages `%d`',
+                        $candidateLock->sha256(),
+                        $this->inline($candidateLock->contentHash() ?? 'unavailable'),
+                        $candidateLock->packageCount()
+                    );
                 }
             }
         }

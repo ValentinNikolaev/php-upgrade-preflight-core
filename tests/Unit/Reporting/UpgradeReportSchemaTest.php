@@ -141,7 +141,12 @@ final class UpgradeReportSchemaTest extends TestCase
                 'packages' => [
                     ['name' => 'laravel/framework', 'version' => 'v9.52.16'],
                 ],
-            ])
+            ]),
+            null,
+            null,
+            '2.8.12',
+            ['composer', 'update', 'laravel/framework', '--with-all-dependencies', '--no-scripts', '--no-plugins', '--no-install', '--no-interaction'],
+            125
         );
         $evidence = [
             new Evidence('solver-1', Evidence::E1_SOLVER, 'Composer reported a root constraint conflict.', 'high', [

@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Composer;
 
 use PhpUpgradePreflight\Core\Filesystem\TemporaryWorkspaceManager;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceManager;
+use PhpUpgradePreflight\Core\Model\CandidateLockEvidence;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\Scenario;
@@ -20,38 +21,61 @@ final class ComposerScenarioRunner
     private JsonFileReader $reader;
     /** @var \Closure(list<string>, string): array{exit_code: int, stdout: string, stderr: string} */
     private \Closure $processRunner;
+    /** @var \Closure(): ?string */
+    private \Closure $composerVersionResolver;
+    /** @var \Closure(): float */
+    private \Closure $clock;
+    private bool $composerVersionResolved = false;
+    private ?string $composerVersion = null;
 
     /**
      * @param null|callable(list<string>, string): array{exit_code: int, stdout: string, stderr: string} $processRunner
+     * @param null|callable(): ?string $composerVersionResolver
+     * @param null|callable(): float $clock
      */
     public function __construct(
         ?WorkspaceManager $workspaces = null,
         ?JsonFileReader $reader = null,
-        ?callable $processRunner = null
+        ?callable $processRunner = null,
+        ?callable $composerVersionResolver = null,
+        ?callable $clock = null
     ) {
         $this->workspaces = $workspaces ?? new TemporaryWorkspaceManager();
         $this->reader = $reader ?? new JsonFileReader();
         $this->processRunner = $processRunner === null
             ? \Closure::fromCallable([$this, 'runProcess'])
             : \Closure::fromCallable($processRunner);
+        $this->composerVersionResolver = $composerVersionResolver === null
+            ? ($processRunner === null ? \Closure::fromCallable([$this, 'detectComposerVersion']) : static fn (): ?string => null)
+            : \Closure::fromCallable($composerVersionResolver);
+        $this->clock = $clock === null
+            ? static fn (): float => microtime(true)
+            : \Closure::fromCallable($clock);
     }
 
     public function run(ProjectState $project, UpgradeRequest $request, Scenario $scenario): ScenarioResult
     {
         $tempPath = null;
+        $command = $this->buildCommand($scenario);
+        $composerVersion = $this->resolveComposerVersion();
+        $durationMs = 0;
+        $startedAt = null;
 
         try {
             $tempPath = $this->workspaces->createFromProject($project->path());
             if (!$scenario->isBaselineValidation()) {
                 $this->applyTemporaryComposerChanges($tempPath, $project->path(), $scenario);
             }
-            $command = $this->buildCommand($scenario);
+            $startedAt = ($this->clock)();
             $process = ($this->processRunner)($command, $tempPath);
+            $durationMs = $this->elapsedMilliseconds($startedAt);
 
             $lock = null;
+            $candidateLockEvidence = null;
             $lockPath = $tempPath . DIRECTORY_SEPARATOR . 'composer.lock';
             if ($process['exit_code'] === 0 && is_file($lockPath)) {
                 $lock = new ComposerLock($this->reader->read($lockPath));
+                $candidateLockEvidence = CandidateLockEvidence::fromFile($lockPath, $lock);
             }
 
             $failureType = null;
@@ -74,9 +98,17 @@ final class ComposerScenarioRunner
                 $process['stderr'],
                 $lock,
                 $request->debug() ? $tempPath : null,
-                $failureType
+                $failureType,
+                $composerVersion,
+                $command,
+                $durationMs,
+                $candidateLockEvidence
             );
         } catch (\Throwable $exception) {
+            if ($startedAt !== null && $durationMs === 0) {
+                $durationMs = $this->elapsedMilliseconds($startedAt);
+            }
+
             $result = new ScenarioResult(
                 $scenario,
                 1,
@@ -84,7 +116,10 @@ final class ComposerScenarioRunner
                 $exception->getMessage(),
                 null,
                 $request->debug() ? $tempPath : null,
-                ScenarioResult::FAILURE_OPERATIONAL
+                ScenarioResult::FAILURE_OPERATIONAL,
+                $composerVersion,
+                $command,
+                $durationMs
             );
         }
 
@@ -94,12 +129,16 @@ final class ComposerScenarioRunner
             } catch (\Throwable $exception) {
                 return new ScenarioResult(
                     $scenario,
-                    1,
+                    $result->exitCode(),
                     $result->stdout(),
                     trim($result->stderr() . PHP_EOL . sprintf('Temporary workspace cleanup failed: %s', $exception->getMessage())),
                     null,
                     $tempPath,
-                    ScenarioResult::FAILURE_OPERATIONAL
+                    ScenarioResult::FAILURE_OPERATIONAL,
+                    $result->composerVersion(),
+                    $result->command(),
+                    $result->durationMs(),
+                    $result->candidateLockEvidence()
                 );
             }
         }
@@ -158,6 +197,46 @@ final class ComposerScenarioRunner
             'stdout' => $process->getOutput(),
             'stderr' => $process->getErrorOutput(),
         ];
+    }
+
+    private function detectComposerVersion(): ?string
+    {
+        $process = new Process(['composer', '--version', '--no-ansi', '--no-interaction'], null, ['COMPOSER_NO_INTERACTION' => '1'], null, 30);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return null;
+        }
+
+        $output = trim($process->getOutput() . "\n" . $process->getErrorOutput());
+        if (preg_match('/\bComposer(?:\s+version)?\s+([^\s]+)/i', $output, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    private function resolveComposerVersion(): ?string
+    {
+        if ($this->composerVersionResolved) {
+            return $this->composerVersion;
+        }
+
+        $this->composerVersionResolved = true;
+
+        try {
+            $version = ($this->composerVersionResolver)();
+            $this->composerVersion = $version === null || trim($version) === '' ? null : trim($version);
+        } catch (\Throwable $exception) {
+            $this->composerVersion = null;
+        }
+
+        return $this->composerVersion;
+    }
+
+    private function elapsedMilliseconds(float $startedAt): int
+    {
+        return max(0, (int) round(((float) ($this->clock)() - $startedAt) * 1000));
     }
 
     private function applyTemporaryComposerChanges(string $tempPath, string $projectPath, Scenario $scenario): void

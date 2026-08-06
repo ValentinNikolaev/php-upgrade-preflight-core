@@ -29,6 +29,10 @@ final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
 
         self::assertTrue($result->succeeded(), $result->stderr());
         self::assertNull($result->failureType());
+        self::assertNotNull($result->composerVersion());
+        self::assertSame('composer', $result->command()[0]);
+        self::assertGreaterThanOrEqual(0, $result->durationMs());
+        self::assertNotNull($result->candidateLockEvidence());
         $snapshot->assertUnchanged($this);
     }
 

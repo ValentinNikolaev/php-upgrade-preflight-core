@@ -18,6 +18,61 @@ use Symfony\Component\Filesystem\Path;
 
 final class ComposerScenarioRunnerTest extends TestCase
 {
+    public function testItCapturesExecutionMetadataAndCandidateLockEvidence(): void
+    {
+        $lockContents = json_encode([
+            'content-hash' => 'fixture-content-hash',
+            'packages' => [['name' => 'fixture/dependency', 'version' => '2.0.0']],
+            'packages-dev' => [['name' => 'fixture/dev-dependency', 'version' => '1.0.0']],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
+        $clockValues = [100.0, 100.125];
+        $runner = new ComposerScenarioRunner(
+            null,
+            null,
+            static function (array $command, string $directory) use ($lockContents): array {
+                file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', $lockContents);
+
+                return [
+                    'exit_code' => 0,
+                    'stdout' => 'Resolved candidate.',
+                    'stderr' => 'Diagnostic note.',
+                ];
+            },
+            static fn (): string => '2.8.12',
+            static function () use (&$clockValues): float {
+                $value = array_shift($clockValues);
+                if (!is_float($value)) {
+                    throw new \LogicException('No test clock value remains.');
+                }
+
+                return $value;
+            }
+        );
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $result = $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('exact-target', $request->targets(), false));
+
+        self::assertSame('2.8.12', $result->composerVersion());
+        self::assertSame([
+            'composer',
+            'update',
+            'fixture/dependency',
+            '--no-scripts',
+            '--no-plugins',
+            '--no-install',
+            '--no-interaction',
+        ], $result->command());
+        self::assertSame(125, $result->durationMs());
+        self::assertSame(0, $result->exitCode());
+        self::assertSame('Resolved candidate.', $result->stdout());
+        self::assertSame('Diagnostic note.', $result->stderr());
+        self::assertNotNull($result->candidateLockEvidence());
+        self::assertSame(hash('sha256', $lockContents), $result->candidateLockEvidence()->sha256());
+        self::assertSame('fixture-content-hash', $result->candidateLockEvidence()->contentHash());
+        self::assertSame(2, $result->candidateLockEvidence()->packageCount());
+    }
+
     public function testBaselineValidationUsesTheUnchangedManifestAndValidationCommand(): void
     {
         $capturedCommand = null;
@@ -170,6 +225,77 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertTrue($operationalResult->isOperationalFailure());
     }
 
+    public function testProcessExceptionPreservesAvailableExecutionMetadata(): void
+    {
+        $clockValues = [100.0, 100.125];
+        $runner = new ComposerScenarioRunner(
+            null,
+            null,
+            static function (): array {
+                throw new \RuntimeException('Composer process failed to start.');
+            },
+            static fn (): string => '2.8.12',
+            static function () use (&$clockValues): float {
+                $value = array_shift($clockValues);
+                if (!is_float($value)) {
+                    throw new \LogicException('No test clock value remains.');
+                }
+
+                return $value;
+            }
+        );
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets(), false));
+
+        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+        self::assertSame(1, $result->exitCode());
+        self::assertSame('2.8.12', $result->composerVersion());
+        self::assertSame([
+            'composer',
+            'update',
+            'fixture/dependency',
+            '--no-scripts',
+            '--no-plugins',
+            '--no-install',
+            '--no-interaction',
+        ], $result->command());
+        self::assertSame(125, $result->durationMs());
+        self::assertStringContainsString('failed to start', $result->stderr());
+        self::assertNull($result->candidateLockEvidence());
+    }
+
+    public function testVersionProbeFailureDoesNotDiscardASuccessfulScenario(): void
+    {
+        $runner = new ComposerScenarioRunner(
+            null,
+            null,
+            static function (array $command, string $directory): array {
+                file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
+                    'packages' => [['name' => 'fixture/dependency', 'version' => '2.0.0']],
+                    'packages-dev' => [],
+                ], JSON_THROW_ON_ERROR));
+
+                return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+            },
+            static function (): ?string {
+                throw new \RuntimeException('Composer version probe failed.');
+            }
+        );
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets(), false));
+
+        self::assertTrue($result->succeeded());
+        self::assertNull($result->composerVersion());
+        self::assertSame(0, $result->exitCode());
+        self::assertNotNull($result->candidateLockEvidence());
+    }
+
     public function testWorkspaceCreationFailureBecomesAnOperationalResult(): void
     {
         $workspaceManager = new FailingCreateWorkspaceManager();
@@ -207,8 +333,10 @@ final class ComposerScenarioRunnerTest extends TestCase
 
             self::assertFalse($result->succeeded());
             self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+            self::assertSame(0, $result->exitCode());
             self::assertStringContainsString('cleanup failed', $result->stderr());
             self::assertNotNull($result->tempPath());
+            self::assertNotNull($result->candidateLockEvidence());
         } finally {
             $workspaceManager->forceCleanup();
         }

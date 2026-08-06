@@ -260,17 +260,38 @@
             "additionalProperties": false,
             "required": [
                 "name",
+                "composer_version",
+                "command",
+                "duration_ms",
                 "exit_code",
                 "succeeded",
                 "failure_type",
                 "stdout_excerpt",
                 "stderr_excerpt",
+                "candidate_lock",
                 "temp_path"
             ],
             "properties": {
                 "name": {
                     "type": "string",
                     "minLength": 1
+                },
+                "composer_version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "duration_ms": {
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "exit_code": {
                     "type": "integer"
@@ -294,11 +315,46 @@
                     "type": "string",
                     "maxLength": 4000
                 },
+                "candidate_lock": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/candidateLock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
                 "temp_path": {
                     "type": [
                         "string",
                         "null"
                     ]
+                }
+            }
+        },
+        "candidateLock": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "sha256",
+                "content_hash",
+                "package_count"
+            ],
+            "properties": {
+                "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "content_hash": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "package_count": {
+                    "type": "integer",
+                    "minimum": 0
                 }
             }
         },

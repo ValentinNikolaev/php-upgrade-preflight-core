@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Model;
 
 use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
 use PhpUpgradePreflight\Core\Model\Blocker;
+use PhpUpgradePreflight\Core\Model\CandidateLockEvidence;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
@@ -46,6 +47,7 @@ final class ImmutableDtoTest extends TestCase
     {
         return [
             [Blocker::class],
+            [CandidateLockEvidence::class],
             [CompatibilityFinding::class],
             [ComposerJson::class],
             [ComposerLock::class],
