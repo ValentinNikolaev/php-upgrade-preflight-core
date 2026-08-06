@@ -17,10 +17,16 @@ final class BlockerGrouper
      */
     public function group(array $scenarioResults, array &$evidence): array
     {
+        foreach ($scenarioResults as $result) {
+            if ($result->succeeded()) {
+                return [];
+            }
+        }
+
         $blockers = [];
 
         foreach ($scenarioResults as $index => $result) {
-            if ($result->succeeded()) {
+            if (!$result->isSolverFailure()) {
                 continue;
             }
 

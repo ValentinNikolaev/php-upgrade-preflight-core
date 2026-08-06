@@ -10,6 +10,9 @@ final class JsonReportWriter
 {
     public function render(UpgradeReport $report): string
     {
-        return json_encode($report->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+        return json_encode(
+            $report->toArray(),
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+        ) . PHP_EOL;
     }
 }

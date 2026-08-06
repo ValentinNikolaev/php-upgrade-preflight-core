@@ -66,6 +66,12 @@ final class UpgradeReport
             }
         }
 
+        foreach ($this->scenarios as $scenario) {
+            if ($scenario->isOperationalFailure()) {
+                return 'unknown';
+            }
+        }
+
         return count($this->blockers) > 0 ? 'blocked' : 'unknown';
     }
 

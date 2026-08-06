@@ -8,11 +8,13 @@ use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
 use PhpUpgradePreflight\Core\Contracts\UpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
+use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
@@ -57,17 +59,19 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario);
         }
 
-        $bestLock = null;
-        foreach ($scenarioResults as $result) {
-            if ($result->succeeded()) {
-                $bestLock = $result->lock;
-                break;
-            }
-        }
+        $bestResult = $this->bestSuccessfulResult($project->composerLock, $scenarioResults);
+        $bestLock = $bestResult === null ? null : $bestResult->lock;
 
         $lockDiff = $bestLock === null ? new LockDiff([]) : $this->lockDiffBuilder->build($project->composerLock, $bestLock);
         $blockers = $this->blockerGrouper->group($scenarioResults, $evidence);
-        $sourceImpact = $this->sourceUsageScanner->scan($project, $sourcePaths, $evidence);
+        $sourceUncertainties = [];
+        $sourceImpact = $this->sourceUsageScanner->scan(
+            $project,
+            $sourcePaths,
+            $evidence,
+            $sourceUncertainties,
+            $request->sourcePaths !== []
+        );
         $frameworkFindings = [];
 
         foreach ($activeFrameworks as $framework) {
@@ -89,7 +93,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $frameworkFindings,
             $this->risk($blockers, $lockDiff->packageChanges, $frameworkFindings),
             $this->effort($blockers, $lockDiff->packageChanges, $sourceImpact, $frameworkFindings),
-            $this->uncertainties($scenarioResults, $sourcePaths),
+            $this->uncertainties($scenarioResults, $sourceUncertainties),
             $evidence
         );
     }
@@ -107,7 +111,18 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     /** @return list<FrameworkIntegration> */
     private function activeFrameworks($project, UpgradeRequest $request): array
     {
-        $requested = array_map('strtolower', $request->frameworks);
+        $requested = array_values(array_unique(array_map('strtolower', $request->frameworks)));
+        $available = array_map(static fn (FrameworkIntegration $framework): string => strtolower($framework->name()), $this->frameworks);
+        $unavailable = array_values(array_diff($requested, $available));
+
+        if ($unavailable !== []) {
+            throw new \InvalidArgumentException(sprintf(
+                'Requested framework integration%s unavailable: %s.',
+                count($unavailable) === 1 ? ' is' : 's are',
+                implode(', ', $unavailable)
+            ));
+        }
+
         $active = [];
 
         foreach ($this->frameworks as $framework) {
@@ -121,6 +136,33 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         }
 
         return $active;
+    }
+
+    /** @param list<ScenarioResult> $scenarioResults */
+    private function bestSuccessfulResult(ComposerLock $baseline, array $scenarioResults): ?ScenarioResult
+    {
+        /** @var list<array{int, int, int, ScenarioResult}> $candidates */
+        $candidates = [];
+
+        foreach ($scenarioResults as $index => $result) {
+            if (!$result->succeeded() || $result->lock === null) {
+                continue;
+            }
+
+            $changeCount = count($this->lockDiffBuilder->build($baseline, $result->lock)->packageChanges);
+            $strategyRank = $result->scenario->minimalChanges ? 1 : ($result->scenario->withAllDependencies ? 2 : 0);
+            $candidates[] = [$changeCount, $strategyRank, $index, $result];
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        usort($candidates, static function (array $left, array $right): int {
+            return [$left[0], $left[1], $left[2]] <=> [$right[0], $right[1], $right[2]];
+        });
+
+        return $candidates[0][3];
     }
 
     /** @param list<FrameworkIntegration> $frameworks @return list<string> */
@@ -172,20 +214,19 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         );
     }
 
-    /** @param list<mixed> $scenarioResults @param list<string> $sourcePaths @return list<string> */
-    private function uncertainties(array $scenarioResults, array $sourcePaths): array
+    /** @param list<mixed> $scenarioResults @param list<string> $sourceUncertainties @return list<string> */
+    private function uncertainties(array $scenarioResults, array $sourceUncertainties): array
     {
-        $uncertainties = [];
-        if ($sourcePaths === []) {
-            $uncertainties[] = 'No source paths were scanned.';
-        }
+        $uncertainties = $sourceUncertainties;
         foreach ($scenarioResults as $result) {
-            if (stripos($result->stderr, 'composer') !== false && stripos($result->stderr, 'not recognized') !== false) {
-                $uncertainties[] = 'Composer executable was unavailable in the analysis environment.';
-                break;
+            if ($result->isOperationalFailure()) {
+                $uncertainties[] = sprintf(
+                    'Composer scenario "%s" could not complete because of an analysis-environment failure.',
+                    $result->scenario->name
+                );
             }
         }
 
-        return $uncertainties;
+        return array_values(array_unique($uncertainties));
     }
 }
