@@ -38,12 +38,12 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
             try {
                 $this->remove($tempPath);
             } catch (\Throwable $cleanupException) {
-                throw new \RuntimeException(sprintf(
+                throw new WorkspaceCleanupException($tempPath, sprintf(
                     '%s Cleanup of partial workspace "%s" also failed: %s',
                     $exception->getMessage(),
                     $tempPath,
                     $cleanupException->getMessage()
-                ), 0, $exception);
+                ), $cleanupException);
             }
 
             throw $exception;
@@ -58,22 +58,28 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
             return;
         }
 
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST
+            );
 
-        foreach ($iterator as $item) {
-            if ($item->isLink()) {
-                $this->unlink($item->getPathname());
-            } elseif ($item->isDir()) {
-                $this->removeDirectory($item->getPathname());
-            } else {
-                $this->unlink($item->getPathname());
+            foreach ($iterator as $item) {
+                if ($item->isLink()) {
+                    $this->unlink($item->getPathname());
+                } elseif ($item->isDir()) {
+                    $this->removeDirectory($item->getPathname());
+                } else {
+                    $this->unlink($item->getPathname());
+                }
             }
-        }
 
-        $this->removeDirectory($path);
+            $this->removeDirectory($path);
+        } catch (WorkspaceCleanupException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            throw new WorkspaceCleanupException($path, $exception->getMessage(), $exception);
+        }
     }
 
     private function unlink(string $path): void

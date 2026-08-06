@@ -12,6 +12,17 @@ final class ScenarioResult
     public const FAILURE_OPERATIONAL = 'operational';
     public const FAILURE_VALIDATION = 'validation';
 
+    public const OUTCOME_SUCCESS = 'success';
+    public const OUTCOME_SOLVER_FAILURE = 'solver_failure';
+    public const OUTCOME_VALIDATION_FAILURE = 'validation_failure';
+    public const OUTCOME_COMPOSER_MISSING = 'composer_missing';
+    public const OUTCOME_TIMEOUT = 'timeout';
+    public const OUTCOME_INVALID_JSON = 'invalid_json';
+    public const OUTCOME_LOCKFILE_MISSING = 'lockfile_missing';
+    public const OUTCOME_PROCESS_FAILURE = 'process_failure';
+    public const OUTCOME_CLEANUP_FAILURE = 'cleanup_failure';
+    public const OUTCOME_WORKSPACE_FAILURE = 'workspace_failure';
+
     private Scenario $scenario;
     private int $exitCode;
     private string $stdout;
@@ -19,6 +30,7 @@ final class ScenarioResult
     private ?ComposerLock $lock;
     private ?string $tempPath;
     private ?string $failureType;
+    private string $outcome;
     private ?string $composerVersion;
     /** @var list<string> */
     private array $command;
@@ -39,7 +51,8 @@ final class ScenarioResult
         array $command = [],
         int $durationMs = 0,
         ?CandidateLockEvidence $candidateLockEvidence = null,
-        array $diagnostics = []
+        array $diagnostics = [],
+        ?string $outcome = null
     ) {
         if ($failureType !== null && !in_array($failureType, [self::FAILURE_SOLVER, self::FAILURE_OPERATIONAL, self::FAILURE_VALIDATION], true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported scenario failure type "%s".', $failureType));
@@ -61,6 +74,28 @@ final class ScenarioResult
             }
         }
 
+        $outcome = $outcome ?? self::inferOutcome($exitCode, $lock, $failureType);
+        if (!in_array($outcome, self::supportedOutcomes(), true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported scenario outcome "%s".', $outcome));
+        }
+
+        $expectedFailureType = self::failureTypeForOutcome($outcome);
+        if ($failureType !== $expectedFailureType) {
+            throw new \InvalidArgumentException(sprintf(
+                'Scenario outcome "%s" requires failure type %s.',
+                $outcome,
+                $expectedFailureType === null ? 'null' : sprintf('"%s"', $expectedFailureType)
+            ));
+        }
+
+        if ($outcome === self::OUTCOME_SUCCESS && ($exitCode !== 0 || $lock === null)) {
+            throw new \InvalidArgumentException('A successful scenario outcome requires exit code 0, a lockfile, and no failure type.');
+        }
+
+        if ($outcome !== self::OUTCOME_SUCCESS && $lock !== null) {
+            throw new \InvalidArgumentException('A failed scenario outcome cannot contain a candidate lock.');
+        }
+
         $this->scenario = $scenario;
         $this->exitCode = $exitCode;
         $this->stdout = $stdout;
@@ -68,6 +103,7 @@ final class ScenarioResult
         $this->lock = $lock;
         $this->tempPath = $tempPath;
         $this->failureType = $failureType;
+        $this->outcome = $outcome;
         $this->composerVersion = $composerVersion;
         $this->command = array_values($command);
         $this->durationMs = $durationMs;
@@ -110,6 +146,11 @@ final class ScenarioResult
         return $this->failureType;
     }
 
+    public function outcome(): string
+    {
+        return $this->outcome;
+    }
+
     public function composerVersion(): ?string
     {
         return $this->composerVersion;
@@ -139,7 +180,7 @@ final class ScenarioResult
 
     public function succeeded(): bool
     {
-        return $this->exitCode === 0 && $this->lock !== null;
+        return $this->outcome === self::OUTCOME_SUCCESS;
     }
 
     public function isSolverFailure(): bool
@@ -157,7 +198,7 @@ final class ScenarioResult
         return !$this->succeeded() && $this->failureType === self::FAILURE_VALIDATION;
     }
 
-    /** @return array{name: string, composer_version: ?string, command: list<string>, duration_ms: int, exit_code: int, succeeded: bool, failure_type: ?string, stdout_excerpt: string, stderr_excerpt: string, candidate_lock: ?array{sha256: string, content_hash: ?string, package_count: int}, diagnostics: list<array{package: string, constraint: string, command: list<string>, exit_code: int, stdout_excerpt: string, stderr_excerpt: string}>, temp_path: ?string} */
+    /** @return array{name: string, composer_version: ?string, command: list<string>, duration_ms: int, exit_code: int, succeeded: bool, outcome: string, failure_type: ?string, stdout_excerpt: string, stderr_excerpt: string, candidate_lock: ?array{sha256: string, content_hash: ?string, package_count: int}, diagnostics: list<array{package: string, constraint: string, command: list<string>, exit_code: int, stdout_excerpt: string, stderr_excerpt: string}>, temp_path: ?string} */
     public function toArray(): array
     {
         return [
@@ -167,6 +208,7 @@ final class ScenarioResult
             'duration_ms' => $this->durationMs,
             'exit_code' => $this->exitCode,
             'succeeded' => $this->succeeded(),
+            'outcome' => $this->outcome,
             'failure_type' => $this->failureType,
             'stdout_excerpt' => OutputExcerpt::bounded($this->stdout),
             'stderr_excerpt' => OutputExcerpt::bounded($this->stderr),
@@ -174,5 +216,56 @@ final class ScenarioResult
             'diagnostics' => array_map(static fn (ComposerDiagnostic $diagnostic): array => $diagnostic->toArray(), $this->diagnostics),
             'temp_path' => $this->tempPath,
         ];
+    }
+
+    /** @return list<string> */
+    public static function supportedOutcomes(): array
+    {
+        return [
+            self::OUTCOME_SUCCESS,
+            self::OUTCOME_SOLVER_FAILURE,
+            self::OUTCOME_VALIDATION_FAILURE,
+            self::OUTCOME_COMPOSER_MISSING,
+            self::OUTCOME_TIMEOUT,
+            self::OUTCOME_INVALID_JSON,
+            self::OUTCOME_LOCKFILE_MISSING,
+            self::OUTCOME_PROCESS_FAILURE,
+            self::OUTCOME_CLEANUP_FAILURE,
+            self::OUTCOME_WORKSPACE_FAILURE,
+        ];
+    }
+
+    private static function inferOutcome(int $exitCode, ?ComposerLock $lock, ?string $failureType): string
+    {
+        if ($exitCode === 0 && $lock !== null && $failureType === null) {
+            return self::OUTCOME_SUCCESS;
+        }
+
+        if ($failureType === self::FAILURE_SOLVER) {
+            return self::OUTCOME_SOLVER_FAILURE;
+        }
+
+        if ($failureType === self::FAILURE_VALIDATION) {
+            return self::OUTCOME_VALIDATION_FAILURE;
+        }
+
+        return self::OUTCOME_PROCESS_FAILURE;
+    }
+
+    private static function failureTypeForOutcome(string $outcome): ?string
+    {
+        if ($outcome === self::OUTCOME_SUCCESS) {
+            return null;
+        }
+
+        if ($outcome === self::OUTCOME_SOLVER_FAILURE) {
+            return self::FAILURE_SOLVER;
+        }
+
+        if ($outcome === self::OUTCOME_VALIDATION_FAILURE) {
+            return self::FAILURE_VALIDATION;
+        }
+
+        return self::FAILURE_OPERATIONAL;
     }
 }

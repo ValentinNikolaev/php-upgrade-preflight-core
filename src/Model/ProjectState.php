@@ -32,13 +32,15 @@ final class ProjectState
         return $this->composerLock;
     }
 
-    /** @return array{path: string, platform_php: ?string, root_requirements: array<string, string>, locked_packages: int} */
+    /** @return array{path: string, platform_php: ?string, root_requirements: array<string, string>|\stdClass, locked_packages: int} */
     public function toArray(): array
     {
+        $rootRequirements = $this->composerJson->rootRequirements();
+
         return [
             'path' => $this->path,
             'platform_php' => $this->composerJson->platformPhp(),
-            'root_requirements' => $this->composerJson->rootRequirements(),
+            'root_requirements' => $rootRequirements === [] ? new \stdClass() : $rootRequirements,
             'locked_packages' => count($this->composerLock->packages()),
         ];
     }

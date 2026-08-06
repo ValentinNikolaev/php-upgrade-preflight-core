@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
+use PhpUpgradePreflight\Core\Composer\InvalidJsonException;
+use PhpUpgradePreflight\Core\Composer\MissingJsonFileException;
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
+use PhpUpgradePreflight\Core\Composer\ProjectStateLoadResult;
 use PhpUpgradePreflight\Core\Contracts\UpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
+use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\LockDiff;
+use PhpUpgradePreflight\Core\Model\RiskSummary;
+use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
@@ -58,7 +64,12 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     public function analyzeUpgrade(UpgradeRequest $request): UpgradeReport
     {
         $evidence = new EvidenceLedger();
-        $project = $this->projectStateBuilder->build($request->projectPath());
+        $projectLoad = $this->projectStateBuilder->load($request->projectPath());
+        if (!$projectLoad->succeeded()) {
+            return $this->inputFailureReport($request, $projectLoad);
+        }
+
+        $project = $projectLoad->project();
         $targets = $this->targetNormalizer->normalize($request->targets()->packageTargets(), $request->targetPhp());
         $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
         $sourcePaths = $this->frameworkRuleEngine->sourcePaths($project, $request, $activeFrameworks);
@@ -105,6 +116,58 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $effort,
             $sourceUncertainties,
             $evidence
+        );
+    }
+
+    private function inputFailureReport(UpgradeRequest $request, ProjectStateLoadResult $projectLoad): UpgradeReport
+    {
+        $failure = $projectLoad->failure();
+        if ($failure === null) {
+            throw new \LogicException('A failed project-state load must contain its failure.');
+        }
+
+        if ($failure instanceof InvalidJsonException) {
+            $outcome = ScenarioResult::OUTCOME_INVALID_JSON;
+        } elseif ($failure instanceof MissingJsonFileException && basename($failure->path()) === 'composer.lock') {
+            $outcome = ScenarioResult::OUTCOME_LOCKFILE_MISSING;
+        } else {
+            $outcome = ScenarioResult::OUTCOME_WORKSPACE_FAILURE;
+        }
+
+        $scenario = new Scenario('project-input', $request->targets(), false);
+        $scenarioResult = new ScenarioResult(
+            $scenario,
+            1,
+            '',
+            $failure->getMessage(),
+            null,
+            null,
+            ScenarioResult::FAILURE_OPERATIONAL,
+            null,
+            [],
+            0,
+            null,
+            [],
+            $outcome
+        );
+
+        return new UpgradeReport(
+            $request,
+            $projectLoad->project(),
+            [$scenarioResult],
+            new LockDiff([]),
+            [],
+            [],
+            [],
+            new RiskSummary('high', ['Upgrade risk could not be assessed because Composer project input is incomplete.']),
+            new EffortEstimate(
+                [0, 0],
+                'low',
+                [],
+                ['Upgrade effort was not estimated because Composer project input could not be loaded.']
+            ),
+            [sprintf('Composer project input could not be loaded: %s', $failure->getMessage())],
+            []
         );
     }
 

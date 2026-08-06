@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Composer;
 
 use Composer\Semver\Semver;
 use PhpUpgradePreflight\Core\Filesystem\TemporaryWorkspaceManager;
+use PhpUpgradePreflight\Core\Filesystem\WorkspaceCleanupException;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceManager;
 use PhpUpgradePreflight\Core\Model\CandidateLockEvidence;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
@@ -15,6 +16,7 @@ use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 final class ComposerScenarioRunner
@@ -66,12 +68,16 @@ final class ComposerScenarioRunner
         $composerVersion = $this->resolveComposerVersion();
         $durationMs = 0;
         $startedAt = null;
+        $phase = 'workspace';
+        $cleanupFailedDuringCreation = false;
 
         try {
             $tempPath = $this->workspaces->createFromProject($project->path());
+            $phase = 'preparation';
             if (!$scenario->isBaselineValidation()) {
                 $this->applyTemporaryComposerChanges($tempPath, $project->path(), $scenario);
             }
+            $phase = 'process';
             $startedAt = ($this->clock)();
             $process = ($this->processRunner)($command, $tempPath);
             $durationMs = $this->elapsedMilliseconds($startedAt);
@@ -79,23 +85,33 @@ final class ComposerScenarioRunner
             $lock = null;
             $candidateLockEvidence = null;
             $lockPath = $tempPath . DIRECTORY_SEPARATOR . 'composer.lock';
+            $phase = 'lockfile';
             if ($process['exit_code'] === 0 && is_file($lockPath)) {
                 $lock = new ComposerLock($this->reader->read($lockPath));
                 $candidateLockEvidence = CandidateLockEvidence::fromFile($lockPath, $lock);
             }
 
             $failureType = null;
+            $outcome = ScenarioResult::OUTCOME_SUCCESS;
             $diagnostics = [];
             if ($process['exit_code'] !== 0) {
-                if ($scenario->isBaselineValidation()) {
+                if ($this->indicatesMissingComposer($process['exit_code'], $process['stdout'], $process['stderr'])) {
+                    $failureType = ScenarioResult::FAILURE_OPERATIONAL;
+                    $outcome = ScenarioResult::OUTCOME_COMPOSER_MISSING;
+                } elseif ($scenario->isBaselineValidation()) {
                     $failureType = ScenarioResult::FAILURE_VALIDATION;
+                    $outcome = ScenarioResult::OUTCOME_VALIDATION_FAILURE;
                 } else {
                     $failureType = $this->isSolverFailure($process['stdout'], $process['stderr'])
                         ? ScenarioResult::FAILURE_SOLVER
                         : ScenarioResult::FAILURE_OPERATIONAL;
+                    $outcome = $failureType === ScenarioResult::FAILURE_SOLVER
+                        ? ScenarioResult::OUTCOME_SOLVER_FAILURE
+                        : ScenarioResult::OUTCOME_PROCESS_FAILURE;
                 }
             } elseif ($lock === null) {
                 $failureType = ScenarioResult::FAILURE_OPERATIONAL;
+                $outcome = ScenarioResult::OUTCOME_LOCKFILE_MISSING;
             }
 
             if ($failureType === ScenarioResult::FAILURE_SOLVER) {
@@ -114,28 +130,53 @@ final class ComposerScenarioRunner
                 $command,
                 $durationMs,
                 $candidateLockEvidence,
-                $diagnostics
+                $diagnostics,
+                $outcome
             );
         } catch (\Throwable $exception) {
+            if ($exception instanceof WorkspaceCleanupException) {
+                $tempPath = $exception->workspacePath();
+                $cleanupFailedDuringCreation = true;
+            }
+
             if ($startedAt !== null && $durationMs === 0) {
                 $durationMs = $this->elapsedMilliseconds($startedAt);
             }
 
+            $stdout = '';
+            $stderr = $exception->getMessage();
+            $exitCode = 1;
+            if ($exception instanceof ProcessTimedOutException) {
+                $timedOutProcess = $exception->getProcess();
+                try {
+                    $stdout = $timedOutProcess->getOutput();
+                    $stderr = $timedOutProcess->getErrorOutput();
+                } catch (\Throwable) {
+                    $stdout = '';
+                    $stderr = '';
+                }
+                $stderr = trim($stderr . PHP_EOL . $exception->getMessage());
+                $exitCode = $timedOutProcess->getExitCode() ?? 1;
+            }
+
             $result = new ScenarioResult(
                 $scenario,
-                1,
-                '',
-                $exception->getMessage(),
+                $exitCode,
+                $stdout,
+                $stderr,
                 null,
-                $request->debug() ? $tempPath : null,
+                $request->debug() || $cleanupFailedDuringCreation ? $tempPath : null,
                 ScenarioResult::FAILURE_OPERATIONAL,
                 $composerVersion,
                 $command,
-                $durationMs
+                $durationMs,
+                null,
+                [],
+                $this->exceptionOutcome($exception, $phase)
             );
         }
 
-        if (!$request->debug() && $tempPath !== null) {
+        if (!$request->debug() && $tempPath !== null && !$cleanupFailedDuringCreation) {
             try {
                 $this->workspaces->remove($tempPath);
             } catch (\Throwable $exception) {
@@ -151,7 +192,8 @@ final class ComposerScenarioRunner
                     $result->command(),
                     $result->durationMs(),
                     $result->candidateLockEvidence(),
-                    $result->diagnostics()
+                    $result->diagnostics(),
+                    ScenarioResult::OUTCOME_CLEANUP_FAILURE
                 );
             }
         }
@@ -323,6 +365,42 @@ final class ComposerScenarioRunner
 
         return stripos($output, 'Your requirements could not be resolved to an installable set of packages') !== false
             || preg_match('/(?:^|\n)\s*- Root composer\.json requires /i', $output) === 1;
+    }
+
+    private function exceptionOutcome(\Throwable $exception, string $phase): string
+    {
+        if ($exception instanceof WorkspaceCleanupException) {
+            return ScenarioResult::OUTCOME_CLEANUP_FAILURE;
+        }
+
+        if ($exception instanceof ProcessTimedOutException) {
+            return ScenarioResult::OUTCOME_TIMEOUT;
+        }
+
+        if ($exception instanceof InvalidJsonException) {
+            return ScenarioResult::OUTCOME_INVALID_JSON;
+        }
+
+        if ($phase === 'process' && $this->indicatesMissingComposer(1, '', $exception->getMessage())) {
+            return ScenarioResult::OUTCOME_COMPOSER_MISSING;
+        }
+
+        if ($phase === 'process') {
+            return ScenarioResult::OUTCOME_PROCESS_FAILURE;
+        }
+
+        return ScenarioResult::OUTCOME_WORKSPACE_FAILURE;
+    }
+
+    private function indicatesMissingComposer(int $exitCode, string $stdout, string $stderr): bool
+    {
+        if (in_array($exitCode, [127, 9009], true)) {
+            return true;
+        }
+
+        $output = $stdout . "\n" . $stderr;
+
+        return preg_match('/(?:composer(?:\.bat|\.phar)?(?: executable)? (?:was |is )?(?:unavailable|missing|not found)|composer:\s*(?:command\s+)?not found|[\'\"]composer[\'\"] is not recognized|could not open input file:\s*composer|createprocess failed[^\n]*error=2|the system cannot find the file specified)/i', $output) === 1;
     }
 
     /** @return list<ComposerDiagnostic> */

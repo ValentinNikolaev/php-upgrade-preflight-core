@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "urn:php-upgrade-preflight:schema:upgrade-report:0.1",
-    "title": "PHP Upgrade Preflight v0.1 Report",
+    "$id": "urn:php-upgrade-preflight:schema:upgrade-report:0.2",
+    "title": "PHP Upgrade Preflight v0.2 Report",
     "description": "Canonical machine-readable report produced by PHP Upgrade Preflight 0.1.x.",
     "type": "object",
     "additionalProperties": false,
@@ -95,7 +95,7 @@
             ],
             "properties": {
                 "schema_version": {
-                    "const": "0.1"
+                    "const": "0.2"
                 },
                 "tool": {
                     "type": "object",
@@ -265,6 +265,7 @@
                 "duration_ms",
                 "exit_code",
                 "succeeded",
+                "outcome",
                 "failure_type",
                 "stdout_excerpt",
                 "stderr_excerpt",
@@ -299,6 +300,20 @@
                 },
                 "succeeded": {
                     "type": "boolean"
+                },
+                "outcome": {
+                    "enum": [
+                        "success",
+                        "solver_failure",
+                        "validation_failure",
+                        "composer_missing",
+                        "timeout",
+                        "invalid_json",
+                        "lockfile_missing",
+                        "process_failure",
+                        "cleanup_failure",
+                        "workspace_failure"
+                    ]
                 },
                 "failure_type": {
                     "enum": [

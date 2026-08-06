@@ -50,13 +50,13 @@ final class EffortEstimate
         return $this->assumptions;
     }
 
-    /** @return array{range_hours: array{0:int,1:int}, confidence: string, components: array<string, array{0:int,1:int}>, assumptions: list<string>} */
+    /** @return array{range_hours: array{0:int,1:int}, confidence: string, components: array<string, array{0:int,1:int}>|\stdClass, assumptions: list<string>} */
     public function toArray(): array
     {
         return [
             'range_hours' => $this->rangeHours,
             'confidence' => $this->confidence,
-            'components' => $this->components,
+            'components' => $this->components === [] ? new \stdClass() : $this->components,
             'assumptions' => $this->assumptions,
         ];
     }

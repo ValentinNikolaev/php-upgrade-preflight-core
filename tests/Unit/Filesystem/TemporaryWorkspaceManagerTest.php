@@ -7,6 +7,7 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Filesystem;
 use PhpUpgradePreflight\Core\Filesystem\NativeWorkspaceFilesystem;
 use PhpUpgradePreflight\Core\Filesystem\TemporaryWorkspaceManager;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceFilesystem;
+use PhpUpgradePreflight\Core\Filesystem\WorkspaceCleanupException;
 use PhpUpgradePreflight\Tests\Support\FixtureSnapshot;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -122,13 +123,43 @@ final class TemporaryWorkspaceManagerTest extends TestCase
             try {
                 $manager->remove($workspacePath);
                 self::fail('Expected workspace cleanup to fail.');
-            } catch (\RuntimeException $exception) {
+            } catch (WorkspaceCleanupException $exception) {
                 self::assertStringContainsString('Unable to remove temporary workspace directory', $exception->getMessage());
+                self::assertSame($workspacePath, $exception->workspacePath());
                 self::assertDirectoryExists($workspacePath);
             }
         } finally {
             $filesystem->failDirectoryRemoval = false;
             $manager->remove($workspacePath);
+        }
+
+        self::assertDirectoryDoesNotExist($workspacePath);
+    }
+
+    public function testInitializationCleanupFailureCarriesTheLeakedWorkspacePath(): void
+    {
+        $filesystem = new ControllableWorkspaceFilesystem();
+        $filesystem->copyFailureBasename = 'composer.lock';
+        $filesystem->failDirectoryRemoval = true;
+        $manager = new TemporaryWorkspaceManager($filesystem);
+        $fixturePath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $workspacePath = null;
+
+        try {
+            try {
+                $manager->createFromProject($fixturePath);
+                self::fail('Expected initialization cleanup to fail.');
+            } catch (WorkspaceCleanupException $exception) {
+                $workspacePath = $exception->workspacePath();
+                self::assertStringContainsString('Cleanup of partial workspace', $exception->getMessage());
+                self::assertSame($filesystem->createdDirectory, $workspacePath);
+                self::assertDirectoryExists($workspacePath);
+            }
+        } finally {
+            $filesystem->failDirectoryRemoval = false;
+            if ($workspacePath !== null) {
+                $manager->remove($workspacePath);
+            }
         }
 
         self::assertDirectoryDoesNotExist($workspacePath);

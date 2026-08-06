@@ -8,6 +8,7 @@ use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
 use PhpUpgradePreflight\Core\Filesystem\TemporaryWorkspaceManager;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceManager;
+use PhpUpgradePreflight\Core\Filesystem\WorkspaceCleanupException;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
@@ -15,6 +16,8 @@ use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\Process;
 
 final class ComposerScenarioRunnerTest extends TestCase
 {
@@ -195,8 +198,87 @@ final class ComposerScenarioRunnerTest extends TestCase
             throw new \RuntimeException('Composer executable was unavailable.');
         });
 
-        self::assertSame(ScenarioResult::FAILURE_SOLVER, $solverRunner->run($project, $request, $scenario)->failureType());
-        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalRunner->run($project, $request, $scenario)->failureType());
+        $solverResult = $solverRunner->run($project, $request, $scenario);
+        $operationalResult = $operationalRunner->run($project, $request, $scenario);
+
+        self::assertSame(ScenarioResult::FAILURE_SOLVER, $solverResult->failureType());
+        self::assertSame(ScenarioResult::OUTCOME_SOLVER_FAILURE, $solverResult->outcome());
+        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalResult->failureType());
+        self::assertSame(ScenarioResult::OUTCOME_COMPOSER_MISSING, $operationalResult->outcome());
+    }
+
+    public function testMissingComposerIsAStructuredOutcome(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 127,
+            'stdout' => '',
+            'stderr' => 'composer: command not found',
+        ]);
+
+        $result = $this->runFixtureScenario($runner);
+
+        self::assertSame(ScenarioResult::OUTCOME_COMPOSER_MISSING, $result->outcome());
+        self::assertSame(ScenarioResult::OUTCOME_COMPOSER_MISSING, $result->toArray()['outcome']);
+        self::assertTrue($result->isOperationalFailure());
+    }
+
+    public function testTimeoutIsAStructuredOutcome(): void
+    {
+        $process = new Process(['composer', 'update']);
+        $process->setTimeout(300);
+        $runner = new ComposerScenarioRunner(null, null, static function () use ($process): array {
+            throw new ProcessTimedOutException($process, ProcessTimedOutException::TYPE_GENERAL);
+        });
+
+        $result = $this->runFixtureScenario($runner);
+
+        self::assertSame(ScenarioResult::OUTCOME_TIMEOUT, $result->outcome());
+        self::assertTrue($result->isOperationalFailure());
+        self::assertStringContainsString('exceeded the timeout', $result->stderr());
+    }
+
+    public function testInvalidCandidateLockJsonIsAStructuredOutcome(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory): array {
+            file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', '{invalid');
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+
+        $result = $this->runFixtureScenario($runner);
+
+        self::assertSame(ScenarioResult::OUTCOME_INVALID_JSON, $result->outcome());
+        self::assertTrue($result->isOperationalFailure());
+        self::assertStringContainsString('Invalid JSON', $result->stderr());
+    }
+
+    public function testMissingCandidateLockfileIsAStructuredOutcome(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory): array {
+            unlink($directory . DIRECTORY_SEPARATOR . 'composer.lock');
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved without a lock.', 'stderr' => ''];
+        });
+
+        $result = $this->runFixtureScenario($runner);
+
+        self::assertSame(ScenarioResult::OUTCOME_LOCKFILE_MISSING, $result->outcome());
+        self::assertTrue($result->isOperationalFailure());
+        self::assertSame(0, $result->exitCode());
+    }
+
+    public function testUnexpectedNonZeroExitIsAStructuredProcessFailure(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 1,
+            'stdout' => '',
+            'stderr' => 'Transport failed before dependency resolution.',
+        ]);
+
+        $result = $this->runFixtureScenario($runner);
+
+        self::assertSame(ScenarioResult::OUTCOME_PROCESS_FAILURE, $result->outcome());
+        self::assertTrue($result->isOperationalFailure());
     }
 
     public function testSolverFailureRunsUsefulProhibitsDiagnosticsInTheScenarioWorkspace(): void
@@ -344,6 +426,7 @@ final class ComposerScenarioRunnerTest extends TestCase
         $operationalResult = $operationalRunner->run($project, $request, $scenario);
 
         self::assertSame(ScenarioResult::FAILURE_VALIDATION, $validationResult->failureType());
+        self::assertSame(ScenarioResult::OUTCOME_VALIDATION_FAILURE, $validationResult->outcome());
         self::assertTrue($validationResult->isValidationFailure());
         self::assertFalse($validationResult->isOperationalFailure());
         self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalResult->failureType());
@@ -377,6 +460,7 @@ final class ComposerScenarioRunnerTest extends TestCase
         $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets(), false));
 
         self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+        self::assertSame(ScenarioResult::OUTCOME_PROCESS_FAILURE, $result->outcome());
         self::assertSame(1, $result->exitCode());
         self::assertSame('2.8.12', $result->composerVersion());
         self::assertSame([
@@ -435,8 +519,32 @@ final class ComposerScenarioRunnerTest extends TestCase
         $result = $runner->run($project, $request, new Scenario('test', $request->targets()));
 
         self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+        self::assertSame(ScenarioResult::OUTCOME_WORKSPACE_FAILURE, $result->outcome());
         self::assertStringContainsString('Unable to create test workspace', $result->stderr());
         self::assertSame(0, $workspaceManager->removeCalls);
+    }
+
+    public function testInitializationCleanupFailureBecomesACleanupOutcomeWithTheLeakedPath(): void
+    {
+        $workspaceManager = new FailingInitializationCleanupWorkspaceManager();
+        $processCalls = 0;
+        $runner = new ComposerScenarioRunner($workspaceManager, null, static function () use (&$processCalls): array {
+            ++$processCalls;
+
+            throw new \LogicException('The process must not run after initialization cleanup fails.');
+        });
+
+        try {
+            $result = $this->runFixtureScenario($runner);
+
+            self::assertSame(0, $processCalls);
+            self::assertSame(ScenarioResult::OUTCOME_CLEANUP_FAILURE, $result->outcome());
+            self::assertTrue($result->isOperationalFailure());
+            self::assertSame($workspaceManager->workspacePath, $result->tempPath());
+            self::assertSame(0, $workspaceManager->removeCalls);
+        } finally {
+            $workspaceManager->forceCleanup();
+        }
     }
 
     public function testWorkspaceCleanupFailureBecomesAnOperationalResult(): void
@@ -459,6 +567,7 @@ final class ComposerScenarioRunnerTest extends TestCase
 
             self::assertFalse($result->succeeded());
             self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+            self::assertSame(ScenarioResult::OUTCOME_CLEANUP_FAILURE, $result->outcome());
             self::assertSame(0, $result->exitCode());
             self::assertStringContainsString('cleanup failed', $result->stderr());
             self::assertNotNull($result->tempPath());
@@ -518,6 +627,15 @@ final class ComposerScenarioRunnerTest extends TestCase
 
         return $projectPath;
     }
+
+    private function runFixtureScenario(ComposerScenarioRunner $runner): ScenarioResult
+    {
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        return $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+    }
 }
 
 final class FailingCreateWorkspaceManager implements WorkspaceManager
@@ -561,6 +679,33 @@ final class FailingCleanupWorkspaceManager implements WorkspaceManager
     {
         if ($this->workspacePath !== null) {
             $this->delegate->remove($this->workspacePath);
+            $this->workspacePath = null;
+        }
+    }
+}
+
+final class FailingInitializationCleanupWorkspaceManager implements WorkspaceManager
+{
+    public int $removeCalls = 0;
+    public ?string $workspacePath = null;
+
+    public function createFromProject(string $projectPath): string
+    {
+        $this->workspacePath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-leaked-' . bin2hex(random_bytes(8));
+        mkdir($this->workspacePath, 0700, true);
+
+        throw new WorkspaceCleanupException($this->workspacePath, 'Synthetic initialization cleanup failure.');
+    }
+
+    public function remove(string $path): void
+    {
+        ++$this->removeCalls;
+    }
+
+    public function forceCleanup(): void
+    {
+        if ($this->workspacePath !== null) {
+            (new Filesystem())->remove($this->workspacePath);
             $this->workspacePath = null;
         }
     }

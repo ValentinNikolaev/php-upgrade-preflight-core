@@ -25,9 +25,10 @@ final class MarkdownReportWriter
         } else {
             foreach ($report->scenarios() as $scenario) {
                 $lines[] = sprintf(
-                    '- `%s`: %s (Composer `%s`, duration `%d ms`, exit `%d`, failure type `%s`)',
+                    '- `%s`: %s (outcome `%s`, Composer `%s`, duration `%d ms`, exit `%d`, failure type `%s`)',
                     $this->inline($scenario->scenario()->name()),
                     $scenario->succeeded() ? 'succeeded' : 'failed',
+                    $scenario->outcome(),
                     $this->inline($scenario->composerVersion() ?? 'unknown'),
                     $scenario->durationMs(),
                     $scenario->exitCode(),

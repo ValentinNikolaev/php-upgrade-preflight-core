@@ -13,6 +13,50 @@ use PHPUnit\Framework\TestCase;
 
 final class ScenarioResultTest extends TestCase
 {
+    public function testItRejectsAnOutcomeWithTheWrongFailureType(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('requires failure type "operational"');
+
+        new ScenarioResult(
+            $this->scenario(),
+            1,
+            '',
+            'Timed out.',
+            null,
+            null,
+            ScenarioResult::FAILURE_SOLVER,
+            null,
+            [],
+            0,
+            null,
+            [],
+            ScenarioResult::OUTCOME_TIMEOUT
+        );
+    }
+
+    public function testItRejectsAFailedOutcomeContainingALock(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('cannot contain a candidate lock');
+
+        new ScenarioResult(
+            $this->scenario(),
+            0,
+            '',
+            'Cleanup failed.',
+            new \PhpUpgradePreflight\Core\Model\ComposerLock([]),
+            null,
+            ScenarioResult::FAILURE_OPERATIONAL,
+            null,
+            [],
+            0,
+            null,
+            [],
+            ScenarioResult::OUTCOME_CLEANUP_FAILURE
+        );
+    }
+
     public function testSerializedOutputExcerptsAreBoundedToFourThousandBytes(): void
     {
         $scenario = new Scenario(
@@ -70,5 +114,13 @@ final class ScenarioResultTest extends TestCase
 
         self::assertSame(4000, strlen($serialized['diagnostics'][0]['stdout_excerpt']));
         self::assertSame(4000, strlen($serialized['diagnostics'][0]['stderr_excerpt']));
+    }
+
+    private function scenario(): Scenario
+    {
+        return new Scenario(
+            'exact-target',
+            new UpgradeTargetSet([new UpgradeTarget('fixture/dependency', '^2.0')])
+        );
     }
 }

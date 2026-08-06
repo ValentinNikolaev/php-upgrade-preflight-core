@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "tool": {
             "name": "php-upgrade-preflight",
             "version": "0.1.0"
@@ -58,6 +58,7 @@
                 "duration_ms": 125,
                 "exit_code": 0,
                 "succeeded": true,
+                "outcome": "success",
                 "failure_type": null,
                 "stdout_excerpt": "Composer resolved the requested target.",
                 "stderr_excerpt": "",

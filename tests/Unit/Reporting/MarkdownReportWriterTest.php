@@ -97,6 +97,8 @@ final class MarkdownReportWriterTest extends TestCase
 
         self::assertStringContainsString('## Composer Scenarios', $markdown);
         self::assertStringContainsString('Composer executable unavailable.', $markdown);
+        self::assertStringContainsString('outcome `process_failure`', $markdown);
+        self::assertStringContainsString('outcome `success`', $markdown);
         self::assertStringContainsString('Composer `2.8.12`, duration `125 ms`, exit `1`', $markdown);
         self::assertStringContainsString('command argv: `["composer","update","fixture/dependency:^2.0"]`', $markdown);
         self::assertStringContainsString('diagnostic for `fixture/dependency ^2.0` (exit `0`)', $markdown);

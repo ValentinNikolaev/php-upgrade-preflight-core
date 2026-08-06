@@ -19,9 +19,41 @@ final class ProjectStateBuilder
 
     public function build(string $projectPath): ProjectState
     {
-        $composerJson = $this->reader->read($projectPath . DIRECTORY_SEPARATOR . 'composer.json');
-        $composerLock = $this->reader->read($projectPath . DIRECTORY_SEPARATOR . 'composer.lock');
+        $result = $this->load($projectPath);
+        if (!$result->succeeded()) {
+            $failure = $result->failure();
+            if ($failure === null) {
+                throw new \LogicException('A failed project-state load must contain its failure.');
+            }
 
-        return new ProjectState($projectPath, new ComposerJson($composerJson), new ComposerLock($composerLock));
+            throw $failure;
+        }
+
+        return $result->project();
+    }
+
+    public function load(string $projectPath): ProjectStateLoadResult
+    {
+        try {
+            $composerJson = $this->reader->read($projectPath . DIRECTORY_SEPARATOR . 'composer.json');
+        } catch (JsonFileException $exception) {
+            return new ProjectStateLoadResult(
+                new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([])),
+                $exception
+            );
+        }
+
+        try {
+            $composerLock = $this->reader->read($projectPath . DIRECTORY_SEPARATOR . 'composer.lock');
+        } catch (JsonFileException $exception) {
+            return new ProjectStateLoadResult(
+                new ProjectState($projectPath, new ComposerJson($composerJson), new ComposerLock([])),
+                $exception
+            );
+        }
+
+        return new ProjectStateLoadResult(
+            new ProjectState($projectPath, new ComposerJson($composerJson), new ComposerLock($composerLock))
+        );
     }
 }

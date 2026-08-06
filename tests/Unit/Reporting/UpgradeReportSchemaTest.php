@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Reporting;
 
 use Opis\JsonSchema\Errors\ErrorFormatter;
 use Opis\JsonSchema\Validator;
+use PhpUpgradePreflight\Core\Analysis\DefaultUpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Analysis\ReportAssembler;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
@@ -29,23 +30,24 @@ use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PhpUpgradePreflight\Core\Reporting\JsonReportWriter;
 use PhpUpgradePreflight\Tests\Support\JsonSnapshotNormalizer;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 
 final class UpgradeReportSchemaTest extends TestCase
 {
-    public function testCanonicalV01ReportMatchesTheCommittedSnapshot(): void
+    public function testCanonicalV02ReportMatchesTheCommittedSnapshot(): void
     {
         $projectPath = dirname(__DIR__, 5);
         $actual = JsonSnapshotNormalizer::normalize(
             (new JsonReportWriter())->render($this->report($projectPath)),
             $projectPath
         );
-        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.1.json');
+        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.2.json');
 
         self::assertIsString($snapshot);
         self::assertSame($snapshot, $actual);
     }
 
-    public function testCanonicalV01ReportConformsToThePublishedSchema(): void
+    public function testCanonicalV02ReportConformsToThePublishedSchema(): void
     {
         $projectPath = dirname(__DIR__, 5);
         $json = (new JsonReportWriter())->render($this->report($projectPath));
@@ -64,15 +66,36 @@ final class UpgradeReportSchemaTest extends TestCase
         $this->assertConformsToSchema($json);
     }
 
+    public function testStructuredProjectInputFailureConformsToThePublishedSchema(): void
+    {
+        $projectPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-schema-input-' . bin2hex(random_bytes(8));
+        mkdir($projectPath, 0700, true);
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'composer.json', '{invalid');
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'composer.lock', '{"packages":[]}');
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        try {
+            $json = (new JsonReportWriter())->render((new DefaultUpgradeAnalyzer())->analyzeUpgrade($request));
+            /** @var array<string, mixed> $decoded */
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+            self::assertSame('invalid_json', $decoded['resolution']['scenarios'][0]['outcome']);
+            $this->assertConformsToSchema($json);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
     public function testPublishedSchemaAndRuntimeMetadataDescribeTheSameContractVersion(): void
     {
-        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.1.schema.json');
+        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.2.schema.json');
 
         self::assertIsString($contents);
         /** @var array<string, mixed> $schema */
         $schema = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('https://json-schema.org/draft/2020-12/schema', $schema['$schema']);
+        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.2', $schema['$id']);
         self::assertSame(
             ReportMetadata::SCHEMA_VERSION,
             $schema['$defs']['metadata']['properties']['schema_version']['const']
@@ -88,6 +111,10 @@ final class UpgradeReportSchemaTest extends TestCase
         self::assertContains(
             ScenarioResult::FAILURE_VALIDATION,
             $schema['$defs']['scenario']['properties']['failure_type']['enum']
+        );
+        self::assertSame(
+            ScenarioResult::supportedOutcomes(),
+            $schema['$defs']['scenario']['properties']['outcome']['enum']
         );
         self::assertSame(array_keys($this->report(dirname(__DIR__, 5))->toArray()), $schema['required']);
     }
@@ -217,7 +244,7 @@ final class UpgradeReportSchemaTest extends TestCase
 
     private function assertConformsToSchema(string $json): void
     {
-        $schemaContents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.1.schema.json');
+        $schemaContents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.2.schema.json');
 
         self::assertIsString($schemaContents);
         /** @var object $schema */

@@ -17,9 +17,68 @@ use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 
 final class DefaultUpgradeAnalyzerTest extends TestCase
 {
+    public function testInvalidProjectComposerJsonProducesAStructuredReportWithoutRunningComposer(): void
+    {
+        $processCalls = 0;
+        $runner = new ComposerScenarioRunner(null, null, static function () use (&$processCalls): array {
+            ++$processCalls;
+
+            throw new \LogicException('Composer must not run for invalid project input.');
+        });
+        $projectPath = $this->createInputProject('{invalid', '{"packages":[]}');
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+            self::assertSame(0, $processCalls);
+            self::assertSame('unknown', $report->resolutionStatus());
+            self::assertCount(1, $report->scenarios());
+            self::assertSame('project-input', $report->scenarios()[0]->scenario()->name());
+            self::assertSame(ScenarioResult::OUTCOME_INVALID_JSON, $report->scenarios()[0]->outcome());
+            self::assertTrue($report->scenarios()[0]->isOperationalFailure());
+            self::assertStringContainsString('Invalid JSON', $report->scenarios()[0]->stderr());
+            self::assertSame([], $report->planStages());
+            self::assertSame('0.2', $report->metadata()->schemaVersion());
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testMissingProjectLockfileProducesAStructuredReportAndRetainsManifestState(): void
+    {
+        $processCalls = 0;
+        $runner = new ComposerScenarioRunner(null, null, static function () use (&$processCalls): array {
+            ++$processCalls;
+
+            throw new \LogicException('Composer must not run without a project lockfile.');
+        });
+        $projectPath = $this->createInputProject(json_encode([
+            'require' => ['fixture/dependency' => '^1.0'],
+        ], JSON_THROW_ON_ERROR));
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+            self::assertSame(0, $processCalls);
+            self::assertSame('unknown', $report->resolutionStatus());
+            self::assertSame(ScenarioResult::OUTCOME_LOCKFILE_MISSING, $report->scenarios()[0]->outcome());
+            self::assertSame(
+                ['fixture/dependency' => '^1.0'],
+                $report->projectState()->composerJson()->rootRequirements()
+            );
+            self::assertSame(0, count($report->projectState()->composerLock()->packages()));
+            self::assertStringContainsString('composer.lock', $report->uncertainties()[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
     public function testCombinedPhpAndPackageTargetsAddPlatformOnlyAndStagedScenarios(): void
     {
         $capturedUpdates = [];
@@ -398,6 +457,18 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('framework-1', $report->evidence()[0]->id());
         self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence()[0]->evidenceClass());
         self::assertSame(['framework-1'], $report->toArray()['framework_findings'][0]['evidence']);
+    }
+
+    private function createInputProject(string $composerJson, ?string $composerLock = null): string
+    {
+        $projectPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-input-' . bin2hex(random_bytes(8));
+        mkdir($projectPath, 0700, true);
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'composer.json', $composerJson);
+        if ($composerLock !== null) {
+            file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'composer.lock', $composerLock);
+        }
+
+        return $projectPath;
     }
 }
 
