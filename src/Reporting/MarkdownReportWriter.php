@@ -64,6 +64,25 @@ final class MarkdownReportWriter
         }
 
         $lines[] = '';
+        $lines[] = '## Root Constraint Changes';
+
+        if ($report->rootConstraintChanges() === []) {
+            $lines[] = '- No root constraint changes are required for the requested targets.';
+        } else {
+            foreach ($report->rootConstraintChanges() as $change) {
+                $lines[] = sprintf(
+                    '- `%s`: %s `%s` -> `%s`. %s (%s)',
+                    $this->inline($change->package()),
+                    $change->changeType(),
+                    $this->inline($change->fromConstraint() ?? '-'),
+                    $this->inline($change->toConstraint() ?? '-'),
+                    $this->singleLine($change->reason()),
+                    implode(', ', $change->evidence())
+                );
+            }
+        }
+
+        $lines[] = '';
         $lines[] = '## Source Impact';
 
         if ($report->sourceImpact() === []) {
@@ -93,10 +112,48 @@ final class MarkdownReportWriter
         }
 
         $lines[] = '';
+        $lines[] = '## Staged Plan';
+
+        if ($report->planStages() === []) {
+            $lines[] = '- No staged actions were generated.';
+        } else {
+            foreach ($report->planStages() as $index => $stage) {
+                $lines[] = sprintf(
+                    '%d. **%s** — %s (%s)',
+                    $index + 1,
+                    $this->singleLine($stage->name()),
+                    $this->singleLine($stage->summary()),
+                    implode(', ', $stage->evidence())
+                );
+                foreach ($stage->actions() as $action) {
+                    $lines[] = '   - ' . $this->singleLine($action);
+                }
+            }
+        }
+
+        $lines[] = '';
         $lines[] = '## Risk And Effort';
         $lines[] = sprintf('- Risk: `%s`', $report->risk()->level());
         $rangeHours = $report->effort()->rangeHours();
         $lines[] = sprintf('- Effort: `%d-%d` hours (%s confidence)', $rangeHours[0], $rangeHours[1], $report->effort()->confidence());
+
+        $lines[] = '';
+        $lines[] = '## Test Guidance';
+
+        if ($report->tests() === []) {
+            $lines[] = '- No test guidance was generated.';
+        } else {
+            foreach ($report->tests() as $test) {
+                $command = $test->command() === null ? 'project-specific command required' : sprintf('`%s`', $this->inline($test->command()));
+                $lines[] = sprintf(
+                    '- **%s** (`%s`): %s Command: %s.',
+                    $this->singleLine($test->name()),
+                    $this->inline($test->priority()),
+                    $this->singleLine($test->purpose()),
+                    $command
+                );
+            }
+        }
 
         $lines[] = '';
         $lines[] = '## Uncertainties';

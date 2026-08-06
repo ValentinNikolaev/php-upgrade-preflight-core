@@ -63,7 +63,18 @@
                 "major_change": true
             }
         ],
-        "root_constraint_changes": []
+        "root_constraint_changes": [
+            {
+                "package": "laravel/framework",
+                "change_type": "updated",
+                "from_constraint": "^7.0",
+                "to_constraint": "^9.0",
+                "reason": "The declared root constraint differs from the requested target.",
+                "evidence": [
+                    "root-constraint-1"
+                ]
+            }
+        ]
     },
     "blockers": [
         {
@@ -98,7 +109,56 @@
         }
     ],
     "plan": {
-        "stages": []
+        "stages": [
+            {
+                "name": "constraints",
+                "summary": "Prepare the requested root constraint changes before dependency resolution.",
+                "actions": [
+                    "Update the `laravel/framework` root constraint to `^9.0`.",
+                    "Select a root PHP constraint that includes target platform PHP 8.1.0 without pinning an exact patch version."
+                ],
+                "evidence": [
+                    "plan-1",
+                    "root-constraint-1"
+                ]
+            },
+            {
+                "name": "dependencies",
+                "summary": "Resolve dependency blockers and review the resulting lockfile transition.",
+                "actions": [
+                    "Resolve the `root-constraint-conflict` blocker affecting `legacy/package`.",
+                    "Rerun the isolated Composer scenarios after resolving the reported blockers."
+                ],
+                "evidence": [
+                    "plan-1",
+                    "solver-1"
+                ]
+            },
+            {
+                "name": "application",
+                "summary": "Apply source and framework migration work after dependency resolution is stable.",
+                "actions": [
+                    "Review the reported source locations and adapt affected application code.",
+                    "Address framework compatibility findings before runtime validation."
+                ],
+                "evidence": [
+                    "plan-1",
+                    "source-1",
+                    "package-1"
+                ]
+            },
+            {
+                "name": "validation",
+                "summary": "Validate the upgraded project on the target runtime before release.",
+                "actions": [
+                    "Validate the Composer manifest and installed platform requirements.",
+                    "Run the project test suite and focused regression tests."
+                ],
+                "evidence": [
+                    "plan-1"
+                ]
+            }
+        ]
     },
     "risk": {
         "level": "high",
@@ -131,9 +191,35 @@
             "The project test suite is available and representative."
         ]
     },
-    "tests": [],
+    "tests": [
+        {
+            "name": "composer-validation",
+            "purpose": "Validate the edited Composer manifest before dependency installation.",
+            "command": "composer validate --strict",
+            "priority": "required"
+        },
+        {
+            "name": "project-test-suite",
+            "purpose": "Run the project test suite after applying the dependency and source changes.",
+            "command": "composer test",
+            "priority": "required"
+        },
+        {
+            "name": "platform-requirements",
+            "purpose": "Confirm the installed dependencies satisfy PHP 8.1.0 and the deployment extensions.",
+            "command": "composer check-platform-reqs",
+            "priority": "required"
+        },
+        {
+            "name": "focused-regressions",
+            "purpose": "Add or run focused regression coverage for the reported source and framework findings.",
+            "command": null,
+            "priority": "recommended"
+        }
+    ],
     "uncertainties": [
-        "Runtime compatibility is not proven by dependency resolution alone."
+        "Dependency resolution does not prove application runtime compatibility; the project test suite must run on the target runtime.",
+        "Root PHP constraint \"^7.4\" does not include target platform PHP 8.1.0; select an appropriate Composer constraint instead of using the exact simulated platform version."
     ],
     "evidence": [
         {
@@ -165,6 +251,30 @@
             "context": {
                 "package": "legacy/package",
                 "locked_version": "1.0.0"
+            }
+        },
+        {
+            "id": "root-constraint-1",
+            "class": "E2",
+            "summary": "Compared the root requirement for laravel/framework with the requested target.",
+            "confidence": "high",
+            "context": {
+                "package": "laravel/framework",
+                "from_constraint": "^7.0",
+                "to_constraint": "^9.0"
+            }
+        },
+        {
+            "id": "plan-1",
+            "class": "E5",
+            "summary": "Generated conservative staged actions from the requested targets and detected findings.",
+            "confidence": "low",
+            "context": {
+                "target_count": 2,
+                "root_constraint_change_count": 1,
+                "blocker_count": 1,
+                "source_finding_count": 1,
+                "framework_finding_count": 1
             }
         }
     ]

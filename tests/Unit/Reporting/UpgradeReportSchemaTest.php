@@ -6,12 +6,14 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Reporting;
 
 use Opis\JsonSchema\Errors\ErrorFormatter;
 use Opis\JsonSchema\Validator;
+use PhpUpgradePreflight\Core\Analysis\ReportAssembler;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\ProjectState;
@@ -114,6 +116,9 @@ final class UpgradeReportSchemaTest extends TestCase
                         'php' => '7.4.33',
                     ],
                 ],
+                'scripts' => [
+                    'test' => 'phpunit',
+                ],
             ]),
             new ComposerLock([
                 'packages' => [
@@ -150,7 +155,7 @@ final class UpgradeReportSchemaTest extends TestCase
             ]),
         ];
 
-        return new UpgradeReport(
+        return (new ReportAssembler())->assemble(
             $request,
             $project,
             [$scenarioResult],
@@ -186,8 +191,8 @@ final class UpgradeReportSchemaTest extends TestCase
                 ],
                 ['The project test suite is available and representative.']
             ),
-            ['Runtime compatibility is not proven by dependency resolution alone.'],
-            $evidence
+            [],
+            new EvidenceLedger($evidence)
         );
     }
 

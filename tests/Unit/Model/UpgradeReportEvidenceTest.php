@@ -10,8 +10,10 @@ use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\LockDiff;
+use PhpUpgradePreflight\Core\Model\PlanStage;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
+use PhpUpgradePreflight\Core\Model\RootConstraintChange;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -58,9 +60,35 @@ final class UpgradeReportEvidenceTest extends TestCase
         self::assertSame('source-1', $report->evidence()[0]->id());
     }
 
-    /** @param list<Blocker> $blockers @param list<Evidence> $evidence @param list<string> $uncertainties */
-    private function report(array $blockers, array $evidence, array $uncertainties = []): UpgradeReport
+    public function testRootConstraintChangesAndPlanStagesParticipateInEvidenceValidation(): void
     {
+        $evidence = [new Evidence('manifest-1', Evidence::E2_PACKAGE_METADATA, 'Compared root constraints.')];
+        $report = $this->report(
+            [],
+            $evidence,
+            [],
+            [new RootConstraintChange('fixture/dependency', 'updated', '^1.0', '^2.0', 'Target changed.', ['manifest-1'])],
+            [new PlanStage('constraints', 'Update constraints.', ['Edit composer.json.'], ['manifest-1'])]
+        );
+
+        self::assertSame(['manifest-1'], $report->rootConstraintChanges()[0]->evidence());
+        self::assertSame(['manifest-1'], $report->planStages()[0]->evidence());
+    }
+
+    /**
+     * @param list<Blocker> $blockers
+     * @param list<Evidence> $evidence
+     * @param list<string> $uncertainties
+     * @param list<RootConstraintChange> $rootConstraintChanges
+     * @param list<PlanStage> $planStages
+     */
+    private function report(
+        array $blockers,
+        array $evidence,
+        array $uncertainties = [],
+        array $rootConstraintChanges = [],
+        array $planStages = []
+    ): UpgradeReport {
         $projectPath = dirname(__DIR__, 5);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
 
@@ -75,7 +103,9 @@ final class UpgradeReportEvidenceTest extends TestCase
             new RiskSummary('low', []),
             new EffortEstimate([0, 0], 'high', [], []),
             $uncertainties,
-            $evidence
+            $evidence,
+            $rootConstraintChanges,
+            $planStages
         );
     }
 }

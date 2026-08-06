@@ -63,7 +63,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertSame([], $report->blockers());
         self::assertSame('low', $report->risk()->level());
-        self::assertCount(3, $report->uncertainties());
+        self::assertCount(5, $report->uncertainties());
         self::assertStringContainsString('analysis-environment failure', $report->uncertainties()[0]);
     }
 
@@ -87,7 +87,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertCount(1, $report->blockers());
-        self::assertCount(2, $report->uncertainties());
+        self::assertCount(4, $report->uncertainties());
     }
 
     public function testUnavailableRequestedFrameworkIsRejected(): void
@@ -123,7 +123,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertCount(1, $report->frameworkFindings());
         self::assertSame('Detected framework requires review.', $report->frameworkFindings()[0]->summary());
         self::assertSame(['framework-1'], $report->frameworkFindings()[0]->evidence());
-        self::assertCount(1, $report->evidence());
+        self::assertCount(3, $report->evidence());
         self::assertSame('framework-1', $report->evidence()[0]->id());
         self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence()[0]->evidenceClass());
         self::assertSame(['framework-1'], $report->toArray()['framework_findings'][0]['evidence']);

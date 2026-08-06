@@ -20,6 +20,12 @@ final class UpgradeReport
     private array $frameworkFindings;
     private RiskSummary $risk;
     private EffortEstimate $effort;
+    /** @var list<RootConstraintChange> */
+    private array $rootConstraintChanges;
+    /** @var list<PlanStage> */
+    private array $planStages;
+    /** @var list<TestGuidance> */
+    private array $tests;
     /** @var list<string> */
     private array $uncertainties;
     /** @var list<Evidence> */
@@ -32,6 +38,9 @@ final class UpgradeReport
      * @param list<CompatibilityFinding> $frameworkFindings
      * @param list<string> $uncertainties
      * @param list<Evidence> $evidence
+     * @param list<RootConstraintChange> $rootConstraintChanges
+     * @param list<PlanStage> $planStages
+     * @param list<TestGuidance> $tests
      */
     public function __construct(
         UpgradeRequest $request,
@@ -44,7 +53,10 @@ final class UpgradeReport
         RiskSummary $risk,
         EffortEstimate $effort,
         array $uncertainties,
-        array $evidence
+        array $evidence,
+        array $rootConstraintChanges = [],
+        array $planStages = [],
+        array $tests = []
     ) {
         $this->metadata = new ReportMetadata();
         $this->request = $request;
@@ -56,6 +68,9 @@ final class UpgradeReport
         $this->frameworkFindings = array_values($frameworkFindings);
         $this->risk = $risk;
         $this->effort = $effort;
+        $this->rootConstraintChanges = array_values($rootConstraintChanges);
+        $this->planStages = array_values($planStages);
+        $this->tests = array_values($tests);
         $this->uncertainties = array_values($uncertainties);
         $this->evidence = array_values($evidence);
 
@@ -117,6 +132,24 @@ final class UpgradeReport
         return $this->effort;
     }
 
+    /** @return list<RootConstraintChange> */
+    public function rootConstraintChanges(): array
+    {
+        return $this->rootConstraintChanges;
+    }
+
+    /** @return list<PlanStage> */
+    public function planStages(): array
+    {
+        return $this->planStages;
+    }
+
+    /** @return list<TestGuidance> */
+    public function tests(): array
+    {
+        return $this->tests;
+    }
+
     /** @return list<string> */
     public function uncertainties(): array
     {
@@ -159,17 +192,20 @@ final class UpgradeReport
             ],
             'transition' => [
                 'package_changes' => array_map(static fn (PackageChange $change): array => $change->toArray(), $this->lockDiff->packageChanges()),
-                'root_constraint_changes' => [],
+                'root_constraint_changes' => array_map(
+                    static fn (RootConstraintChange $change): array => $change->toArray(),
+                    $this->rootConstraintChanges
+                ),
             ],
             'blockers' => array_map(static fn (Blocker $blocker): array => $blocker->toArray(), $this->blockers),
             'source_impact' => array_map(static fn (SourceUsage $usage): array => $usage->toArray(), $this->sourceImpact),
             'framework_findings' => array_map(static fn (CompatibilityFinding $finding): array => $finding->toArray(), $this->frameworkFindings),
             'plan' => [
-                'stages' => [],
+                'stages' => array_map(static fn (PlanStage $stage): array => $stage->toArray(), $this->planStages),
             ],
             'risk' => $this->risk->toArray(),
             'effort' => $this->effort->toArray(),
-            'tests' => [],
+            'tests' => array_map(static fn (TestGuidance $test): array => $test->toArray(), $this->tests),
             'uncertainties' => $this->uncertainties,
             'evidence' => array_map(static fn (Evidence $evidence): array => $evidence->toArray(), $this->evidence),
         ];
@@ -190,6 +226,14 @@ final class UpgradeReport
 
         foreach ($this->frameworkFindings as $index => $finding) {
             $references = $this->appendFindingReferences($references, $finding->evidence(), sprintf('Framework finding at index %d', $index));
+        }
+
+        foreach ($this->rootConstraintChanges as $index => $change) {
+            $references = $this->appendFindingReferences($references, $change->evidence(), sprintf('Root constraint change at index %d', $index));
+        }
+
+        foreach ($this->planStages as $index => $stage) {
+            $references = $this->appendFindingReferences($references, $stage->evidence(), sprintf('Plan stage at index %d', $index));
         }
 
         foreach ($this->evidence as $evidence) {

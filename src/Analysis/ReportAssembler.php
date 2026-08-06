@@ -18,6 +18,13 @@ use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 
 final class ReportAssembler
 {
+    private ReportSectionBuilder $sectionBuilder;
+
+    public function __construct(?ReportSectionBuilder $sectionBuilder = null)
+    {
+        $this->sectionBuilder = $sectionBuilder ?? new ReportSectionBuilder();
+    }
+
     /**
      * @param list<ScenarioResult> $scenarioResults
      * @param list<Blocker> $blockers
@@ -38,6 +45,18 @@ final class ReportAssembler
         array $sourceUncertainties,
         EvidenceLedger $evidence
     ): UpgradeReport {
+        $sections = $this->sectionBuilder->build(
+            $request,
+            $project,
+            $scenarioResults,
+            $lockDiff,
+            $blockers,
+            $sourceImpact,
+            $frameworkFindings,
+            $sourceUncertainties,
+            $evidence
+        );
+
         return new UpgradeReport(
             $request,
             $project,
@@ -48,24 +67,11 @@ final class ReportAssembler
             $frameworkFindings,
             $risk,
             $effort,
-            $this->uncertainties($scenarioResults, $sourceUncertainties),
-            $evidence->all()
+            $sections->uncertainties(),
+            $evidence->all(),
+            $sections->rootConstraintChanges(),
+            $sections->planStages(),
+            $sections->tests()
         );
-    }
-
-    /** @param list<ScenarioResult> $scenarioResults @param list<string> $sourceUncertainties @return list<string> */
-    private function uncertainties(array $scenarioResults, array $sourceUncertainties): array
-    {
-        $uncertainties = $sourceUncertainties;
-        foreach ($scenarioResults as $result) {
-            if ($result->isOperationalFailure()) {
-                $uncertainties[] = sprintf(
-                    'Composer scenario "%s" could not complete because of an analysis-environment failure.',
-                    $result->scenario()->name()
-                );
-            }
-        }
-
-        return array_values(array_unique($uncertainties));
     }
 }

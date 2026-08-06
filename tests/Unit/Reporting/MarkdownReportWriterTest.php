@@ -9,11 +9,14 @@ use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\LockDiff;
+use PhpUpgradePreflight\Core\Model\PlanStage;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\RootConstraintChange;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
+use PhpUpgradePreflight\Core\Model\TestGuidance;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -42,7 +45,17 @@ final class MarkdownReportWriterTest extends TestCase
             new RiskSummary('low', []),
             new EffortEstimate([1, 2], 'low', [], []),
             ['Composer scenario could not run.'],
-            [$evidence]
+            [$evidence],
+            [new RootConstraintChange(
+                'fixture/dependency',
+                'added',
+                null,
+                '^2.0',
+                'The requested target is not declared as a root requirement.',
+                ['source-1']
+            )],
+            [new PlanStage('dependencies', 'Resolve the dependency transition.', ['Regenerate the lock file.'], ['source-1'])],
+            [new TestGuidance('project-test-suite', 'Run regression coverage.', 'composer test', 'required')]
         );
 
         $markdown = (new MarkdownReportWriter())->render($report);
@@ -51,6 +64,12 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('Composer executable unavailable.', $markdown);
         self::assertStringContainsString('## Source Impact', $markdown);
         self::assertStringContainsString('src/Example.php:12', $markdown);
+        self::assertStringContainsString('## Root Constraint Changes', $markdown);
+        self::assertStringContainsString('fixture/dependency', $markdown);
+        self::assertStringContainsString('## Staged Plan', $markdown);
+        self::assertStringContainsString('Regenerate the lock file.', $markdown);
+        self::assertStringContainsString('## Test Guidance', $markdown);
+        self::assertStringContainsString('composer test', $markdown);
         self::assertStringContainsString('## Uncertainties', $markdown);
         self::assertStringContainsString('Composer scenario could not run.', $markdown);
         self::assertStringContainsString('## Evidence', $markdown);

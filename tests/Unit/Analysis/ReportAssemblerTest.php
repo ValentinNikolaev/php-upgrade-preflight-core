@@ -58,7 +58,17 @@ final class ReportAssemblerTest extends TestCase
         self::assertSame([
             'Source path was unavailable.',
             'Composer scenario "exact-target" could not complete because of an analysis-environment failure.',
+            'Dependency resolution does not prove application runtime compatibility; the project test suite must run on the target runtime.',
+            'No Composer "test" script was found, so the project\'s canonical test command is unknown.',
         ], $report->uncertainties());
         self::assertSame($evidenceId, $report->evidence()[0]->id());
+        self::assertCount(1, $report->rootConstraintChanges());
+        self::assertCount(3, $report->planStages());
+        self::assertSame([
+            'Resolve the `conflict` blocker affecting `vendor/package`.',
+            'Restore the Composer analysis environment so every scenario can complete.',
+            'Rerun the isolated Composer scenarios after resolving the reported blockers.',
+        ], $report->planStages()[1]->actions());
+        self::assertCount(3, $report->tests());
     }
 }

@@ -14,12 +14,16 @@ use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\PackageRef;
+use PhpUpgradePreflight\Core\Model\PlanStage;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\ReportSections;
 use PhpUpgradePreflight\Core\Model\ReportMetadata;
+use PhpUpgradePreflight\Core\Model\RootConstraintChange;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
+use PhpUpgradePreflight\Core\Model\TestGuidance;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -51,12 +55,16 @@ final class ImmutableDtoTest extends TestCase
             [LockDiff::class],
             [PackageChange::class],
             [PackageRef::class],
+            [PlanStage::class],
             [ProjectState::class],
+            [ReportSections::class],
             [ReportMetadata::class],
+            [RootConstraintChange::class],
             [RiskSummary::class],
             [Scenario::class],
             [ScenarioResult::class],
             [SourceUsage::class],
+            [TestGuidance::class],
             [UpgradeReport::class],
             [UpgradeRequest::class],
             [UpgradeTarget::class],
