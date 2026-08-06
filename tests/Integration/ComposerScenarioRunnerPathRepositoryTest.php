@@ -58,6 +58,7 @@ final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
             '9.0.0',
             '--tree',
             '--locked',
+            '--no-scripts',
             '--no-plugins',
             '--no-interaction',
         ], $result->diagnostics()[0]->command());

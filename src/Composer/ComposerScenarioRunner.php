@@ -22,6 +22,8 @@ use Symfony\Component\Process\Process;
 final class ComposerScenarioRunner
 {
     private const LOCKED_DIAGNOSTIC_MIN_COMPOSER_VERSION = '2.4.0';
+    /** @var list<string> */
+    private const COMPOSER_SAFETY_OPTIONS = ['--no-scripts', '--no-plugins'];
 
     private WorkspaceManager $workspaces;
     private JsonFileReader $reader;
@@ -29,6 +31,8 @@ final class ComposerScenarioRunner
     private \Closure $processRunner;
     /** @var \Closure(): ?string */
     private \Closure $composerVersionResolver;
+    /** @var \Closure(list<string>): array{exit_code: int, stdout: string, stderr: string} */
+    private \Closure $composerVersionProcessRunner;
     /** @var \Closure(): float */
     private \Closure $clock;
     private bool $composerVersionResolved = false;
@@ -40,21 +44,28 @@ final class ComposerScenarioRunner
      * @param null|callable(list<string>, string): array{exit_code: int, stdout: string, stderr: string} $processRunner
      * @param null|callable(): ?string $composerVersionResolver
      * @param null|callable(): float $clock
+     * @param null|callable(list<string>): array{exit_code: int, stdout: string, stderr: string} $composerVersionProcessRunner
      */
     public function __construct(
         ?WorkspaceManager $workspaces = null,
         ?JsonFileReader $reader = null,
         ?callable $processRunner = null,
         ?callable $composerVersionResolver = null,
-        ?callable $clock = null
+        ?callable $clock = null,
+        ?callable $composerVersionProcessRunner = null
     ) {
         $this->workspaces = $workspaces ?? new TemporaryWorkspaceManager();
         $this->reader = $reader ?? new JsonFileReader();
         $this->processRunner = $processRunner === null
             ? \Closure::fromCallable([$this, 'runProcess'])
             : \Closure::fromCallable($processRunner);
+        $this->composerVersionProcessRunner = $composerVersionProcessRunner === null
+            ? \Closure::fromCallable([$this, 'runVersionProcess'])
+            : \Closure::fromCallable($composerVersionProcessRunner);
         $this->composerVersionResolver = $composerVersionResolver === null
-            ? ($processRunner === null ? \Closure::fromCallable([$this, 'detectComposerVersion']) : static fn (): ?string => null)
+            ? ($processRunner === null || $composerVersionProcessRunner !== null
+                ? \Closure::fromCallable([$this, 'detectComposerVersion'])
+                : static fn (): ?string => null)
             : \Closure::fromCallable($composerVersionResolver);
         $this->clock = $clock === null
             ? static fn (): float => microtime(true)
@@ -210,15 +221,14 @@ final class ComposerScenarioRunner
     private function buildCommand(Scenario $scenario): array
     {
         if ($scenario->isBaselineValidation()) {
-            return [
+            return array_merge([
                 'composer',
                 'validate',
                 '--check-lock',
                 '--no-check-publish',
-                '--no-scripts',
-                '--no-plugins',
+            ], self::COMPOSER_SAFETY_OPTIONS, [
                 '--no-interaction',
-            ];
+            ]);
         }
 
         $command = ['composer', 'update'];
@@ -235,8 +245,7 @@ final class ComposerScenarioRunner
             $command[] = '--minimal-changes';
         }
 
-        $command[] = '--no-scripts';
-        $command[] = '--no-plugins';
+        $command = array_merge($command, self::COMPOSER_SAFETY_OPTIONS);
         $command[] = '--no-install';
         $command[] = '--no-interaction';
 
@@ -261,19 +270,38 @@ final class ComposerScenarioRunner
 
     private function detectComposerVersion(): ?string
     {
-        $process = new Process(['composer', '--version', '--no-ansi', '--no-interaction'], null, ['COMPOSER_NO_INTERACTION' => '1'], null, 30);
-        $process->run();
+        $process = ($this->composerVersionProcessRunner)(array_merge(
+            ['composer', '--version', '--no-ansi'],
+            self::COMPOSER_SAFETY_OPTIONS,
+            ['--no-interaction']
+        ));
 
-        if (!$process->isSuccessful()) {
+        if ($process['exit_code'] !== 0) {
             return null;
         }
 
-        $output = trim($process->getOutput() . "\n" . $process->getErrorOutput());
+        $output = trim($process['stdout'] . "\n" . $process['stderr']);
         if (preg_match('/\bComposer(?:\s+version)?\s+([^\s]+)/i', $output, $matches) !== 1) {
             return null;
         }
 
         return $matches[1];
+    }
+
+    /**
+     * @param list<string> $command
+     * @return array{exit_code: int, stdout: string, stderr: string}
+     */
+    private function runVersionProcess(array $command): array
+    {
+        $process = new Process($command, null, ['COMPOSER_NO_INTERACTION' => '1'], null, 30);
+        $process->run();
+
+        return [
+            'exit_code' => $process->getExitCode() ?? 1,
+            'stdout' => $process->getOutput(),
+            'stderr' => $process->getErrorOutput(),
+        ];
     }
 
     private function resolveComposerVersion(): ?string
@@ -459,9 +487,8 @@ final class ComposerScenarioRunner
             $constraint,
             '--tree',
             '--locked',
-            '--no-plugins',
-            '--no-interaction',
         ];
+        $command = array_merge($command, self::COMPOSER_SAFETY_OPTIONS, ['--no-interaction']);
 
         try {
             $process = ($this->processRunner)($command, $workingDirectory);

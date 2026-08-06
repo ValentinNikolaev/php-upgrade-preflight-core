@@ -102,6 +102,37 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertArrayNotHasKey('config', $capturedComposer);
     }
 
+    public function testVersionProbeDisablesScriptsAndPlugins(): void
+    {
+        $capturedCommand = null;
+        $runner = new ComposerScenarioRunner(
+            null,
+            null,
+            static function (array $command, string $directory): array {
+                return ['exit_code' => 1, 'stdout' => '', 'stderr' => 'Synthetic operational stop.'];
+            },
+            null,
+            null,
+            static function (array $command) use (&$capturedCommand): array {
+                $capturedCommand = $command;
+
+                return ['exit_code' => 0, 'stdout' => 'Composer version 2.8.12', 'stderr' => ''];
+            }
+        );
+
+        $result = $this->runFixtureScenario($runner);
+
+        self::assertSame('2.8.12', $result->composerVersion());
+        self::assertSame([
+            'composer',
+            '--version',
+            '--no-ansi',
+            '--no-scripts',
+            '--no-plugins',
+            '--no-interaction',
+        ], $capturedCommand);
+    }
+
     public function testItUpdatesTheLockWithoutInstallingDependencies(): void
     {
         $capturedCommand = null;
@@ -318,6 +349,7 @@ final class ComposerScenarioRunnerTest extends TestCase
             '^2.0',
             '--tree',
             '--locked',
+            '--no-scripts',
             '--no-plugins',
             '--no-interaction',
         ], $calls[1]['command']);
@@ -524,6 +556,93 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertSame(0, $workspaceManager->removeCalls);
     }
 
+    public function testNonDebugWorkspaceIsRemovedAfterAProcessFailure(): void
+    {
+        $workspaceManager = new TrackingWorkspaceManager();
+        $runner = new ComposerScenarioRunner($workspaceManager, null, static function (): array {
+            throw new \RuntimeException('Synthetic process failure.');
+        });
+
+        $result = $this->runFixtureScenario($runner);
+
+        self::assertSame(ScenarioResult::OUTCOME_PROCESS_FAILURE, $result->outcome());
+        self::assertNull($result->tempPath());
+        self::assertCount(1, $workspaceManager->createdPaths);
+        self::assertSame($workspaceManager->createdPaths, $workspaceManager->removedPaths);
+        self::assertDirectoryDoesNotExist($workspaceManager->createdPaths[0]);
+    }
+
+    public function testDebugWorkspaceIsTheOnlyIntentionallyPreservedWorkspace(): void
+    {
+        $workspaceManager = new TrackingWorkspaceManager();
+        $runner = new ComposerScenarioRunner($workspaceManager, null, static function (array $command, string $directory): array {
+            file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
+                'packages' => [['name' => 'fixture/dependency', 'version' => '2.0.0']],
+                'packages-dev' => [],
+            ], JSON_THROW_ON_ERROR));
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('fixture/dependency', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            \PhpUpgradePreflight\Core\Model\ReportFormat::JSON,
+            null,
+            true
+        );
+
+        try {
+            $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+
+            self::assertTrue($result->succeeded());
+            self::assertCount(1, $workspaceManager->createdPaths);
+            self::assertSame([], $workspaceManager->removedPaths);
+            self::assertSame($workspaceManager->createdPaths[0], $result->tempPath());
+            self::assertDirectoryExists($result->tempPath());
+        } finally {
+            $workspaceManager->forceCleanup();
+        }
+    }
+
+    public function testDebugWorkspaceIsPreservedAfterAProcessFailure(): void
+    {
+        $workspaceManager = new TrackingWorkspaceManager();
+        $runner = new ComposerScenarioRunner($workspaceManager, null, static function (): array {
+            throw new \RuntimeException('Synthetic process failure.');
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('fixture/dependency', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            \PhpUpgradePreflight\Core\Model\ReportFormat::JSON,
+            null,
+            true
+        );
+
+        try {
+            $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+
+            self::assertSame(ScenarioResult::OUTCOME_PROCESS_FAILURE, $result->outcome());
+            self::assertCount(1, $workspaceManager->createdPaths);
+            self::assertSame([], $workspaceManager->removedPaths);
+            self::assertSame($workspaceManager->createdPaths[0], $result->tempPath());
+            self::assertDirectoryExists($result->tempPath());
+        } finally {
+            $workspaceManager->forceCleanup();
+        }
+    }
+
     public function testInitializationCleanupFailureBecomesACleanupOutcomeWithTheLeakedPath(): void
     {
         $workspaceManager = new FailingInitializationCleanupWorkspaceManager();
@@ -650,6 +769,43 @@ final class FailingCreateWorkspaceManager implements WorkspaceManager
     public function remove(string $path): void
     {
         ++$this->removeCalls;
+    }
+}
+
+final class TrackingWorkspaceManager implements WorkspaceManager
+{
+    private TemporaryWorkspaceManager $delegate;
+    /** @var list<string> */
+    public array $createdPaths = [];
+    /** @var list<string> */
+    public array $removedPaths = [];
+
+    public function __construct()
+    {
+        $this->delegate = new TemporaryWorkspaceManager();
+    }
+
+    public function createFromProject(string $projectPath): string
+    {
+        $path = $this->delegate->createFromProject($projectPath);
+        $this->createdPaths[] = $path;
+
+        return $path;
+    }
+
+    public function remove(string $path): void
+    {
+        $this->delegate->remove($path);
+        $this->removedPaths[] = $path;
+    }
+
+    public function forceCleanup(): void
+    {
+        foreach ($this->createdPaths as $path) {
+            if (is_dir($path)) {
+                $this->delegate->remove($path);
+            }
+        }
     }
 }
 
