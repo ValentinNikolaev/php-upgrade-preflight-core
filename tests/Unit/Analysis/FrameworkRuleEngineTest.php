@@ -39,6 +39,7 @@ final class FrameworkRuleEngineTest extends TestCase
 
         self::assertSame([$detected], $active);
         self::assertSame(['app', 'config'], $engine->sourcePaths($project, $request, $active));
+        self::assertSame([], $engine->packageFamilyClassifiers($active));
         self::assertCount(1, $findings);
         self::assertSame('Review detected framework.', $findings[0]->summary());
         self::assertSame(['framework-1'], $findings[0]->evidence());

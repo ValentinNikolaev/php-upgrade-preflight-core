@@ -94,14 +94,18 @@ final class MarkdownReportWriter
             foreach ($report->lockDiff()->packageChanges() as $change) {
                 $classification = $change->isDirect() ? 'direct' : 'transitive';
                 $majorChange = $change->isMajorChange() ? '; major-version jump' : '';
+                $families = $change->packageFamilies() === []
+                    ? ''
+                    : '; families: ' . implode(', ', $change->packageFamilies());
                 $lines[] = sprintf(
-                    '- `%s`: %s `%s` -> `%s` (%s dependency%s)',
+                    '- `%s`: %s `%s` -> `%s` (%s dependency%s%s)',
                     $change->name(),
                     $change->changeType(),
                     $change->fromVersion() ?? '-',
                     $change->toVersion() ?? '-',
                     $classification,
-                    $majorChange
+                    $majorChange,
+                    $families
                 );
                 if ($change->hasSourceReferenceChange()) {
                     $lines[] = sprintf('  - source reference: `%s` -> `%s`', $change->fromSourceReference() ?? '-', $change->toSourceReference() ?? '-');

@@ -9,6 +9,7 @@ use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
 use PhpUpgradePreflight\Core\Framework\CompatibilityRule;
 use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
@@ -44,7 +45,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
             self::assertTrue($report->scenarios()[0]->isOperationalFailure());
             self::assertStringContainsString('Invalid JSON', $report->scenarios()[0]->stderr());
             self::assertSame([], $report->planStages());
-            self::assertSame('0.4', $report->metadata()->schemaVersion());
+            self::assertSame('0.5', $report->metadata()->schemaVersion());
         } finally {
             (new Filesystem())->remove($projectPath);
         }
@@ -285,7 +286,8 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, null, ['src']);
 
-        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+        $framework = new AnalyzerFixtureFrameworkIntegration();
+        $report = (new DefaultUpgradeAnalyzer([$framework], null, $runner))->analyzeUpgrade($request);
 
         self::assertSame('feasible_with_changes', $report->resolutionStatus());
         self::assertSame([], $report->blockers());
@@ -299,14 +301,17 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('fixture/transitive', $report->lockDiff()->packageChanges()[1]->name());
         self::assertFalse($report->lockDiff()->packageChanges()[1]->isDirect());
         self::assertFalse($report->lockDiff()->packageChanges()[1]->isMajorChange());
+        self::assertSame(['fixture'], $report->lockDiff()->packageChanges()[0]->packageFamilies());
+        self::assertSame(['fixture'], $report->lockDiff()->packageChanges()[1]->packageFamilies());
 
         /** @var array<string, mixed> $json */
         $json = json_decode((new JsonReportWriter())->render($report), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('0.4', $json['metadata']['schema_version']);
+        self::assertSame('0.5', $json['metadata']['schema_version']);
         self::assertTrue($json['transition']['package_changes'][0]['direct']);
         self::assertSame('source-2.0.0', $json['transition']['package_changes'][0]['to_source_reference']);
         self::assertSame('dist-2.0.0', $json['transition']['package_changes'][0]['to_dist_reference']);
         self::assertFalse($json['transition']['package_changes'][1]['direct']);
+        self::assertSame(['fixture'], $json['transition']['package_changes'][0]['package_families']);
     }
 
     public function testOperationalFailuresProduceUnknownResolutionAndUncertainties(): void
@@ -496,7 +501,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
     }
 }
 
-final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration
+final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration, PackageFamilyClassifier
 {
     public int $detectionCount = 0;
 
@@ -520,6 +525,11 @@ final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration
     public function defaultSourcePaths(ProjectState $project): array
     {
         return ['src'];
+    }
+
+    public function packageFamilies(string $packageName): array
+    {
+        return strpos($packageName, 'fixture/') === 0 ? ['fixture'] : [];
     }
 }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ProjectState;
@@ -64,6 +65,18 @@ final class FrameworkRuleEngine
         }
 
         return $paths !== [] ? array_values(array_unique($paths)) : ['src', 'app', 'config', 'routes', 'tests'];
+    }
+
+    /**
+     * @param list<FrameworkIntegration> $frameworks
+     * @return list<PackageFamilyClassifier>
+     */
+    public function packageFamilyClassifiers(array $frameworks): array
+    {
+        return array_values(array_filter(
+            $frameworks,
+            static fn (FrameworkIntegration $framework): bool => $framework instanceof PackageFamilyClassifier
+        ));
     }
 
     /**

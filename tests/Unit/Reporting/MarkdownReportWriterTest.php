@@ -85,7 +85,8 @@ final class MarkdownReportWriterTest extends TestCase
                     'source-after',
                     'dist-before',
                     'dist-after',
-                    true
+                    true,
+                    ['laravel', 'symfony']
                 ),
                 new PackageChange('vendor/transitive', 'added', null, '1.0.0'),
             ]),
@@ -120,7 +121,7 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('fixture/blocker 1.0.0 requires fixture/dependency (^1.0)', $markdown);
         self::assertStringContainsString('candidate lock: SHA-256', $markdown);
         self::assertStringContainsString('content hash `candidate-content`, packages `0`', $markdown);
-        self::assertStringContainsString('(direct dependency; major-version jump)', $markdown);
+        self::assertStringContainsString('(direct dependency; major-version jump; families: laravel, symfony)', $markdown);
         self::assertStringContainsString('`vendor/transitive`: added `-` -> `1.0.0` (transitive dependency)', $markdown);
         self::assertStringContainsString('source reference: `source-before` -> `source-after`', $markdown);
         self::assertStringContainsString('dist reference: `dist-before` -> `dist-after`', $markdown);

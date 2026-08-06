@@ -72,6 +72,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $project = $projectLoad->project();
         $targets = $this->targetNormalizer->normalize($request->targets()->packageTargets(), $request->targetPhp());
         $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
+        $packageFamilyClassifiers = $this->frameworkRuleEngine->packageFamilyClassifiers($activeFrameworks);
         $sourcePaths = $this->frameworkRuleEngine->sourcePaths($project, $request, $activeFrameworks);
         $analysisUncertainties = [];
         $scenarios = $this->scenarioSelector->select(
@@ -90,7 +91,9 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $bestResult = $this->bestSuccessfulResult($project->composerLock(), $scenarioResults);
         $bestLock = $bestResult === null ? null : $bestResult->lock();
 
-        $lockDiff = $bestLock === null ? new LockDiff([]) : $this->lockDiffBuilder->build($project->composerLock(), $bestLock);
+        $lockDiff = $bestLock === null
+            ? new LockDiff([])
+            : $this->lockDiffBuilder->build($project->composerLock(), $bestLock, $packageFamilyClassifiers);
         $blockers = $this->blockerGrouper->group($scenarioResults, $evidence);
         $sourceUncertainties = $analysisUncertainties;
         $sourceImpact = $this->sourceUsageScanner->scan(

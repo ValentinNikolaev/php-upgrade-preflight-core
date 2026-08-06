@@ -16,7 +16,10 @@ final class PackageChange
     private ?string $fromDistReference;
     private ?string $toDistReference;
     private bool $direct;
+    /** @var list<string> */
+    private array $packageFamilies;
 
+    /** @param list<string> $packageFamilies */
     public function __construct(
         string $name,
         string $changeType,
@@ -27,7 +30,8 @@ final class PackageChange
         ?string $toSourceReference = null,
         ?string $fromDistReference = null,
         ?string $toDistReference = null,
-        bool $direct = false
+        bool $direct = false,
+        array $packageFamilies = []
     ) {
         $this->name = $name;
         $this->changeType = $changeType;
@@ -39,6 +43,15 @@ final class PackageChange
         $this->fromDistReference = $fromDistReference;
         $this->toDistReference = $toDistReference;
         $this->direct = $direct;
+        $families = [];
+        foreach ($packageFamilies as $family) {
+            $family = trim($family);
+            if ($family !== '') {
+                $families[$family] = true;
+            }
+        }
+        $this->packageFamilies = array_keys($families);
+        sort($this->packageFamilies);
     }
 
     public function name(): string
@@ -71,6 +84,12 @@ final class PackageChange
         return $this->direct;
     }
 
+    /** @return list<string> */
+    public function packageFamilies(): array
+    {
+        return $this->packageFamilies;
+    }
+
     public function fromSourceReference(): ?string
     {
         return $this->fromSourceReference;
@@ -101,7 +120,7 @@ final class PackageChange
         return $this->fromDistReference !== $this->toDistReference;
     }
 
-    /** @return array{name: string, change_type: string, from_version: ?string, to_version: ?string, direct: bool, major_change: bool, from_source_reference: ?string, to_source_reference: ?string, from_dist_reference: ?string, to_dist_reference: ?string} */
+    /** @return array{name: string, change_type: string, from_version: ?string, to_version: ?string, direct: bool, major_change: bool, package_families: list<string>, from_source_reference: ?string, to_source_reference: ?string, from_dist_reference: ?string, to_dist_reference: ?string} */
     public function toArray(): array
     {
         return [
@@ -111,6 +130,7 @@ final class PackageChange
             'to_version' => $this->toVersion,
             'direct' => $this->direct,
             'major_change' => $this->majorChange,
+            'package_families' => $this->packageFamilies,
             'from_source_reference' => $this->fromSourceReference,
             'to_source_reference' => $this->toSourceReference,
             'from_dist_reference' => $this->fromDistReference,

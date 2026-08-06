@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Analysis;
 
+use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
@@ -11,7 +12,8 @@ use PhpUpgradePreflight\Core\Model\PackageRef;
 
 final class LockDiffBuilder
 {
-    public function build(ComposerLock $before, ComposerLock $after): LockDiff
+    /** @param list<PackageFamilyClassifier> $familyClassifiers */
+    public function build(ComposerLock $before, ComposerLock $after, array $familyClassifiers = []): LockDiff
     {
         $changes = [];
         $beforePackages = $before->packages();
@@ -34,7 +36,8 @@ final class LockDiffBuilder
                     $to->sourceReference(),
                     null,
                     $to->distReference(),
-                    $to->isDirect()
+                    $to->isDirect(),
+                    $this->packageFamilies($name, $familyClassifiers)
                 );
                 continue;
             }
@@ -50,7 +53,8 @@ final class LockDiffBuilder
                     null,
                     $from->distReference(),
                     null,
-                    $from->isDirect()
+                    $from->isDirect(),
+                    $this->packageFamilies($name, $familyClassifiers)
                 );
                 continue;
             }
@@ -68,7 +72,8 @@ final class LockDiffBuilder
                     $to->sourceReference(),
                     $from->distReference(),
                     $to->distReference(),
-                    $to->isDirect()
+                    $to->isDirect(),
+                    $this->packageFamilies($name, $familyClassifiers)
                 );
             }
         }
@@ -114,5 +119,28 @@ final class LockDiffBuilder
         $toMajor = $this->majorVersion($to);
 
         return $fromMajor !== null && $toMajor !== null && $fromMajor !== $toMajor;
+    }
+
+    /**
+     * @param list<PackageFamilyClassifier> $classifiers
+     * @return list<string>
+     */
+    private function packageFamilies(string $packageName, array $classifiers): array
+    {
+        $families = [];
+
+        foreach ($classifiers as $classifier) {
+            foreach ($classifier->packageFamilies($packageName) as $family) {
+                $family = trim($family);
+                if ($family !== '') {
+                    $families[$family] = true;
+                }
+            }
+        }
+
+        $families = array_keys($families);
+        sort($families);
+
+        return $families;
     }
 }
