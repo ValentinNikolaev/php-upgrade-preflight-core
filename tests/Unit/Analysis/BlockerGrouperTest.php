@@ -8,6 +8,7 @@ use PhpUpgradePreflight\Core\Analysis\BlockerGrouper;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
+use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
@@ -283,6 +284,40 @@ final class BlockerGrouperTest extends TestCase
         self::assertCount(1, $evidence->all());
     }
 
+    public function testItDeduplicatesRootConflictsAcrossScenariosAndRetainsTheirEvidence(): void
+    {
+        $targets = [new UpgradeTarget('vendor/package', '^2.0')];
+        $output = '- Root composer.json requires vendor/package ^1.0';
+        $evidence = new EvidenceLedger();
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult($this->scenario($targets, 'exact-target'), 2, '', $output, null, null, ScenarioResult::FAILURE_SOLVER),
+            new ScenarioResult($this->scenario($targets, 'all-dependencies'), 2, '', $output, null, null, ScenarioResult::FAILURE_SOLVER),
+        ], $evidence);
+
+        self::assertCount(1, $blockers);
+        self::assertSame('root-constraint-conflict', $blockers[0]->type());
+        self::assertSame(['solver-1', 'solver-2'], $blockers[0]->evidence());
+        $evidence->validateReferences($blockers[0]->evidence());
+        self::assertSame(
+            ['exact-target', 'all-dependencies'],
+            array_map(static fn (Evidence $item): string => $item->context()['scenario'], $evidence->all())
+        );
+    }
+
+    public function testItKeepsDifferentRootConflictsSeparate(): void
+    {
+        $targets = [new UpgradeTarget('vendor/package', '^2.0')];
+        $evidence = new EvidenceLedger();
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult($this->scenario($targets, 'exact-target'), 2, '', '- Root composer.json requires vendor/package ^1.0', null, null, ScenarioResult::FAILURE_SOLVER),
+            new ScenarioResult($this->scenario($targets, 'all-dependencies'), 2, '', '- Root composer.json requires vendor/package ~1.5', null, null, ScenarioResult::FAILURE_SOLVER),
+        ], $evidence);
+
+        self::assertCount(2, $blockers);
+        self::assertSame(['^1.0', '~1.5'], array_map(static fn (Blocker $blocker): ?string => $blocker->conflict(), $blockers));
+        self::assertSame([['solver-1'], ['solver-2']], array_map(static fn (Blocker $blocker): array => $blocker->evidence(), $blockers));
+    }
+
     public function testAnySuccessfulScenarioSuppressesFallbackBlockers(): void
     {
         $scenario = $this->scenario([new UpgradeTarget('vendor/package', '^2.0')]);
@@ -308,8 +343,8 @@ final class BlockerGrouperTest extends TestCase
     }
 
     /** @param list<UpgradeTarget> $targets */
-    private function scenario(array $targets): Scenario
+    private function scenario(array $targets, string $name = 'test'): Scenario
     {
-        return new Scenario('test', new UpgradeTargetSet($targets));
+        return new Scenario($name, new UpgradeTargetSet($targets));
     }
 }

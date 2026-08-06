@@ -49,7 +49,7 @@ final class Blocker
         $this->options = array_values(array_unique($options));
         $this->summary = $summary;
         $this->confidence = $confidence;
-        $this->evidence = array_values($evidence);
+        $this->evidence = array_values(array_unique($evidence));
     }
 
     public function type(): string
@@ -108,6 +108,24 @@ final class Blocker
     public function evidence(): array
     {
         return $this->evidence;
+    }
+
+    /** @param list<string> $evidence */
+    public function withAdditionalEvidence(array $evidence): self
+    {
+        return new self(
+            $this->type,
+            $this->subject,
+            $this->summary,
+            $this->confidence,
+            array_merge($this->evidence, $evidence),
+            $this->requestedConstraint,
+            $this->blocker,
+            $this->lockedVersion,
+            $this->conflict,
+            $this->dependencyPath,
+            $this->options
+        );
     }
 
     /** @return array{type: string, subject: string, requested_constraint: ?string, blocker: ?string, locked_version: ?string, conflict: ?string, dependency_path: list<string>, options: list<string>, summary: string, confidence: string, evidence: list<string>} */

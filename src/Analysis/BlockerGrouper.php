@@ -32,6 +32,8 @@ final class BlockerGrouper
         }
 
         $blockers = [];
+        /** @var array<string, int> $rootConflictIndexes */
+        $rootConflictIndexes = [];
 
         foreach ($scenarioResults as $result) {
             if ($result->scenario()->isBaselineValidation() || !$result->isSolverFailure()) {
@@ -48,10 +50,40 @@ final class BlockerGrouper
             ])->id();
 
             foreach ($this->parser->parse($result, $evidenceId) as $blocker) {
+                $rootConflictKey = $this->rootConflictKey($blocker);
+                if ($rootConflictKey !== null && isset($rootConflictIndexes[$rootConflictKey])) {
+                    $index = $rootConflictIndexes[$rootConflictKey];
+                    $blockers[$index] = $blockers[$index]->withAdditionalEvidence($blocker->evidence());
+
+                    continue;
+                }
+
+                $index = count($blockers);
                 $blockers[] = $blocker;
+
+                if ($rootConflictKey !== null) {
+                    $rootConflictIndexes[$rootConflictKey] = $index;
+                }
             }
         }
 
         return $blockers;
+    }
+
+    private function rootConflictKey(Blocker $blocker): ?string
+    {
+        if ($blocker->type() !== 'root-constraint-conflict') {
+            return null;
+        }
+
+        return serialize([
+            $blocker->type(),
+            $blocker->subject(),
+            $blocker->requestedConstraint(),
+            $blocker->blocker(),
+            $blocker->lockedVersion(),
+            $blocker->conflict(),
+            $blocker->dependencyPath(),
+        ]);
     }
 }
