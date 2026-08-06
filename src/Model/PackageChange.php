@@ -11,14 +11,31 @@ final class PackageChange
     private ?string $fromVersion;
     private ?string $toVersion;
     private bool $majorChange;
+    private ?string $fromSourceReference;
+    private ?string $toSourceReference;
+    private ?string $fromDistReference;
+    private ?string $toDistReference;
 
-    public function __construct(string $name, string $changeType, ?string $fromVersion, ?string $toVersion, bool $majorChange = false)
-    {
+    public function __construct(
+        string $name,
+        string $changeType,
+        ?string $fromVersion,
+        ?string $toVersion,
+        bool $majorChange = false,
+        ?string $fromSourceReference = null,
+        ?string $toSourceReference = null,
+        ?string $fromDistReference = null,
+        ?string $toDistReference = null
+    ) {
         $this->name = $name;
         $this->changeType = $changeType;
         $this->fromVersion = $fromVersion;
         $this->toVersion = $toVersion;
         $this->majorChange = $majorChange;
+        $this->fromSourceReference = $fromSourceReference;
+        $this->toSourceReference = $toSourceReference;
+        $this->fromDistReference = $fromDistReference;
+        $this->toDistReference = $toDistReference;
     }
 
     public function name(): string
@@ -46,7 +63,37 @@ final class PackageChange
         return $this->majorChange;
     }
 
-    /** @return array{name: string, change_type: string, from_version: ?string, to_version: ?string, major_change: bool} */
+    public function fromSourceReference(): ?string
+    {
+        return $this->fromSourceReference;
+    }
+
+    public function toSourceReference(): ?string
+    {
+        return $this->toSourceReference;
+    }
+
+    public function fromDistReference(): ?string
+    {
+        return $this->fromDistReference;
+    }
+
+    public function toDistReference(): ?string
+    {
+        return $this->toDistReference;
+    }
+
+    public function hasSourceReferenceChange(): bool
+    {
+        return $this->fromSourceReference !== $this->toSourceReference;
+    }
+
+    public function hasDistReferenceChange(): bool
+    {
+        return $this->fromDistReference !== $this->toDistReference;
+    }
+
+    /** @return array{name: string, change_type: string, from_version: ?string, to_version: ?string, major_change: bool, from_source_reference: ?string, to_source_reference: ?string, from_dist_reference: ?string, to_dist_reference: ?string} */
     public function toArray(): array
     {
         return [
@@ -55,6 +102,10 @@ final class PackageChange
             'from_version' => $this->fromVersion,
             'to_version' => $this->toVersion,
             'major_change' => $this->majorChange,
+            'from_source_reference' => $this->fromSourceReference,
+            'to_source_reference' => $this->toSourceReference,
+            'from_dist_reference' => $this->fromDistReference,
+            'to_dist_reference' => $this->toDistReference,
         ];
     }
 }

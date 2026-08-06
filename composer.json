@@ -2,7 +2,7 @@
   "name": "php-upgrade-preflight/core",
   "description": "Deterministic Composer/PHP upgrade analysis core.",
   "type": "library",
-  "license": "MIT",
+  "license": "proprietary",
   "require": {
     "php": "^8.0",
     "composer/semver": "^3.4",

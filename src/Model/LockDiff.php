@@ -21,7 +21,7 @@ final class LockDiff
         return $this->packageChanges;
     }
 
-    /** @return array{package_changes: list<array{name: string, change_type: string, from_version: ?string, to_version: ?string, major_change: bool}>} */
+    /** @return array{package_changes: list<array{name: string, change_type: string, from_version: ?string, to_version: ?string, major_change: bool, from_source_reference: ?string, to_source_reference: ?string, from_dist_reference: ?string, to_dist_reference: ?string}>} */
     public function toArray(): array
     {
         return [

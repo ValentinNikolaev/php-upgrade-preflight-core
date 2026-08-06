@@ -10,6 +10,7 @@ use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\LockDiff;
+use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\PlanStage;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\RootConstraintChange;
@@ -73,7 +74,17 @@ final class MarkdownReportWriterTest extends TestCase
                     250
                 ),
             ],
-            new LockDiff([]),
+            new LockDiff([new PackageChange(
+                'vendor/package',
+                'changed',
+                'dev-main',
+                'dev-main',
+                false,
+                'source-before',
+                'source-after',
+                'dist-before',
+                'dist-after'
+            )]),
             [],
             [new SourceUsage('src/Example.php', 'Vendor\\Package\\Client', 'static_call', ['source-1'], 12)],
             [],
@@ -105,6 +116,8 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('fixture/blocker 1.0.0 requires fixture/dependency (^1.0)', $markdown);
         self::assertStringContainsString('candidate lock: SHA-256', $markdown);
         self::assertStringContainsString('content hash `candidate-content`, packages `0`', $markdown);
+        self::assertStringContainsString('source reference: `source-before` -> `source-after`', $markdown);
+        self::assertStringContainsString('dist reference: `dist-before` -> `dist-after`', $markdown);
         self::assertStringContainsString('## Source Impact', $markdown);
         self::assertStringContainsString('src/Example.php:12', $markdown);
         self::assertStringContainsString('## Root Constraint Changes', $markdown);

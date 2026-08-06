@@ -16,6 +16,7 @@ use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
+use PhpUpgradePreflight\Core\Reporting\JsonReportWriter;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -43,7 +44,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
             self::assertTrue($report->scenarios()[0]->isOperationalFailure());
             self::assertStringContainsString('Invalid JSON', $report->scenarios()[0]->stderr());
             self::assertSame([], $report->planStages());
-            self::assertSame('0.2', $report->metadata()->schemaVersion());
+            self::assertSame('0.3', $report->metadata()->schemaVersion());
         } finally {
             (new Filesystem())->remove($projectPath);
         }
@@ -267,7 +268,12 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
             $version = in_array('--minimal-changes', $command, true) ? '2.0.0' : '3.0.0';
             file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
-                'packages' => [['name' => 'fixture/dependency', 'version' => $version]],
+                'packages' => [[
+                    'name' => 'fixture/dependency',
+                    'version' => $version,
+                    'source' => ['reference' => 'source-' . $version],
+                    'dist' => ['reference' => 'dist-' . $version],
+                ]],
                 'packages-dev' => [],
             ], JSON_THROW_ON_ERROR));
 
@@ -283,6 +289,14 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('low', $report->risk()->level());
         self::assertCount(1, $report->lockDiff()->packageChanges());
         self::assertSame('2.0.0', $report->lockDiff()->packageChanges()[0]->toVersion());
+        self::assertSame('source-2.0.0', $report->lockDiff()->packageChanges()[0]->toSourceReference());
+        self::assertSame('dist-2.0.0', $report->lockDiff()->packageChanges()[0]->toDistReference());
+
+        /** @var array<string, mixed> $json */
+        $json = json_decode((new JsonReportWriter())->render($report), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('0.3', $json['metadata']['schema_version']);
+        self::assertSame('source-2.0.0', $json['transition']['package_changes'][0]['to_source_reference']);
+        self::assertSame('dist-2.0.0', $json['transition']['package_changes'][0]['to_dist_reference']);
     }
 
     public function testOperationalFailuresProduceUnknownResolutionAndUncertainties(): void

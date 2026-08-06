@@ -24,27 +24,60 @@ final class LockDiffBuilder
             $to = $afterPackages[$name] ?? null;
 
             if ($from === null && $to !== null) {
-                $changes[] = new PackageChange($name, 'added', null, $to->version(), false);
+                $changes[] = new PackageChange(
+                    $name,
+                    'added',
+                    null,
+                    $to->version(),
+                    false,
+                    null,
+                    $to->sourceReference(),
+                    null,
+                    $to->distReference()
+                );
                 continue;
             }
 
             if ($from !== null && $to === null) {
-                $changes[] = new PackageChange($name, 'removed', $from->version(), null, false);
+                $changes[] = new PackageChange(
+                    $name,
+                    'removed',
+                    $from->version(),
+                    null,
+                    false,
+                    $from->sourceReference(),
+                    null,
+                    $from->distReference(),
+                    null
+                );
                 continue;
             }
 
-            if ($from instanceof PackageRef && $to instanceof PackageRef && $from->version() !== $to->version()) {
+            if ($from instanceof PackageRef && $to instanceof PackageRef && $this->packageChanged($from, $to)) {
                 $changes[] = new PackageChange(
                     $name,
-                    $this->compareVersions($from->version(), $to->version()),
+                    $from->version() === $to->version()
+                        ? 'changed'
+                        : $this->compareVersions($from->version(), $to->version()),
                     $from->version(),
                     $to->version(),
-                    $this->majorVersion($from->version()) !== $this->majorVersion($to->version())
+                    $this->majorVersion($from->version()) !== $this->majorVersion($to->version()),
+                    $from->sourceReference(),
+                    $to->sourceReference(),
+                    $from->distReference(),
+                    $to->distReference()
                 );
             }
         }
 
         return new LockDiff($changes);
+    }
+
+    private function packageChanged(PackageRef $from, PackageRef $to): bool
+    {
+        return $from->version() !== $to->version()
+            || $from->sourceReference() !== $to->sourceReference()
+            || $from->distReference() !== $to->distReference();
     }
 
     private function compareVersions(string $from, string $to): string

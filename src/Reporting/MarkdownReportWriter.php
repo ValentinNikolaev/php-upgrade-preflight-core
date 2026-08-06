@@ -93,6 +93,12 @@ final class MarkdownReportWriter
         } else {
             foreach ($report->lockDiff()->packageChanges() as $change) {
                 $lines[] = sprintf('- `%s`: %s `%s` -> `%s`', $change->name(), $change->changeType(), $change->fromVersion() ?? '-', $change->toVersion() ?? '-');
+                if ($change->hasSourceReferenceChange()) {
+                    $lines[] = sprintf('  - source reference: `%s` -> `%s`', $change->fromSourceReference() ?? '-', $change->toSourceReference() ?? '-');
+                }
+                if ($change->hasDistReferenceChange()) {
+                    $lines[] = sprintf('  - dist reference: `%s` -> `%s`', $change->fromDistReference() ?? '-', $change->toDistReference() ?? '-');
+                }
             }
         }
 

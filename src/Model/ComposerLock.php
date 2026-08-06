@@ -51,10 +51,29 @@ final class ComposerLock
                 }
 
                 $name = strtolower((string) $package['name']);
-                $indexed[$name] = new PackageRef($name, (string) $package['version']);
+                $indexed[$name] = new PackageRef(
+                    $name,
+                    (string) $package['version'],
+                    false,
+                    $this->packageReference($package, 'source'),
+                    $this->packageReference($package, 'dist')
+                );
             }
         }
 
         return $indexed;
+    }
+
+    /** @param array<string, mixed> $package */
+    private function packageReference(array $package, string $key): ?string
+    {
+        $metadata = $package[$key] ?? null;
+        if (!is_array($metadata)) {
+            return null;
+        }
+
+        $reference = $metadata['reference'] ?? null;
+
+        return is_string($reference) ? $reference : null;
     }
 }
