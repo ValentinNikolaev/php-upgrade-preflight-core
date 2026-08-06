@@ -1,0 +1,338 @@
+{
+    "metadata": {
+        "schema_version": "0.6",
+        "tool": {
+            "name": "php-upgrade-preflight",
+            "version": "0.1.0"
+        }
+    },
+    "request_summary": {
+        "project_path": "<PROJECT_PATH>",
+        "targets": [
+            {
+                "package": "laravel/framework",
+                "constraint": "^9.0"
+            },
+            {
+                "package": "php",
+                "constraint": "8.1.0"
+            }
+        ],
+        "from_php": "7.4",
+        "target_php": "8.1.0",
+        "source_paths": [
+            "app"
+        ],
+        "frameworks": [
+            "laravel"
+        ],
+        "format": "json",
+        "output_path": null
+    },
+    "project_state": {
+        "path": "<PROJECT_PATH>",
+        "platform_php": "7.4.33",
+        "root_requirements": {
+            "php": "^7.4",
+            "laravel/framework": "^7.0",
+            "phpunit/phpunit": "^8.5"
+        },
+        "locked_packages": 2
+    },
+    "resolution": {
+        "status": "feasible_with_changes",
+        "scenarios": [
+            {
+                "name": "all-dependencies",
+                "composer_version": "2.8.12",
+                "command": [
+                    "composer",
+                    "update",
+                    "laravel/framework",
+                    "--with-all-dependencies",
+                    "--no-scripts",
+                    "--no-plugins",
+                    "--no-install",
+                    "--no-interaction"
+                ],
+                "duration_ms": 125,
+                "exit_code": 0,
+                "succeeded": true,
+                "outcome": "success",
+                "failure_type": null,
+                "stdout_excerpt": "Composer resolved the requested target.",
+                "stderr_excerpt": "",
+                "candidate_lock": {
+                    "sha256": "ae4c031e1bebb7f828571cbafc40aae68a849aa8de835da994134f6bf4215aa3",
+                    "content_hash": null,
+                    "package_count": 1
+                },
+                "diagnostics": [
+                    {
+                        "package": "laravel/framework",
+                        "constraint": "^9.0",
+                        "command": [
+                            "composer",
+                            "prohibits",
+                            "laravel/framework",
+                            "^9.0",
+                            "--tree",
+                            "--locked",
+                            "--no-plugins",
+                            "--no-interaction"
+                        ],
+                        "exit_code": 0,
+                        "stdout_excerpt": "legacy/package 1.0.0 requires illuminate/support (^7.0)",
+                        "stderr_excerpt": ""
+                    }
+                ],
+                "temp_path": null
+            }
+        ]
+    },
+    "transition": {
+        "package_changes": [
+            {
+                "name": "laravel/framework",
+                "change_type": "upgraded",
+                "from_version": "v7.30.6",
+                "to_version": "v9.52.16",
+                "direct": true,
+                "major_change": true,
+                "package_families": [
+                    "laravel"
+                ],
+                "from_source_reference": "source-before",
+                "to_source_reference": "source-after",
+                "from_dist_reference": "dist-before",
+                "to_dist_reference": "dist-after"
+            }
+        ],
+        "root_constraint_changes": [
+            {
+                "package": "laravel/framework",
+                "change_type": "updated",
+                "from_constraint": "^7.0",
+                "to_constraint": "^9.0",
+                "reason": "The declared root constraint differs from the requested target.",
+                "evidence": [
+                    "root-constraint-1"
+                ]
+            }
+        ]
+    },
+    "blockers": [
+        {
+            "type": "root-constraint-conflict",
+            "subject": "legacy/package",
+            "requested_constraint": "^9.0",
+            "blocker": "legacy/package",
+            "locked_version": "1.0.0",
+            "conflict": "^7.0",
+            "dependency_path": [
+                "legacy/package",
+                "laravel/framework"
+            ],
+            "options": [
+                "Upgrade or replace `legacy/package`.",
+                "Choose a compatible Laravel target."
+            ],
+            "summary": "A legacy root constraint must be reviewed.",
+            "confidence": "high",
+            "evidence": [
+                "solver-1"
+            ]
+        }
+    ],
+    "source_impact": [
+        {
+            "file": "app/Example.php",
+            "symbol": "Legacy\\Facade",
+            "usage_type": "static_call",
+            "line": 17,
+            "evidence": [
+                "source-1"
+            ]
+        }
+    ],
+    "framework_findings": [
+        {
+            "framework": "laravel",
+            "severity": "medium",
+            "summary": "Legacy package requires review.",
+            "evidence": [
+                "package-1"
+            ]
+        }
+    ],
+    "plan": {
+        "stages": [
+            {
+                "name": "constraints",
+                "summary": "Prepare the requested root constraint changes before dependency resolution.",
+                "actions": [
+                    "Update the `laravel/framework` root constraint to `^9.0`.",
+                    "Select a root PHP constraint that includes target platform PHP 8.1.0 without pinning an exact patch version."
+                ],
+                "evidence": [
+                    "plan-1",
+                    "root-constraint-1"
+                ]
+            },
+            {
+                "name": "dependencies",
+                "summary": "Resolve dependency blockers and review the resulting lockfile transition.",
+                "actions": [
+                    "Resolve the `root-constraint-conflict` blocker affecting `legacy/package`.",
+                    "Rerun the isolated Composer scenarios after resolving the reported blockers."
+                ],
+                "evidence": [
+                    "plan-1",
+                    "solver-1"
+                ]
+            },
+            {
+                "name": "application",
+                "summary": "Apply source and framework migration work after dependency resolution is stable.",
+                "actions": [
+                    "Review the reported source locations and adapt affected application code.",
+                    "Address framework compatibility findings before runtime validation."
+                ],
+                "evidence": [
+                    "plan-1",
+                    "source-1",
+                    "package-1"
+                ]
+            },
+            {
+                "name": "validation",
+                "summary": "Validate the upgraded project on the target runtime before release.",
+                "actions": [
+                    "Validate the Composer manifest and installed platform requirements.",
+                    "Run the project test suite and focused regression tests."
+                ],
+                "evidence": [
+                    "plan-1"
+                ]
+            }
+        ]
+    },
+    "risk": {
+        "level": "high",
+        "drivers": [
+            "A root dependency constraint conflicts with the requested target.",
+            "A framework compatibility finding requires review."
+        ]
+    },
+    "effort": {
+        "range_hours": [
+            8,
+            20
+        ],
+        "confidence": "low",
+        "components": {
+            "dependency_resolution": [
+                3,
+                8
+            ],
+            "source_changes": [
+                2,
+                4
+            ],
+            "tests_and_debugging": [
+                3,
+                8
+            ]
+        },
+        "assumptions": [
+            "The project test suite is available and representative."
+        ]
+    },
+    "tests": [
+        {
+            "name": "composer-validation",
+            "purpose": "Validate the edited Composer manifest before dependency installation.",
+            "command": "composer validate --strict",
+            "priority": "required"
+        },
+        {
+            "name": "project-test-suite",
+            "purpose": "Run the project test suite after applying the dependency and source changes.",
+            "command": "composer test",
+            "priority": "required"
+        },
+        {
+            "name": "platform-requirements",
+            "purpose": "Confirm the installed dependencies satisfy PHP 8.1.0 and the deployment extensions.",
+            "command": "composer check-platform-reqs",
+            "priority": "required"
+        },
+        {
+            "name": "focused-regressions",
+            "purpose": "Add or run focused regression coverage for the reported source and framework findings.",
+            "command": null,
+            "priority": "recommended"
+        }
+    ],
+    "uncertainties": [
+        "Dependency resolution does not prove application runtime compatibility; the project test suite must run on the target runtime.",
+        "Root PHP constraint \"^7.4\" does not include target platform PHP 8.1.0; select an appropriate Composer constraint instead of using the exact simulated platform version."
+    ],
+    "evidence": [
+        {
+            "id": "solver-1",
+            "class": "E1",
+            "summary": "Composer reported a root constraint conflict.",
+            "confidence": "high",
+            "context": {
+                "scenario": "strict-target",
+                "package": "legacy/package"
+            }
+        },
+        {
+            "id": "source-1",
+            "class": "E3",
+            "summary": "Detected a legacy facade call.",
+            "confidence": "high",
+            "context": {
+                "file": "app/Example.php",
+                "line": 17,
+                "usage_type": "static_call"
+            }
+        },
+        {
+            "id": "package-1",
+            "class": "E2",
+            "summary": "Legacy package metadata requires review.",
+            "confidence": "medium",
+            "context": {
+                "package": "legacy/package",
+                "locked_version": "1.0.0"
+            }
+        },
+        {
+            "id": "root-constraint-1",
+            "class": "E2",
+            "summary": "Compared the root requirement for laravel/framework with the requested target.",
+            "confidence": "high",
+            "context": {
+                "package": "laravel/framework",
+                "from_constraint": "^7.0",
+                "to_constraint": "^9.0"
+            }
+        },
+        {
+            "id": "plan-1",
+            "class": "E5",
+            "summary": "Generated conservative staged actions from the requested targets and detected findings.",
+            "confidence": "low",
+            "context": {
+                "target_count": 2,
+                "root_constraint_change_count": 1,
+                "blocker_count": 1,
+                "source_finding_count": 1,
+                "framework_finding_count": 1
+            }
+        }
+    ]
+}

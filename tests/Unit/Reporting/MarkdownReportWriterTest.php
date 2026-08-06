@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Tests\Unit\Reporting;
 
+use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
@@ -90,7 +91,19 @@ final class MarkdownReportWriterTest extends TestCase
                 ),
                 new PackageChange('vendor/transitive', 'added', null, '1.0.0'),
             ]),
-            [],
+            [new Blocker(
+                'transitive-package-conflict',
+                'fixture/dependency',
+                'A transitive constraint blocks the target.',
+                'high',
+                ['source-1'],
+                '^2.0',
+                'fixture/blocker',
+                '1.0.0',
+                '^1.0',
+                ['fixture/blocker', 'fixture/dependency'],
+                ['Upgrade or replace `fixture/blocker`.']
+            )],
             [new SourceUsage('src/Example.php', 'Vendor\\Package\\Client', 'static_call', ['source-1'], 12)],
             [],
             new RiskSummary('low', []),
@@ -121,6 +134,10 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('fixture/blocker 1.0.0 requires fixture/dependency (^1.0)', $markdown);
         self::assertStringContainsString('candidate lock: SHA-256', $markdown);
         self::assertStringContainsString('content hash `candidate-content`, packages `0`', $markdown);
+        self::assertStringContainsString('`transitive-package-conflict` `fixture/dependency`', $markdown);
+        self::assertStringContainsString('requested `^2.0`; blocker `fixture/blocker`; locked `1.0.0`; conflict `^1.0`', $markdown);
+        self::assertStringContainsString('dependency path: `fixture/blocker -> fixture/dependency`', $markdown);
+        self::assertStringContainsString('option: Upgrade or replace `fixture/blocker`.', $markdown);
         self::assertStringContainsString('(direct dependency; major-version jump; families: laravel, symfony)', $markdown);
         self::assertStringContainsString('`vendor/transitive`: added `-` -> `1.0.0` (transitive dependency)', $markdown);
         self::assertStringContainsString('source reference: `source-before` -> `source-after`', $markdown);

@@ -81,7 +81,28 @@ final class MarkdownReportWriter
             $lines[] = '- None detected.';
         } else {
             foreach ($report->blockers() as $blocker) {
-                $lines[] = sprintf('- `%s` %s (%s)', $blocker->type(), $blocker->summary(), implode(', ', $blocker->evidence()));
+                $lines[] = sprintf(
+                    '- `%s` `%s`: %s (%s confidence; %s)',
+                    $this->inline($blocker->type()),
+                    $this->inline($blocker->subject()),
+                    $this->singleLine($blocker->summary()),
+                    $blocker->confidence(),
+                    implode(', ', $blocker->evidence())
+                );
+                $lines[] = sprintf(
+                    '  - requested `%s`; blocker `%s`; locked `%s`; conflict `%s`',
+                    $this->inline($blocker->requestedConstraint() ?? '-'),
+                    $this->inline($blocker->blocker() ?? '-'),
+                    $this->inline($blocker->lockedVersion() ?? '-'),
+                    $this->inline($blocker->conflict() ?? '-')
+                );
+                $lines[] = sprintf(
+                    '  - dependency path: %s',
+                    $blocker->dependencyPath() === [] ? 'unknown' : '`' . $this->inline(implode(' -> ', $blocker->dependencyPath())) . '`'
+                );
+                foreach ($blocker->options() as $option) {
+                    $lines[] = '  - option: ' . $this->singleLine($option);
+                }
             }
         }
 

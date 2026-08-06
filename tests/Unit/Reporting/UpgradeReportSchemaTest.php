@@ -34,20 +34,20 @@ use Symfony\Component\Filesystem\Filesystem;
 
 final class UpgradeReportSchemaTest extends TestCase
 {
-    public function testCanonicalV05ReportMatchesTheCommittedSnapshot(): void
+    public function testCanonicalV06ReportMatchesTheCommittedSnapshot(): void
     {
         $projectPath = dirname(__DIR__, 5);
         $actual = JsonSnapshotNormalizer::normalize(
             (new JsonReportWriter())->render($this->report($projectPath)),
             $projectPath
         );
-        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.5.json');
+        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.6.json');
 
         self::assertIsString($snapshot);
         self::assertSame($snapshot, $actual);
     }
 
-    public function testCanonicalV05ReportConformsToThePublishedSchema(): void
+    public function testCanonicalV06ReportConformsToThePublishedSchema(): void
     {
         $projectPath = dirname(__DIR__, 5);
         $json = (new JsonReportWriter())->render($this->report($projectPath));
@@ -88,14 +88,14 @@ final class UpgradeReportSchemaTest extends TestCase
 
     public function testPublishedSchemaAndRuntimeMetadataDescribeTheSameContractVersion(): void
     {
-        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.5.schema.json');
+        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.6.schema.json');
 
         self::assertIsString($contents);
         /** @var array<string, mixed> $schema */
         $schema = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('https://json-schema.org/draft/2020-12/schema', $schema['$schema']);
-        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.5', $schema['$id']);
+        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.6', $schema['$id']);
         self::assertSame(
             ReportMetadata::SCHEMA_VERSION,
             $schema['$defs']['metadata']['properties']['schema_version']['const']
@@ -121,6 +121,33 @@ final class UpgradeReportSchemaTest extends TestCase
             array_keys($this->report(dirname(__DIR__, 5))->toArray()['transition']['package_changes'][0]),
             $schema['$defs']['packageChange']['required']
         );
+        self::assertSame(
+            array_keys($this->report(dirname(__DIR__, 5))->toArray()['blockers'][0]),
+            $schema['$defs']['blocker']['required']
+        );
+    }
+
+    public function testPublishedV05BlockerContractRemainsUnchanged(): void
+    {
+        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.5.schema.json');
+
+        self::assertIsString($contents);
+        /** @var array<string, mixed> $schema */
+        $schema = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+        $expectedFields = ['type', 'subject', 'summary', 'confidence', 'evidence'];
+
+        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.5', $schema['$id']);
+        self::assertSame('0.5', $schema['$defs']['metadata']['properties']['schema_version']['const']);
+        self::assertSame($expectedFields, $schema['$defs']['blocker']['required']);
+        self::assertSame($expectedFields, array_keys($schema['$defs']['blocker']['properties']));
+    }
+
+    public function testCanonicalV05SnapshotStillConformsToThePreservedSchema(): void
+    {
+        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.5.json');
+
+        self::assertIsString($snapshot);
+        $this->assertConformsToSchema($snapshot, '0.5');
     }
 
     public function testPublishedV04PackageChangeContractRemainsUnchanged(): void
@@ -320,7 +347,13 @@ final class UpgradeReportSchemaTest extends TestCase
                     'legacy/package',
                     'A legacy root constraint must be reviewed.',
                     'high',
-                    ['solver-1']
+                    ['solver-1'],
+                    '^9.0',
+                    'legacy/package',
+                    '1.0.0',
+                    '^7.0',
+                    ['legacy/package', 'laravel/framework'],
+                    ['Upgrade or replace `legacy/package`.', 'Choose a compatible Laravel target.']
                 ),
             ],
             [
@@ -348,7 +381,7 @@ final class UpgradeReportSchemaTest extends TestCase
         );
     }
 
-    private function assertConformsToSchema(string $json, string $schemaVersion = '0.5'): void
+    private function assertConformsToSchema(string $json, string $schemaVersion = '0.6'): void
     {
         $schemaContents = file_get_contents(sprintf(
             '%s/resources/schema/upgrade-report-v%s.schema.json',

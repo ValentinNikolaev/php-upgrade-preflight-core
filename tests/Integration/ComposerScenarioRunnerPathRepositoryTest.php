@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Tests\Integration;
 
+use PhpUpgradePreflight\Core\Analysis\BlockerGrouper;
 use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -62,7 +64,20 @@ final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
             '--no-plugins',
             '--no-interaction',
         ], $result->diagnostics()[0]->command());
-        self::assertStringContainsString('fixture/dependency', $result->diagnostics()[0]->stdout() . $result->diagnostics()[0]->stderr());
+        $diagnosticOutput = $result->diagnostics()[0]->stdout() . $result->diagnostics()[0]->stderr();
+        self::assertStringContainsString('fixture/dependency', $diagnosticOutput);
+
+        $evidence = new EvidenceLedger();
+        $blockers = (new BlockerGrouper())->group([$result], $evidence);
+
+        self::assertNotSame([], $blockers);
+        self::assertSame('php-platform-too-high', $blockers[0]->type(), $diagnosticOutput);
+        self::assertSame('php', $blockers[0]->subject());
+        self::assertSame('9.0.0', $blockers[0]->requestedConstraint());
+        self::assertNotNull($blockers[0]->conflict());
+        self::assertContains('php', $blockers[0]->dependencyPath());
+        self::assertSame(['solver-1'], $blockers[0]->evidence());
+        self::assertCount(1, $evidence->all());
         $snapshot->assertUnchanged($this);
     }
 
