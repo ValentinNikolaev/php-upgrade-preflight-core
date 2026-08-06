@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Tests\Unit\Reporting;
 
 use PhpUpgradePreflight\Core\Model\ComposerJson;
+use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
@@ -48,7 +49,16 @@ final class MarkdownReportWriterTest extends TestCase
                     ScenarioResult::FAILURE_OPERATIONAL,
                     '2.8.12',
                     ['composer', 'update', 'fixture/dependency:^2.0'],
-                    125
+                    125,
+                    null,
+                    [new ComposerDiagnostic(
+                        'fixture/dependency',
+                        '^2.0',
+                        ['composer', 'prohibits', 'fixture/dependency', '^2.0', '--tree', '--locked'],
+                        0,
+                        'fixture/blocker 1.0.0 requires fixture/dependency (^1.0)',
+                        ''
+                    )]
                 ),
                 new ScenarioResult(
                     $scenario,
@@ -89,6 +99,8 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('Composer executable unavailable.', $markdown);
         self::assertStringContainsString('Composer `2.8.12`, duration `125 ms`, exit `1`', $markdown);
         self::assertStringContainsString('command argv: `["composer","update","fixture/dependency:^2.0"]`', $markdown);
+        self::assertStringContainsString('diagnostic for `fixture/dependency ^2.0` (exit `0`)', $markdown);
+        self::assertStringContainsString('fixture/blocker 1.0.0 requires fixture/dependency (^1.0)', $markdown);
         self::assertStringContainsString('candidate lock: SHA-256', $markdown);
         self::assertStringContainsString('content hash `candidate-content`, packages `0`', $markdown);
         self::assertStringContainsString('## Source Impact', $markdown);

@@ -8,6 +8,7 @@ use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CandidateLockEvidence;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
+use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
@@ -49,6 +50,7 @@ final class ImmutableDtoTest extends TestCase
             [Blocker::class],
             [CandidateLockEvidence::class],
             [CompatibilityFinding::class],
+            [ComposerDiagnostic::class],
             [ComposerJson::class],
             [ComposerLock::class],
             [EffortEstimate::class],

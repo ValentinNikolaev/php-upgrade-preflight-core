@@ -9,6 +9,7 @@ use Opis\JsonSchema\Validator;
 use PhpUpgradePreflight\Core\Analysis\ReportAssembler;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
+use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
@@ -146,7 +147,16 @@ final class UpgradeReportSchemaTest extends TestCase
             null,
             '2.8.12',
             ['composer', 'update', 'laravel/framework', '--with-all-dependencies', '--no-scripts', '--no-plugins', '--no-install', '--no-interaction'],
-            125
+            125,
+            null,
+            [new ComposerDiagnostic(
+                'laravel/framework',
+                '^9.0',
+                ['composer', 'prohibits', 'laravel/framework', '^9.0', '--tree', '--locked', '--no-plugins', '--no-interaction'],
+                0,
+                'legacy/package 1.0.0 requires illuminate/support (^7.0)',
+                ''
+            )]
         );
         $evidence = [
             new Evidence('solver-1', Evidence::E1_SOLVER, 'Composer reported a root constraint conflict.', 'high', [

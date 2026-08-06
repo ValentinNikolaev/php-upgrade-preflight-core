@@ -199,6 +199,132 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalRunner->run($project, $request, $scenario)->failureType());
     }
 
+    public function testSolverFailureRunsUsefulProhibitsDiagnosticsInTheScenarioWorkspace(): void
+    {
+        $calls = [];
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory) use (&$calls): array {
+            $calls[] = ['command' => $command, 'directory' => $directory];
+
+            if ($command[1] === 'prohibits') {
+                return [
+                    'exit_code' => 0,
+                    'stdout' => 'fixture/blocker 1.0.0 requires fixture/dependency (^1.0)',
+                    'stderr' => '',
+                ];
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => 'Your requirements could not be resolved to an installable set of packages.',
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], '8.0', '8.1');
+
+        $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets(), false));
+
+        self::assertSame(ScenarioResult::FAILURE_SOLVER, $result->failureType());
+        self::assertCount(2, $result->diagnostics());
+        self::assertSame($calls[0]['directory'], $calls[1]['directory']);
+        self::assertSame($calls[0]['directory'], $calls[2]['directory']);
+        self::assertSame([
+            'composer',
+            'prohibits',
+            'fixture/dependency',
+            '^2.0',
+            '--tree',
+            '--locked',
+            '--no-plugins',
+            '--no-interaction',
+        ], $calls[1]['command']);
+        self::assertSame('php', $result->diagnostics()[1]->package());
+        self::assertStringContainsString('fixture/blocker', $result->diagnostics()[0]->stdout());
+    }
+
+    public function testDiagnosticsSkipSatisfiedLockedTargetsAndStagedCurrentPhp(): void
+    {
+        $calls = [];
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command) use (&$calls): array {
+            $calls[] = $command;
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => 'Your requirements could not be resolved to an installable set of packages.',
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^1.0')], '8.0', '8.1');
+        $stagedTargets = new \PhpUpgradePreflight\Core\Model\UpgradeTargetSet(
+            [new UpgradeTarget('fixture/dependency', '^1.0')],
+            '8.0'
+        );
+
+        $result = $runner->run($project, $request, new Scenario('staged-targets', $stagedTargets));
+
+        self::assertSame([], $result->diagnostics());
+        self::assertCount(1, $calls);
+    }
+
+    public function testDiagnosticFailureDoesNotReplaceThePrimarySolverOutcome(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command): array {
+            if ($command[1] === 'prohibits') {
+                throw new \RuntimeException('Diagnostic process could not start.');
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => 'Your requirements could not be resolved to an installable set of packages.',
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+
+        self::assertSame(ScenarioResult::FAILURE_SOLVER, $result->failureType());
+        self::assertSame(2, $result->exitCode());
+        self::assertCount(1, $result->diagnostics());
+        self::assertSame(1, $result->diagnostics()[0]->exitCode());
+        self::assertStringContainsString('could not start', $result->diagnostics()[0]->stderr());
+    }
+
+    public function testComposerBefore24RecordsUnsupportedLockedDiagnosticWithoutRunningIt(): void
+    {
+        $calls = [];
+        $runner = new ComposerScenarioRunner(
+            null,
+            null,
+            static function (array $command) use (&$calls): array {
+                $calls[] = $command;
+
+                return [
+                    'exit_code' => 2,
+                    'stdout' => '',
+                    'stderr' => 'Your requirements could not be resolved to an installable set of packages.',
+                ];
+            },
+            static fn (): string => '2.3.10'
+        );
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+
+        self::assertSame(ScenarioResult::FAILURE_SOLVER, $result->failureType());
+        self::assertCount(1, $calls);
+        self::assertCount(1, $result->diagnostics());
+        self::assertSame([], $result->diagnostics()[0]->command());
+        self::assertStringContainsString('Composer 2.4.0 or newer is required', $result->diagnostics()[0]->stderr());
+    }
+
     public function testItSeparatesBaselineValidationAndOperationalFailures(): void
     {
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
@@ -337,6 +463,40 @@ final class ComposerScenarioRunnerTest extends TestCase
             self::assertStringContainsString('cleanup failed', $result->stderr());
             self::assertNotNull($result->tempPath());
             self::assertNotNull($result->candidateLockEvidence());
+        } finally {
+            $workspaceManager->forceCleanup();
+        }
+    }
+
+    public function testWorkspaceCleanupFailurePreservesCollectedDiagnostics(): void
+    {
+        $workspaceManager = new FailingCleanupWorkspaceManager();
+        $runner = new ComposerScenarioRunner($workspaceManager, null, static function (array $command): array {
+            if ($command[1] === 'prohibits') {
+                return [
+                    'exit_code' => 0,
+                    'stdout' => 'fixture/blocker 1.0.0 requires fixture/dependency (^1.0)',
+                    'stderr' => '',
+                ];
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => 'Your requirements could not be resolved to an installable set of packages.',
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        try {
+            $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+
+            self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+            self::assertCount(1, $result->diagnostics());
+            self::assertStringContainsString('fixture/blocker', $result->diagnostics()[0]->stdout());
+            self::assertStringContainsString('cleanup failed', $result->stderr());
         } finally {
             $workspaceManager->forceCleanup();
         }

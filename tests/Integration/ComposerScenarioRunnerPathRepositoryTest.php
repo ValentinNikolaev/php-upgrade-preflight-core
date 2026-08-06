@@ -36,6 +36,35 @@ final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
         $snapshot->assertUnchanged($this);
     }
 
+    public function testBlockedPhpTargetCapturesLockedProhibitsDiagnostic(): void
+    {
+        if (!$this->composerIsAvailable()) {
+            self::markTestSkipped('Composer is required for the path-repository integration test.');
+        }
+
+        $projectPath = dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'path-repository' . DIRECTORY_SEPARATOR . 'project';
+        $snapshot = FixtureSnapshot::capture(dirname($projectPath));
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('php', '9.0')]);
+
+        $result = (new ComposerScenarioRunner())->run($project, $request, new Scenario('blocked-php-target', $request->targets(), false));
+
+        self::assertTrue($result->isSolverFailure(), $result->stderr());
+        self::assertCount(1, $result->diagnostics());
+        self::assertSame([
+            'composer',
+            'prohibits',
+            'php',
+            '9.0.0',
+            '--tree',
+            '--locked',
+            '--no-plugins',
+            '--no-interaction',
+        ], $result->diagnostics()[0]->command());
+        self::assertStringContainsString('fixture/dependency', $result->diagnostics()[0]->stdout() . $result->diagnostics()[0]->stderr());
+        $snapshot->assertUnchanged($this);
+    }
+
     private function composerIsAvailable(): bool
     {
         $process = proc_open(['composer', '--version'], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);

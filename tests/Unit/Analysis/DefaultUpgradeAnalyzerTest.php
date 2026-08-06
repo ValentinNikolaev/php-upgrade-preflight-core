@@ -268,6 +268,46 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertCount(3, $report->blockers());
     }
 
+    public function testIdenticalProhibitsDiagnosticsAreReusedWithinEachAnalysis(): void
+    {
+        $diagnosticCalls = 0;
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command) use (&$diagnosticCalls): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            if ($command[1] === 'prohibits') {
+                ++$diagnosticCalls;
+
+                return [
+                    'exit_code' => 0,
+                    'stdout' => 'fixture/blocker 1.0.0 requires fixture/dependency (^1.0)',
+                    'stderr' => '',
+                ];
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => 'Your requirements could not be resolved to an installable set of packages.',
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+        $analyzer = new DefaultUpgradeAnalyzer([], null, $runner);
+
+        $firstReport = $analyzer->analyzeUpgrade($request);
+
+        self::assertSame(1, $diagnosticCalls);
+        self::assertCount(1, $firstReport->scenarios()[1]->diagnostics());
+        self::assertCount(1, $firstReport->scenarios()[2]->diagnostics());
+        self::assertCount(1, $firstReport->scenarios()[3]->diagnostics());
+
+        $analyzer->analyzeUpgrade($request);
+
+        self::assertSame(2, $diagnosticCalls);
+    }
+
     public function testInvalidBaselineDoesNotProduceEnvironmentRemediationForTargetBlockers(): void
     {
         $runner = new ComposerScenarioRunner(null, null, static function (array $command): array {

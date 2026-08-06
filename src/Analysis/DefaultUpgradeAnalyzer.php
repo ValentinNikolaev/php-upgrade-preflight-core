@@ -70,6 +70,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $analysisUncertainties
         );
 
+        $this->scenarioRunner->resetDiagnosticCache();
         $scenarioResults = [];
         foreach ($scenarios as $scenario) {
             $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario);

@@ -66,6 +66,25 @@
                     "content_hash": null,
                     "package_count": 1
                 },
+                "diagnostics": [
+                    {
+                        "package": "laravel/framework",
+                        "constraint": "^9.0",
+                        "command": [
+                            "composer",
+                            "prohibits",
+                            "laravel/framework",
+                            "^9.0",
+                            "--tree",
+                            "--locked",
+                            "--no-plugins",
+                            "--no-interaction"
+                        ],
+                        "exit_code": 0,
+                        "stdout_excerpt": "legacy/package 1.0.0 requires illuminate/support (^7.0)",
+                        "stderr_excerpt": ""
+                    }
+                ],
                 "temp_path": null
             }
         ]

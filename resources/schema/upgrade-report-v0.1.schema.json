@@ -269,6 +269,7 @@
                 "stdout_excerpt",
                 "stderr_excerpt",
                 "candidate_lock",
+                "diagnostics",
                 "temp_path"
             ],
             "properties": {
@@ -325,11 +326,56 @@
                         }
                     ]
                 },
+                "diagnostics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/composerDiagnostic"
+                    }
+                },
                 "temp_path": {
                     "type": [
                         "string",
                         "null"
                     ]
+                }
+            }
+        },
+        "composerDiagnostic": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "package",
+                "constraint",
+                "command",
+                "exit_code",
+                "stdout_excerpt",
+                "stderr_excerpt"
+            ],
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "constraint": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "exit_code": {
+                    "type": "integer"
+                },
+                "stdout_excerpt": {
+                    "type": "string",
+                    "maxLength": 4000
+                },
+                "stderr_excerpt": {
+                    "type": "string",
+                    "maxLength": 4000
                 }
             }
         },

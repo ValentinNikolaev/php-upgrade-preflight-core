@@ -53,6 +53,23 @@ final class MarkdownReportWriter
                         $candidateLock->packageCount()
                     );
                 }
+
+                foreach ($scenario->diagnostics() as $diagnostic) {
+                    $diagnosticCommand = json_encode($diagnostic->command(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                    $lines[] = sprintf(
+                        '  - diagnostic for `%s %s` (exit `%d`), command argv: `%s`',
+                        $this->inline($diagnostic->package()),
+                        $this->inline($diagnostic->constraint()),
+                        $diagnostic->exitCode(),
+                        $this->inline($diagnosticCommand)
+                    );
+                    if (trim($diagnostic->stdout()) !== '') {
+                        $lines[] = sprintf('    - stdout excerpt: `%s`', $this->inline($this->excerpt($diagnostic->stdout())));
+                    }
+                    if (trim($diagnostic->stderr()) !== '') {
+                        $lines[] = sprintf('    - stderr excerpt: `%s`', $this->inline($this->excerpt($diagnostic->stderr())));
+                    }
+                }
             }
         }
 

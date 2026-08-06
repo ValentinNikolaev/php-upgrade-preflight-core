@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Composer;
 
+use Composer\Semver\Semver;
 use PhpUpgradePreflight\Core\Filesystem\TemporaryWorkspaceManager;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceManager;
 use PhpUpgradePreflight\Core\Model\CandidateLockEvidence;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
+use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
@@ -17,6 +19,8 @@ use Symfony\Component\Process\Process;
 
 final class ComposerScenarioRunner
 {
+    private const LOCKED_DIAGNOSTIC_MIN_COMPOSER_VERSION = '2.4.0';
+
     private WorkspaceManager $workspaces;
     private JsonFileReader $reader;
     /** @var \Closure(list<string>, string): array{exit_code: int, stdout: string, stderr: string} */
@@ -27,6 +31,8 @@ final class ComposerScenarioRunner
     private \Closure $clock;
     private bool $composerVersionResolved = false;
     private ?string $composerVersion = null;
+    /** @var array<string, ComposerDiagnostic> */
+    private array $diagnosticCache = [];
 
     /**
      * @param null|callable(list<string>, string): array{exit_code: int, stdout: string, stderr: string} $processRunner
@@ -79,6 +85,7 @@ final class ComposerScenarioRunner
             }
 
             $failureType = null;
+            $diagnostics = [];
             if ($process['exit_code'] !== 0) {
                 if ($scenario->isBaselineValidation()) {
                     $failureType = ScenarioResult::FAILURE_VALIDATION;
@@ -89,6 +96,10 @@ final class ComposerScenarioRunner
                 }
             } elseif ($lock === null) {
                 $failureType = ScenarioResult::FAILURE_OPERATIONAL;
+            }
+
+            if ($failureType === ScenarioResult::FAILURE_SOLVER) {
+                $diagnostics = $this->runTargetDiagnostics($project, $request, $scenario, $tempPath);
             }
 
             $result = new ScenarioResult(
@@ -102,7 +113,8 @@ final class ComposerScenarioRunner
                 $composerVersion,
                 $command,
                 $durationMs,
-                $candidateLockEvidence
+                $candidateLockEvidence,
+                $diagnostics
             );
         } catch (\Throwable $exception) {
             if ($startedAt !== null && $durationMs === 0) {
@@ -138,12 +150,18 @@ final class ComposerScenarioRunner
                     $result->composerVersion(),
                     $result->command(),
                     $result->durationMs(),
-                    $result->candidateLockEvidence()
+                    $result->candidateLockEvidence(),
+                    $result->diagnostics()
                 );
             }
         }
 
         return $result;
+    }
+
+    public function resetDiagnosticCache(): void
+    {
+        $this->diagnosticCache = [];
     }
 
     /** @return list<string> */
@@ -305,5 +323,126 @@ final class ComposerScenarioRunner
 
         return stripos($output, 'Your requirements could not be resolved to an installable set of packages') !== false
             || preg_match('/(?:^|\n)\s*- Root composer\.json requires /i', $output) === 1;
+    }
+
+    /** @return list<ComposerDiagnostic> */
+    private function runTargetDiagnostics(
+        ProjectState $project,
+        UpgradeRequest $request,
+        Scenario $scenario,
+        string $workingDirectory
+    ): array {
+        $diagnostics = [];
+
+        foreach ($scenario->targets()->all() as $target) {
+            if (!$this->targetNeedsDiagnostic($project, $request, $target->package(), $target->constraint())) {
+                continue;
+            }
+
+            $cacheKey = $this->diagnosticCacheKey($project, $scenario, $target->package(), $target->constraint());
+            if (isset($this->diagnosticCache[$cacheKey])) {
+                $diagnostics[] = $this->diagnosticCache[$cacheKey];
+                continue;
+            }
+
+            $diagnostic = $this->runTargetDiagnostic(
+                $target->package(),
+                $target->constraint(),
+                $workingDirectory
+            );
+            $this->diagnosticCache[$cacheKey] = $diagnostic;
+            $diagnostics[] = $diagnostic;
+        }
+
+        return $diagnostics;
+    }
+
+    private function runTargetDiagnostic(string $package, string $constraint, string $workingDirectory): ComposerDiagnostic
+    {
+        if (!$this->supportsLockedDiagnostics()) {
+            return new ComposerDiagnostic(
+                $package,
+                $constraint,
+                [],
+                1,
+                '',
+                sprintf(
+                    'Composer %s does not support locked prohibits diagnostics; Composer %s or newer is required.',
+                    $this->composerVersion,
+                    self::LOCKED_DIAGNOSTIC_MIN_COMPOSER_VERSION
+                )
+            );
+        }
+
+        $command = [
+            'composer',
+            'prohibits',
+            $package,
+            $constraint,
+            '--tree',
+            '--locked',
+            '--no-plugins',
+            '--no-interaction',
+        ];
+
+        try {
+            $process = ($this->processRunner)($command, $workingDirectory);
+
+            return new ComposerDiagnostic(
+                $package,
+                $constraint,
+                $command,
+                $process['exit_code'],
+                $process['stdout'],
+                $process['stderr']
+            );
+        } catch (\Throwable $exception) {
+            return new ComposerDiagnostic(
+                $package,
+                $constraint,
+                $command,
+                1,
+                '',
+                $exception->getMessage()
+            );
+        }
+    }
+
+    private function supportsLockedDiagnostics(): bool
+    {
+        if ($this->composerVersion === null || preg_match('/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $this->composerVersion) !== 1) {
+            return true;
+        }
+
+        return version_compare($this->composerVersion, self::LOCKED_DIAGNOSTIC_MIN_COMPOSER_VERSION, '>=');
+    }
+
+    private function diagnosticCacheKey(
+        ProjectState $project,
+        Scenario $scenario,
+        string $package,
+        string $constraint
+    ): string {
+        return hash('sha256', serialize([
+            $project->path(),
+            $scenario->targets()->toArray(),
+            $package,
+            $constraint,
+        ]));
+    }
+
+    private function targetNeedsDiagnostic(
+        ProjectState $project,
+        UpgradeRequest $request,
+        string $package,
+        string $constraint
+    ): bool {
+        if ($package === 'php') {
+            return $constraint === $request->targets()->targetPhp();
+        }
+
+        $locked = $project->composerLock()->package($package);
+
+        return $locked === null || !Semver::satisfies($locked->version(), $constraint);
     }
 }
