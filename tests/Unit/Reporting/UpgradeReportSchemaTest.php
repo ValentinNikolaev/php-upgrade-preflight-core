@@ -84,6 +84,10 @@ final class UpgradeReportSchemaTest extends TestCase
             '/' . $schema['$defs']['metadata']['properties']['tool']['properties']['version']['pattern'] . '/',
             ReportMetadata::TOOL_VERSION
         ));
+        self::assertContains(
+            ScenarioResult::FAILURE_VALIDATION,
+            $schema['$defs']['scenario']['properties']['failure_type']['enum']
+        );
         self::assertSame(array_keys($this->report(dirname(__DIR__, 5))->toArray()), $schema['required']);
     }
 

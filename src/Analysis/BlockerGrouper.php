@@ -18,7 +18,7 @@ final class BlockerGrouper
     public function group(array $scenarioResults, EvidenceLedger $evidence): array
     {
         foreach ($scenarioResults as $result) {
-            if ($result->succeeded()) {
+            if (!$result->scenario()->isBaselineValidation() && $result->succeeded()) {
                 return [];
             }
         }
@@ -26,7 +26,7 @@ final class BlockerGrouper
         $blockers = [];
 
         foreach ($scenarioResults as $result) {
-            if (!$result->isSolverFailure()) {
+            if ($result->scenario()->isBaselineValidation() || !$result->isSolverFailure()) {
                 continue;
             }
 

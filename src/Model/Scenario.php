@@ -10,17 +10,20 @@ final class Scenario
     private UpgradeTargetSet $targets;
     private bool $withAllDependencies;
     private bool $minimalChanges;
+    private bool $baselineValidation;
 
     public function __construct(
         string $name,
         UpgradeTargetSet $targets,
         bool $withAllDependencies = true,
-        bool $minimalChanges = false
+        bool $minimalChanges = false,
+        bool $baselineValidation = false
     ) {
         $this->name = $name;
         $this->targets = $targets;
         $this->withAllDependencies = $withAllDependencies;
         $this->minimalChanges = $minimalChanges;
+        $this->baselineValidation = $baselineValidation;
     }
 
     public function name(): string
@@ -41,5 +44,10 @@ final class Scenario
     public function minimalChanges(): bool
     {
         return $this->minimalChanges;
+    }
+
+    public function isBaselineValidation(): bool
+    {
+        return $this->baselineValidation;
     }
 }

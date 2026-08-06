@@ -52,10 +52,11 @@ final class DefaultUpgradeAnalyzerIsolationTest extends TestCase
         $report = $analyzer->analyzeUpgrade($request);
 
         $snapshot->assertUnchanged($this);
-        self::assertCount(3, $report->scenarios());
+        self::assertCount(4, $report->scenarios());
+        self::assertSame('baseline-validation', $report->scenarios()[0]->scenario()->name());
         self::assertCount(1, $report->lockDiff()->packageChanges());
-        self::assertCount(3, $workingDirectories);
-        self::assertCount(3, array_unique($workingDirectories));
+        self::assertCount(4, $workingDirectories);
+        self::assertCount(4, array_unique($workingDirectories));
 
         foreach ($workingDirectories as $workingDirectory) {
             self::assertNotSame($projectPath, $workingDirectory);

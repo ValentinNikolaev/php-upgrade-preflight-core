@@ -165,13 +165,13 @@ final class UpgradeReport
     public function resolutionStatus(): string
     {
         foreach ($this->scenarios as $scenario) {
-            if ($scenario->succeeded()) {
+            if (!$scenario->scenario()->isBaselineValidation() && $scenario->succeeded()) {
                 return count($this->lockDiff->packageChanges()) > 0 ? 'feasible_with_changes' : 'feasible';
             }
         }
 
         foreach ($this->scenarios as $scenario) {
-            if ($scenario->isOperationalFailure()) {
+            if (!$scenario->scenario()->isBaselineValidation() && $scenario->isOperationalFailure()) {
                 return 'unknown';
             }
         }

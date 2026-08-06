@@ -18,6 +18,32 @@ use Symfony\Component\Filesystem\Path;
 
 final class ComposerScenarioRunnerTest extends TestCase
 {
+    public function testBaselineValidationUsesTheUnchangedManifestAndValidationCommand(): void
+    {
+        $capturedCommand = null;
+        $capturedComposer = null;
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory) use (&$capturedCommand, &$capturedComposer): array {
+            $capturedCommand = $command;
+            $capturedComposer = json_decode((string) file_get_contents($directory . DIRECTORY_SEPARATOR . 'composer.json'), true, 512, JSON_THROW_ON_ERROR);
+
+            return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, '8.1');
+        $scenario = new Scenario('baseline-validation', $request->targets(), false, false, true);
+
+        $result = $runner->run((new ProjectStateBuilder())->build($projectPath), $request, $scenario);
+
+        self::assertTrue($result->succeeded());
+        self::assertSame(
+            ['composer', 'validate', '--check-lock', '--no-check-publish', '--no-scripts', '--no-plugins', '--no-interaction'],
+            $capturedCommand
+        );
+        self::assertIsArray($capturedComposer);
+        self::assertSame('1.0.0', $capturedComposer['require']['fixture/dependency']);
+        self::assertArrayNotHasKey('config', $capturedComposer);
+    }
+
     public function testItUpdatesTheLockWithoutInstallingDependencies(): void
     {
         $capturedCommand = null;
@@ -116,6 +142,32 @@ final class ComposerScenarioRunnerTest extends TestCase
 
         self::assertSame(ScenarioResult::FAILURE_SOLVER, $solverRunner->run($project, $request, $scenario)->failureType());
         self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalRunner->run($project, $request, $scenario)->failureType());
+    }
+
+    public function testItSeparatesBaselineValidationAndOperationalFailures(): void
+    {
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+        $scenario = new Scenario('baseline-validation', $request->targets(), false, false, true);
+        $validationRunner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 2,
+            'stdout' => '',
+            'stderr' => 'The lock file is not up to date with the latest changes in composer.json.',
+        ]);
+        $operationalRunner = new ComposerScenarioRunner(null, null, static function (): array {
+            throw new \RuntimeException('Composer executable was unavailable.');
+        });
+
+        $validationResult = $validationRunner->run($project, $request, $scenario);
+        $operationalResult = $operationalRunner->run($project, $request, $scenario);
+
+        self::assertSame(ScenarioResult::FAILURE_VALIDATION, $validationResult->failureType());
+        self::assertTrue($validationResult->isValidationFailure());
+        self::assertFalse($validationResult->isOperationalFailure());
+        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $operationalResult->failureType());
+        self::assertFalse($operationalResult->isValidationFailure());
+        self::assertTrue($operationalResult->isOperationalFailure());
     }
 
     public function testWorkspaceCreationFailureBecomesAnOperationalResult(): void

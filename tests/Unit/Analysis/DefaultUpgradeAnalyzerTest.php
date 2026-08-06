@@ -13,6 +13,7 @@ use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PHPUnit\Framework\TestCase;
@@ -63,8 +64,63 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertSame([], $report->blockers());
         self::assertSame('low', $report->risk()->level());
-        self::assertCount(5, $report->uncertainties());
+        self::assertCount(6, $report->uncertainties());
+        self::assertStringContainsString('"baseline-validation"', $report->uncertainties()[0]);
         self::assertStringContainsString('analysis-environment failure', $report->uncertainties()[0]);
+    }
+
+    public function testSuccessfulBaselineDoesNotMaskBlockedTargetScenarios(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => "Your requirements could not be resolved to an installable set of packages.\n- Root composer.json requires fixture/dependency ^2.0.",
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, null, ['src']);
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+        self::assertSame('blocked', $report->resolutionStatus());
+        self::assertCount(4, $report->scenarios());
+        self::assertTrue($report->scenarios()[0]->succeeded());
+        self::assertCount(3, $report->blockers());
+    }
+
+    public function testInvalidBaselineDoesNotProduceEnvironmentRemediationForTargetBlockers(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command): array {
+            if ($command[1] === 'validate') {
+                return [
+                    'exit_code' => 2,
+                    'stdout' => '',
+                    'stderr' => 'The lock file is not up to date with the latest changes in composer.json.',
+                ];
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => "Your requirements could not be resolved to an installable set of packages.\n- Root composer.json requires fixture/dependency ^2.0.",
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, null, ['src']);
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+        $dependencyActions = $report->planStages()[1]->actions();
+
+        self::assertSame(ScenarioResult::FAILURE_VALIDATION, $report->scenarios()[0]->failureType());
+        self::assertSame(ScenarioResult::FAILURE_VALIDATION, $report->toArray()['resolution']['scenarios'][0]['failure_type']);
+        self::assertNotContains('Restore the Composer analysis environment so every scenario can complete.', $dependencyActions);
+        self::assertContains('Rerun the isolated Composer scenarios after resolving the reported blockers.', $dependencyActions);
+        self::assertStringContainsString('baseline validation did not pass', $report->uncertainties()[0]);
     }
 
     public function testOperationalFallbackFailuresKeepTheOverallResolutionUnknown(): void
@@ -87,7 +143,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertCount(1, $report->blockers());
-        self::assertCount(4, $report->uncertainties());
+        self::assertCount(5, $report->uncertainties());
     }
 
     public function testUnavailableRequestedFrameworkIsRejected(): void

@@ -42,7 +42,9 @@ final class ComposerScenarioRunner
 
         try {
             $tempPath = $this->workspaces->createFromProject($project->path());
-            $this->applyTemporaryComposerChanges($tempPath, $project->path(), $scenario);
+            if (!$scenario->isBaselineValidation()) {
+                $this->applyTemporaryComposerChanges($tempPath, $project->path(), $scenario);
+            }
             $command = $this->buildCommand($scenario);
             $process = ($this->processRunner)($command, $tempPath);
 
@@ -54,9 +56,13 @@ final class ComposerScenarioRunner
 
             $failureType = null;
             if ($process['exit_code'] !== 0) {
-                $failureType = $this->isSolverFailure($process['stdout'], $process['stderr'])
-                    ? ScenarioResult::FAILURE_SOLVER
-                    : ScenarioResult::FAILURE_OPERATIONAL;
+                if ($scenario->isBaselineValidation()) {
+                    $failureType = ScenarioResult::FAILURE_VALIDATION;
+                } else {
+                    $failureType = $this->isSolverFailure($process['stdout'], $process['stderr'])
+                        ? ScenarioResult::FAILURE_SOLVER
+                        : ScenarioResult::FAILURE_OPERATIONAL;
+                }
             } elseif ($lock === null) {
                 $failureType = ScenarioResult::FAILURE_OPERATIONAL;
             }
@@ -104,6 +110,18 @@ final class ComposerScenarioRunner
     /** @return list<string> */
     private function buildCommand(Scenario $scenario): array
     {
+        if ($scenario->isBaselineValidation()) {
+            return [
+                'composer',
+                'validate',
+                '--check-lock',
+                '--no-check-publish',
+                '--no-scripts',
+                '--no-plugins',
+                '--no-interaction',
+            ];
+        }
+
         $command = ['composer', 'update'];
 
         foreach ($scenario->targets()->packageTargets() as $target) {

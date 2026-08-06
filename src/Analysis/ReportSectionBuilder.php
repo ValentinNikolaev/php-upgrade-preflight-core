@@ -296,6 +296,11 @@ final class ReportSectionBuilder
     ): array {
         $uncertainties = $sourceUncertainties;
         foreach ($scenarioResults as $result) {
+            if ($result->scenario()->isBaselineValidation() && $result->isValidationFailure()) {
+                $uncertainties[] = 'Composer baseline validation did not pass; target results may include pre-existing manifest or lockfile issues.';
+                continue;
+            }
+
             if ($result->isOperationalFailure()) {
                 $uncertainties[] = sprintf(
                     'Composer scenario "%s" could not complete because of an analysis-environment failure.',
@@ -322,7 +327,7 @@ final class ReportSectionBuilder
     private function hasSuccessfulScenario(array $scenarioResults): bool
     {
         foreach ($scenarioResults as $result) {
-            if ($result->succeeded()) {
+            if (!$result->scenario()->isBaselineValidation() && $result->succeeded()) {
                 return true;
             }
         }

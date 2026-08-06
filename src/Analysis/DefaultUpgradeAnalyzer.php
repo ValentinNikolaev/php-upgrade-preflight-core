@@ -104,6 +104,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     private function candidateScenarios(UpgradeTargetSet $targets): array
     {
         return [
+            new Scenario('baseline-validation', $targets, false, false, true),
             new Scenario('exact-target', $targets, false, false),
             new Scenario('target-with-all-dependencies', $targets, true, false),
             new Scenario('minimal-changes', $targets, true, true),
@@ -117,7 +118,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $candidates = [];
 
         foreach ($scenarioResults as $index => $result) {
-            if (!$result->succeeded() || $result->lock() === null) {
+            if ($result->scenario()->isBaselineValidation() || !$result->succeeded() || $result->lock() === null) {
                 continue;
             }
 

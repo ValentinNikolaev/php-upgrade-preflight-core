@@ -282,6 +282,7 @@
                     "enum": [
                         "solver",
                         "operational",
+                        "validation",
                         null
                     ]
                 },

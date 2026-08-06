@@ -8,6 +8,7 @@ final class ScenarioResult
 {
     public const FAILURE_SOLVER = 'solver';
     public const FAILURE_OPERATIONAL = 'operational';
+    public const FAILURE_VALIDATION = 'validation';
 
     private Scenario $scenario;
     private int $exitCode;
@@ -26,7 +27,7 @@ final class ScenarioResult
         ?string $tempPath = null,
         ?string $failureType = null
     ) {
-        if ($failureType !== null && !in_array($failureType, [self::FAILURE_SOLVER, self::FAILURE_OPERATIONAL], true)) {
+        if ($failureType !== null && !in_array($failureType, [self::FAILURE_SOLVER, self::FAILURE_OPERATIONAL, self::FAILURE_VALIDATION], true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported scenario failure type "%s".', $failureType));
         }
 
@@ -87,6 +88,11 @@ final class ScenarioResult
     public function isOperationalFailure(): bool
     {
         return !$this->succeeded() && $this->failureType === self::FAILURE_OPERATIONAL;
+    }
+
+    public function isValidationFailure(): bool
+    {
+        return !$this->succeeded() && $this->failureType === self::FAILURE_VALIDATION;
     }
 
     /** @return array{name: string, exit_code: int, succeeded: bool, failure_type: ?string, stdout_excerpt: string, stderr_excerpt: string, temp_path: ?string} */
