@@ -121,7 +121,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
 
         self::assertSame(
-            ['baseline-validation', 'exact-target', 'target-with-all-dependencies', 'minimal-changes'],
+            ['baseline-validation', 'exact-target', 'minimal-changes'],
             array_map(static fn (ScenarioResult $result): string => $result->scenario()->name(), $report->scenarios())
         );
     }

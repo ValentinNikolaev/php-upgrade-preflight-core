@@ -11,11 +11,9 @@ use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\LockDiff;
-use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
-use PhpUpgradePreflight\Core\Model\UpgradeTargetSet;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
 
 final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
@@ -26,6 +24,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     private BlockerGrouper $blockerGrouper;
     private SourceUsageScanner $sourceUsageScanner;
     private TargetNormalizer $targetNormalizer;
+    private ScenarioSelector $scenarioSelector;
     private FrameworkRuleEngine $frameworkRuleEngine;
     private RiskAndEffortEstimator $riskAndEffortEstimator;
     private ReportAssembler $reportAssembler;
@@ -41,7 +40,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         ?TargetNormalizer $targetNormalizer = null,
         ?FrameworkRuleEngine $frameworkRuleEngine = null,
         ?RiskAndEffortEstimator $riskAndEffortEstimator = null,
-        ?ReportAssembler $reportAssembler = null
+        ?ReportAssembler $reportAssembler = null,
+        ?ScenarioSelector $scenarioSelector = null
     ) {
         $this->projectStateBuilder = $projectStateBuilder ?? new ProjectStateBuilder();
         $this->scenarioRunner = $scenarioRunner ?? new ComposerScenarioRunner();
@@ -49,6 +49,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $this->blockerGrouper = $blockerGrouper ?? new BlockerGrouper();
         $this->sourceUsageScanner = $sourceUsageScanner ?? new SourceUsageScanner();
         $this->targetNormalizer = $targetNormalizer ?? new TargetNormalizer();
+        $this->scenarioSelector = $scenarioSelector ?? new ScenarioSelector();
         $this->frameworkRuleEngine = $frameworkRuleEngine ?? new FrameworkRuleEngine($frameworks);
         $this->riskAndEffortEstimator = $riskAndEffortEstimator ?? new RiskAndEffortEstimator();
         $this->reportAssembler = $reportAssembler ?? new ReportAssembler();
@@ -62,7 +63,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
         $sourcePaths = $this->frameworkRuleEngine->sourcePaths($project, $request, $activeFrameworks);
         $analysisUncertainties = [];
-        $scenarios = $this->candidateScenarios(
+        $scenarios = $this->scenarioSelector->select(
             $targets,
             $request->fromPhp(),
             $project->composerJson()->platformPhp(),
@@ -104,52 +105,6 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $sourceUncertainties,
             $evidence
         );
-    }
-
-    /** @param list<string> $uncertainties @return list<Scenario> */
-    private function candidateScenarios(
-        UpgradeTargetSet $targets,
-        ?string $fromPhp,
-        ?string $projectPlatformPhp,
-        array &$uncertainties
-    ): array {
-        $scenarios = [
-            new Scenario('baseline-validation', $targets, false, false, true),
-            new Scenario('exact-target', $targets, false, false),
-            new Scenario('target-with-all-dependencies', $targets, true, false),
-            new Scenario('minimal-changes', $targets, true, true),
-        ];
-
-        if ($targets->targetPhp() === null || $targets->packageTargets() === []) {
-            return $scenarios;
-        }
-
-        $scenarios[] = new Scenario(
-            'target-platform-only',
-            new UpgradeTargetSet([], $targets->targetPhp()),
-            false,
-            false,
-            false,
-            false
-        );
-
-        $sourcePhp = $fromPhp ?? $projectPlatformPhp;
-        if ($sourcePhp === null) {
-            $uncertainties[] = 'The staged package-target scenario was skipped because the current project PHP version is unknown; supply --from-php or configure config.platform.php.';
-
-            return $scenarios;
-        }
-
-        $scenarios[] = new Scenario(
-            'staged-targets',
-            new UpgradeTargetSet($targets->packageTargets(), $sourcePhp),
-            true,
-            false,
-            false,
-            false
-        );
-
-        return $scenarios;
     }
 
     /** @param list<ScenarioResult> $scenarioResults */
