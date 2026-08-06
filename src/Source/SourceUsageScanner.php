@@ -15,6 +15,7 @@ use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\Parser;
 use PhpParser\ParserFactory;
 use PhpUpgradePreflight\Core\Model\Evidence;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
 use Symfony\Component\Filesystem\Path;
@@ -30,14 +31,13 @@ final class SourceUsageScanner
 
     /**
      * @param list<string> $paths
-     * @param list<Evidence> $evidence
      * @param list<string> $uncertainties
      * @return list<SourceUsage>
      */
     public function scan(
         ProjectState $project,
         array $paths,
-        array &$evidence,
+        EvidenceLedger $evidence,
         array &$uncertainties = [],
         bool $reportMissingPaths = true
     ): array {
@@ -60,23 +60,21 @@ final class SourceUsageScanner
             try {
                 $detectedUsages = $this->extractSymbols($contents);
             } catch (Error $exception) {
-                $id = $this->nextEvidenceId($evidence);
-                $evidence[] = new Evidence($id, Evidence::E3_PROJECT_SOURCE, sprintf('Unable to parse %s.', $relative), 'high', [
+                $id = $evidence->add('source', Evidence::E3_PROJECT_SOURCE, sprintf('Unable to parse %s.', $relative), 'high', [
                     'file' => $relative,
                     'line' => $exception->getStartLine(),
                     'error' => $exception->getMessage(),
-                ]);
+                ])->id;
                 $uncertainties[] = sprintf('Source file "%s" could not be parsed and was not scanned (%s).', $relative, $id);
                 continue;
             }
 
             foreach ($detectedUsages as $detectedUsage) {
-                $id = $this->nextEvidenceId($evidence);
-                $evidence[] = new Evidence($id, Evidence::E3_PROJECT_SOURCE, sprintf('Detected %s in %s.', $detectedUsage['symbol'], $relative), 'high', [
+                $id = $evidence->add('source', Evidence::E3_PROJECT_SOURCE, sprintf('Detected %s in %s.', $detectedUsage['symbol'], $relative), 'high', [
                     'file' => $relative,
                     'line' => $detectedUsage['line'],
                     'usage_type' => $detectedUsage['usage_type'],
-                ]);
+                ])->id;
                 $usages[] = new SourceUsage(
                     $relative,
                     $detectedUsage['symbol'],
@@ -277,20 +275,6 @@ final class SourceUsageScanner
         }
 
         return 'namespace_import';
-    }
-
-    /** @param list<Evidence> $evidence */
-    private function nextEvidenceId(array $evidence): string
-    {
-        $ids = array_fill_keys(array_map(static fn (Evidence $item): string => $item->id, $evidence), true);
-        $index = count($evidence) + 1;
-
-        do {
-            $id = 'source-' . $index;
-            ++$index;
-        } while (isset($ids[$id]));
-
-        return $id;
     }
 
     private function createParser(): Parser

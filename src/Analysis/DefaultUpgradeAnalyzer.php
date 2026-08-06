@@ -10,7 +10,7 @@ use PhpUpgradePreflight\Core\Contracts\UpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
-use PhpUpgradePreflight\Core\Model\Evidence;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
@@ -48,7 +48,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
 
     public function analyzeUpgrade(UpgradeRequest $request): UpgradeReport
     {
-        $evidence = [];
+        $evidence = new EvidenceLedger();
         $project = $this->projectStateBuilder->build($request->projectPath);
         $activeFrameworks = $this->activeFrameworks($project, $request);
         $sourcePaths = $request->sourcePaths !== [] ? $request->sourcePaths : $this->defaultSourcePaths($project, $activeFrameworks);
@@ -94,7 +94,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $this->risk($blockers, $lockDiff->packageChanges, $frameworkFindings),
             $this->effort($blockers, $lockDiff->packageChanges, $sourceImpact, $frameworkFindings),
             $this->uncertainties($scenarioResults, $sourceUncertainties),
-            $evidence
+            $evidence->all()
         );
     }
 

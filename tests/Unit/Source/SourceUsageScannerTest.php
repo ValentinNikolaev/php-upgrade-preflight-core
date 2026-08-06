@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Tests\Unit\Source;
 
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -15,13 +16,13 @@ final class SourceUsageScannerTest extends TestCase
     {
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
         $project = (new ProjectStateBuilder())->build($projectPath);
-        $evidence = [];
+        $evidence = new EvidenceLedger();
         $uncertainties = [];
 
         $usages = (new SourceUsageScanner())->scan($project, ['does-not-exist'], $evidence, $uncertainties, true);
 
         self::assertSame([], $usages);
-        self::assertSame([], $evidence);
+        self::assertSame([], $evidence->all());
         self::assertContains('Source path "does-not-exist" does not exist and was not scanned.', $uncertainties);
         self::assertContains('No PHP source files were scanned.', $uncertainties);
     }
@@ -30,7 +31,7 @@ final class SourceUsageScannerTest extends TestCase
     {
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
         $project = (new ProjectStateBuilder())->build($projectPath);
-        $evidence = [];
+        $evidence = new EvidenceLedger();
         $uncertainties = [];
 
         (new SourceUsageScanner())->scan($project, ['..'], $evidence, $uncertainties, true);
@@ -42,13 +43,13 @@ final class SourceUsageScannerTest extends TestCase
     {
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
         $project = (new ProjectStateBuilder())->build($projectPath);
-        $evidence = [];
+        $evidence = new EvidenceLedger();
         $uncertainties = [];
 
         $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
 
         self::assertSame([], $usages);
-        self::assertSame([], $evidence);
+        self::assertSame([], $evidence->all());
         self::assertSame([], $uncertainties);
     }
 
@@ -81,7 +82,7 @@ final class Example extends BaseClass implements Contract
     }
 }
 PHP);
-        $evidence = [];
+        $evidence = new EvidenceLedger();
         $uncertainties = [];
 
         try {
@@ -107,7 +108,7 @@ PHP);
             self::assertContains(['Vendor\\Package\\helper', 'function_import'], $usagePairs);
             self::assertContains(['Vendor\\Package\\helper', 'function_call'], $usagePairs);
             self::assertSame([], $uncertainties);
-            self::assertNotEmpty($evidence);
+            self::assertNotEmpty($evidence->all());
             self::assertContainsOnly('int', array_map(static fn ($usage): ?int => $usage->line, $usages));
         } finally {
             (new Filesystem())->remove($projectPath);
@@ -117,7 +118,7 @@ PHP);
     public function testSyntaxFailureProducesEvidenceAndUncertainty(): void
     {
         $projectPath = $this->createProject("<?php\nnew ;\n");
-        $evidence = [];
+        $evidence = new EvidenceLedger();
         $uncertainties = [];
 
         try {
@@ -125,8 +126,8 @@ PHP);
             $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
 
             self::assertSame([], $usages);
-            self::assertCount(1, $evidence);
-            self::assertSame('source-1', $evidence[0]->id);
+            self::assertCount(1, $evidence->all());
+            self::assertSame('source-1', $evidence->all()[0]->id);
             self::assertStringContainsString('could not be parsed', $uncertainties[0]);
             self::assertStringContainsString('source-1', $uncertainties[0]);
         } finally {
@@ -147,12 +148,12 @@ PHP);
             }
 
             $project = (new ProjectStateBuilder())->build($projectPath);
-            $evidence = [];
+            $evidence = new EvidenceLedger();
             $uncertainties = [];
             $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
 
             self::assertSame([], $usages);
-            self::assertSame([], $evidence);
+            self::assertSame([], $evidence->all());
             self::assertStringContainsString('resolves outside the analyzed project', $uncertainties[0]);
         } finally {
             (new Filesystem())->remove([$projectPath, $outsidePath]);
@@ -173,12 +174,12 @@ PHP);
             }
 
             $project = (new ProjectStateBuilder())->build($projectPath);
-            $evidence = [];
+            $evidence = new EvidenceLedger();
             $uncertainties = [];
             $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
 
             self::assertSame([], $usages);
-            self::assertSame([], $evidence);
+            self::assertSame([], $evidence->all());
             self::assertStringContainsString('resolves outside the analyzed project', $uncertainties[0]);
             self::assertStringContainsString('outside-directory', $uncertainties[0]);
         } finally {

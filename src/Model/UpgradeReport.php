@@ -56,6 +56,9 @@ final class UpgradeReport
         $this->effort = $effort;
         $this->uncertainties = array_values($uncertainties);
         $this->evidence = array_values($evidence);
+
+        $ledger = new EvidenceLedger($this->evidence);
+        $ledger->validateReferences($this->evidenceReferences());
     }
 
     public function resolutionStatus(): string
@@ -100,5 +103,56 @@ final class UpgradeReport
             'uncertainties' => $this->uncertainties,
             'evidence' => array_map(static fn (Evidence $evidence): array => $evidence->toArray(), $this->evidence),
         ];
+    }
+
+    /** @return list<string> */
+    private function evidenceReferences(): array
+    {
+        $references = [];
+
+        foreach ($this->blockers as $index => $blocker) {
+            $references = $this->appendFindingReferences($references, $blocker->evidence, sprintf('Blocker at index %d', $index));
+        }
+
+        foreach ($this->sourceImpact as $index => $usage) {
+            $references = $this->appendFindingReferences($references, $usage->evidence, sprintf('Source usage at index %d', $index));
+        }
+
+        foreach ($this->frameworkFindings as $index => $finding) {
+            $references = $this->appendFindingReferences($references, $finding->evidence, sprintf('Framework finding at index %d', $index));
+        }
+
+        foreach ($this->evidence as $evidence) {
+            foreach ($this->uncertainties as $uncertainty) {
+                if ($this->containsEvidenceReference($uncertainty, $evidence->id)) {
+                    $references[] = $evidence->id;
+                    break;
+                }
+            }
+        }
+
+        return $references;
+    }
+
+    /** @param list<string> $references @param list<string> $findingReferences @return list<string> */
+    private function appendFindingReferences(array $references, array $findingReferences, string $description): array
+    {
+        if ($findingReferences === []) {
+            throw new \LogicException($description . ' must reference at least one evidence item.');
+        }
+
+        foreach ($findingReferences as $reference) {
+            $references[] = $reference;
+        }
+
+        return $references;
+    }
+
+    private function containsEvidenceReference(string $text, string $id): bool
+    {
+        return preg_match(
+            '/(?<![A-Za-z0-9_-])' . preg_quote($id, '/') . '(?![A-Za-z0-9_-])/',
+            $text
+        ) === 1;
     }
 }

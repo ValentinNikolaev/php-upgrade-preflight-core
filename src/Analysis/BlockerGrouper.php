@@ -6,16 +6,16 @@ namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\Evidence;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 
 final class BlockerGrouper
 {
     /**
      * @param list<ScenarioResult> $scenarioResults
-     * @param list<Evidence> $evidence
      * @return list<Blocker>
      */
-    public function group(array $scenarioResults, array &$evidence): array
+    public function group(array $scenarioResults, EvidenceLedger $evidence): array
     {
         foreach ($scenarioResults as $result) {
             if ($result->succeeded()) {
@@ -25,17 +25,16 @@ final class BlockerGrouper
 
         $blockers = [];
 
-        foreach ($scenarioResults as $index => $result) {
+        foreach ($scenarioResults as $result) {
             if (!$result->isSolverFailure()) {
                 continue;
             }
 
             $output = trim($result->stdout . "\n" . $result->stderr);
-            $evidenceId = 'solver-' . ($index + 1);
-            $evidence[] = new Evidence($evidenceId, Evidence::E1_SOLVER, sprintf('Composer scenario "%s" failed.', $result->scenario->name), 'high', [
+            $evidenceId = $evidence->add('solver', Evidence::E1_SOLVER, sprintf('Composer scenario "%s" failed.', $result->scenario->name), 'high', [
                 'exit_code' => $result->exitCode,
                 'output_excerpt' => substr($output, 0, 2000),
-            ]);
+            ])->id;
 
             $blockers[] = $this->fromOutput($output, $evidenceId);
         }

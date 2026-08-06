@@ -11,6 +11,7 @@ use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
+use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -53,7 +54,10 @@ final class JsonReportWriterTest extends TestCase
             [],
             new LockDiff([]),
             [],
-            [],
+            array_map(
+                static fn (Evidence $item): SourceUsage => new SourceUsage('src/Example.php', 'Fixture\\Example', 'class_reference', [$item->id]),
+                $evidence
+            ),
             [],
             new RiskSummary('low', []),
             new EffortEstimate([0, 0], 'high', [], []),
