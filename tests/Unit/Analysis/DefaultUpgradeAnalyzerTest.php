@@ -20,6 +20,181 @@ use PHPUnit\Framework\TestCase;
 
 final class DefaultUpgradeAnalyzerTest extends TestCase
 {
+    public function testCombinedPhpAndPackageTargetsAddPlatformOnlyAndStagedScenarios(): void
+    {
+        $capturedUpdates = [];
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory) use (&$capturedUpdates): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            $capturedUpdates[] = [
+                'command' => $command,
+                'composer' => json_decode((string) file_get_contents($directory . DIRECTORY_SEPARATOR . 'composer.json'), true, 512, JSON_THROW_ON_ERROR),
+            ];
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], '8.0', '8.1');
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+        self::assertSame(
+            [
+                'baseline-validation',
+                'exact-target',
+                'target-with-all-dependencies',
+                'minimal-changes',
+                'target-platform-only',
+                'staged-targets',
+            ],
+            array_map(static fn (ScenarioResult $result): string => $result->scenario()->name(), $report->scenarios())
+        );
+        self::assertCount(5, $capturedUpdates);
+
+        $platformOnly = $capturedUpdates[3];
+        self::assertSame('1.0.0', $platformOnly['composer']['require']['fixture/dependency']);
+        self::assertSame('8.1.0', $platformOnly['composer']['config']['platform']['php']);
+        self::assertNotContains('fixture/dependency', $platformOnly['command']);
+
+        $stagedTargets = $capturedUpdates[4];
+        self::assertSame('^2.0', $stagedTargets['composer']['require']['fixture/dependency']);
+        self::assertSame('8.0.0', $stagedTargets['composer']['config']['platform']['php']);
+        self::assertContains('fixture/dependency', $stagedTargets['command']);
+        self::assertContains('--with-all-dependencies', $stagedTargets['command']);
+        self::assertFalse($report->scenarios()[4]->scenario()->determinesTargetFeasibility());
+        self::assertFalse($report->scenarios()[5]->scenario()->determinesTargetFeasibility());
+        self::assertTrue($report->scenarios()[4]->scenario()->isPartialTargetProbe());
+        self::assertTrue($report->scenarios()[5]->scenario()->isPartialTargetProbe());
+    }
+
+    public function testSuccessfulPartialStagesDoNotMakeABlockedCombinedTargetFeasible(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            $composer = json_decode((string) file_get_contents($directory . DIRECTORY_SEPARATOR . 'composer.json'), true, 512, JSON_THROW_ON_ERROR);
+            $hasPackageTarget = $composer['require']['fixture/dependency'] === '^2.0';
+            $platformPhp = $composer['config']['platform']['php'] ?? null;
+            $hasPhpTarget = $platformPhp === '8.1.0';
+
+            if (!$hasPackageTarget || !$hasPhpTarget) {
+                file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
+                    'packages' => [['name' => 'fixture/dependency', 'version' => $hasPackageTarget ? '2.0.0' : '1.0.0']],
+                    'packages-dev' => [],
+                ], JSON_THROW_ON_ERROR));
+
+                return ['exit_code' => 0, 'stdout' => 'Partial stage resolved.', 'stderr' => ''];
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => "Your requirements could not be resolved to an installable set of packages.\n- Root composer.json requires fixture/dependency ^2.0.",
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], '8.0', '8.1');
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+        self::assertTrue($report->scenarios()[4]->succeeded());
+        self::assertTrue($report->scenarios()[5]->succeeded());
+        self::assertSame('blocked', $report->resolutionStatus());
+        self::assertSame([], $report->lockDiff()->packageChanges());
+        self::assertCount(3, $report->blockers());
+    }
+
+    public function testPartialScenariosAreSkippedForPhpOnlyTargets(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 0,
+            'stdout' => 'Resolved.',
+            'stderr' => '',
+        ]);
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('php', '8.1')], '8.0');
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+        self::assertSame(
+            ['baseline-validation', 'exact-target', 'target-with-all-dependencies', 'minimal-changes'],
+            array_map(static fn (ScenarioResult $result): string => $result->scenario()->name(), $report->scenarios())
+        );
+    }
+
+    public function testStagedScenarioIsSkippedWhenTheCurrentPhpVersionIsUnknown(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 0,
+            'stdout' => 'Resolved.',
+            'stderr' => '',
+        ]);
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, '8.1');
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+        $scenarioNames = array_map(
+            static fn (ScenarioResult $result): string => $result->scenario()->name(),
+            $report->scenarios()
+        );
+
+        self::assertContains('target-platform-only', $scenarioNames);
+        self::assertNotContains('staged-targets', $scenarioNames);
+        self::assertContains(
+            'The staged package-target scenario was skipped because the current project PHP version is unknown; supply --from-php or configure config.platform.php.',
+            $report->uncertainties()
+        );
+    }
+
+    public function testStagedScenarioUsesTheProjectComposerPlatformWhenFromPhpIsOmitted(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 0,
+            'stdout' => 'Resolved.',
+            'stderr' => '',
+        ]);
+        $projectPath = dirname(__DIR__, 5);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, '8.1');
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+        $staged = array_values(array_filter(
+            $report->scenarios(),
+            static fn (ScenarioResult $result): bool => $result->scenario()->name() === 'staged-targets'
+        ));
+
+        self::assertCount(1, $staged);
+        self::assertSame('8.0.30', $staged[0]->scenario()->targets()->targetPhp());
+    }
+
+    public function testBaselineOperationalFailureStillProducesEnvironmentRemediation(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command): array {
+            if ($command[1] === 'validate') {
+                throw new \RuntimeException('Composer validation could not start.');
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => "Your requirements could not be resolved to an installable set of packages.\n- Root composer.json requires fixture/dependency ^2.0.",
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+        self::assertTrue($report->scenarios()[0]->isOperationalFailure());
+        self::assertContains(
+            'Restore the Composer analysis environment so every scenario can complete.',
+            $report->planStages()[1]->actions()
+        );
+    }
+
     public function testSuccessfulFallbackRemovesBlockersAndPrefersMinimalChanges(): void
     {
         $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory): array {

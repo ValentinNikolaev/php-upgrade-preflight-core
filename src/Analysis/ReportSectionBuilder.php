@@ -327,7 +327,7 @@ final class ReportSectionBuilder
     private function hasSuccessfulScenario(array $scenarioResults): bool
     {
         foreach ($scenarioResults as $result) {
-            if (!$result->scenario()->isBaselineValidation() && $result->succeeded()) {
+            if ($result->scenario()->determinesTargetFeasibility() && $result->succeeded()) {
                 return true;
             }
         }
@@ -339,7 +339,7 @@ final class ReportSectionBuilder
     private function hasOperationalFailure(array $scenarioResults): bool
     {
         foreach ($scenarioResults as $result) {
-            if ($result->isOperationalFailure()) {
+            if (!$result->scenario()->isPartialTargetProbe() && $result->isOperationalFailure()) {
                 return true;
             }
         }

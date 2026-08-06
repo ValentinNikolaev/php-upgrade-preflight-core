@@ -61,7 +61,13 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $targets = $this->targetNormalizer->normalize($request->targets()->packageTargets(), $request->targetPhp());
         $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
         $sourcePaths = $this->frameworkRuleEngine->sourcePaths($project, $request, $activeFrameworks);
-        $scenarios = $this->candidateScenarios($targets);
+        $analysisUncertainties = [];
+        $scenarios = $this->candidateScenarios(
+            $targets,
+            $request->fromPhp(),
+            $project->composerJson()->platformPhp(),
+            $analysisUncertainties
+        );
 
         $scenarioResults = [];
         foreach ($scenarios as $scenario) {
@@ -73,7 +79,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
 
         $lockDiff = $bestLock === null ? new LockDiff([]) : $this->lockDiffBuilder->build($project->composerLock(), $bestLock);
         $blockers = $this->blockerGrouper->group($scenarioResults, $evidence);
-        $sourceUncertainties = [];
+        $sourceUncertainties = $analysisUncertainties;
         $sourceImpact = $this->sourceUsageScanner->scan(
             $project,
             $sourcePaths,
@@ -100,15 +106,50 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         );
     }
 
-    /** @return list<Scenario> */
-    private function candidateScenarios(UpgradeTargetSet $targets): array
-    {
-        return [
+    /** @param list<string> $uncertainties @return list<Scenario> */
+    private function candidateScenarios(
+        UpgradeTargetSet $targets,
+        ?string $fromPhp,
+        ?string $projectPlatformPhp,
+        array &$uncertainties
+    ): array {
+        $scenarios = [
             new Scenario('baseline-validation', $targets, false, false, true),
             new Scenario('exact-target', $targets, false, false),
             new Scenario('target-with-all-dependencies', $targets, true, false),
             new Scenario('minimal-changes', $targets, true, true),
         ];
+
+        if ($targets->targetPhp() === null || $targets->packageTargets() === []) {
+            return $scenarios;
+        }
+
+        $scenarios[] = new Scenario(
+            'target-platform-only',
+            new UpgradeTargetSet([], $targets->targetPhp()),
+            false,
+            false,
+            false,
+            false
+        );
+
+        $sourcePhp = $fromPhp ?? $projectPlatformPhp;
+        if ($sourcePhp === null) {
+            $uncertainties[] = 'The staged package-target scenario was skipped because the current project PHP version is unknown; supply --from-php or configure config.platform.php.';
+
+            return $scenarios;
+        }
+
+        $scenarios[] = new Scenario(
+            'staged-targets',
+            new UpgradeTargetSet($targets->packageTargets(), $sourcePhp),
+            true,
+            false,
+            false,
+            false
+        );
+
+        return $scenarios;
     }
 
     /** @param list<ScenarioResult> $scenarioResults */
@@ -118,7 +159,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $candidates = [];
 
         foreach ($scenarioResults as $index => $result) {
-            if ($result->scenario()->isBaselineValidation() || !$result->succeeded() || $result->lock() === null) {
+            if (!$result->scenario()->determinesTargetFeasibility() || !$result->succeeded() || $result->lock() === null) {
                 continue;
             }
 

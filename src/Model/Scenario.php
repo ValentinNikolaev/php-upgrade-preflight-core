@@ -11,19 +11,22 @@ final class Scenario
     private bool $withAllDependencies;
     private bool $minimalChanges;
     private bool $baselineValidation;
+    private bool $targetFeasibility;
 
     public function __construct(
         string $name,
         UpgradeTargetSet $targets,
         bool $withAllDependencies = true,
         bool $minimalChanges = false,
-        bool $baselineValidation = false
+        bool $baselineValidation = false,
+        bool $targetFeasibility = true
     ) {
         $this->name = $name;
         $this->targets = $targets;
         $this->withAllDependencies = $withAllDependencies;
         $this->minimalChanges = $minimalChanges;
         $this->baselineValidation = $baselineValidation;
+        $this->targetFeasibility = $targetFeasibility;
     }
 
     public function name(): string
@@ -49,5 +52,15 @@ final class Scenario
     public function isBaselineValidation(): bool
     {
         return $this->baselineValidation;
+    }
+
+    public function determinesTargetFeasibility(): bool
+    {
+        return !$this->baselineValidation && $this->targetFeasibility;
+    }
+
+    public function isPartialTargetProbe(): bool
+    {
+        return !$this->baselineValidation && !$this->targetFeasibility;
     }
 }
