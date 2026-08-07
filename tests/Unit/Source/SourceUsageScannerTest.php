@@ -146,6 +146,62 @@ PHP);
         }
     }
 
+    public function testItAggregatesRepeatedUsagesPerFileAndTypeWhileRetainingEveryLocationEvidence(): void
+    {
+        $projectPath = $this->createProject(<<<'PHP'
+<?php
+Vendor\Package\Client::first();
+Vendor\Package\Client::second();
+Vendor\Package\Client::$connection;
+PHP);
+        file_put_contents(
+            $projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Other.php',
+            "<?php\nVendor\\Package\\Client::third();\n"
+        );
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
+
+            self::assertCount(3, $usages);
+            self::assertSame('src' . DIRECTORY_SEPARATOR . 'Example.php', $usages[0]->file());
+            self::assertSame('Vendor\Package\Client', $usages[0]->symbol());
+            self::assertSame('static_call', $usages[0]->usageType());
+            self::assertSame(2, $usages[0]->line());
+            self::assertSame(['source-1', 'source-2'], $usages[0]->evidence());
+            self::assertSame('static_property_access', $usages[1]->usageType());
+            self::assertSame(['source-3'], $usages[1]->evidence());
+            self::assertSame('src' . DIRECTORY_SEPARATOR . 'Other.php', $usages[2]->file());
+            self::assertSame('static_call', $usages[2]->usageType());
+            self::assertSame(['source-4'], $usages[2]->evidence());
+            self::assertSame(
+                [
+                    ['src' . DIRECTORY_SEPARATOR . 'Example.php', 2, 'static_call'],
+                    ['src' . DIRECTORY_SEPARATOR . 'Example.php', 3, 'static_call'],
+                    ['src' . DIRECTORY_SEPARATOR . 'Example.php', 4, 'static_property_access'],
+                    ['src' . DIRECTORY_SEPARATOR . 'Other.php', 2, 'static_call'],
+                ],
+                array_map(
+                    static fn (Evidence $item): array => [
+                        $item->context()['file'],
+                        $item->context()['line'],
+                        $item->context()['usage_type'],
+                    ],
+                    $evidence->all()
+                )
+            );
+            $evidence->validateReferences(array_merge(...array_map(
+                static fn ($usage): array => $usage->evidence(),
+                $usages
+            )));
+            self::assertSame([], $uncertainties);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
     public function testSyntaxFailureProducesEvidenceAndUncertainty(): void
     {
         $projectPath = $this->createProject("<?php\nnew ;\n");
@@ -313,10 +369,22 @@ PHP,
             self::assertContains(['tests' . DIRECTORY_SEPARATOR . 'ExampleTest.php', 'App\Services\LegacyClient', 'test_double'], $usageTriples);
             self::assertSame([], $uncertainties);
 
+            $evidenceById = [];
+            foreach ($evidence->all() as $item) {
+                $evidenceById[$item->id()] = $item;
+            }
+
             foreach ($usages as $usage) {
                 if (in_array($usage->usageType(), ['config_reference', 'service_provider', 'middleware_reference', 'console_command', 'test_double'], true)) {
                     self::assertNotNull($usage->line());
-                    self::assertCount(1, $usage->evidence());
+                    self::assertNotEmpty($usage->evidence());
+
+                    foreach ($usage->evidence() as $evidenceId) {
+                        self::assertArrayHasKey($evidenceId, $evidenceById);
+                        self::assertSame($usage->file(), $evidenceById[$evidenceId]->context()['file']);
+                        self::assertSame($usage->usageType(), $evidenceById[$evidenceId]->context()['usage_type']);
+                        self::assertIsInt($evidenceById[$evidenceId]->context()['line']);
+                    }
                 }
             }
         } finally {

@@ -38,6 +38,8 @@ final class SourceUsageScanner
         bool $reportMissingPaths = true
     ): array {
         $usages = [];
+        /** @var array<string, int> $usageIndexes */
+        $usageIndexes = [];
         $files = $this->phpFiles($project->path(), $paths, $uncertainties, $reportMissingPaths);
 
         if ($files === []) {
@@ -73,6 +75,16 @@ final class SourceUsageScanner
                     'line' => $detectedUsage['line'],
                     'usage_type' => $detectedUsage['usage_type'],
                 ])->id();
+
+                $usageKey = serialize([$relative, $detectedUsage['symbol'], $detectedUsage['usage_type']]);
+                if (isset($usageIndexes[$usageKey])) {
+                    $index = $usageIndexes[$usageKey];
+                    $usages[$index] = $usages[$index]->withAdditionalEvidence([$id]);
+
+                    continue;
+                }
+
+                $usageIndexes[$usageKey] = count($usages);
                 $usages[] = new SourceUsage(
                     $relative,
                     $detectedUsage['symbol'],

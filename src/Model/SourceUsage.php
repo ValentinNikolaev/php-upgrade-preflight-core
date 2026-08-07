@@ -20,7 +20,7 @@ final class SourceUsage
         $this->symbol = $symbol;
         $this->usageType = $usageType;
         $this->line = $line;
-        $this->evidence = array_values($evidence);
+        $this->evidence = array_values(array_unique($evidence));
     }
 
     public function file(): string
@@ -47,6 +47,18 @@ final class SourceUsage
     public function evidence(): array
     {
         return $this->evidence;
+    }
+
+    /** @param list<string> $evidence */
+    public function withAdditionalEvidence(array $evidence): self
+    {
+        return new self(
+            $this->file,
+            $this->symbol,
+            $this->usageType,
+            array_merge($this->evidence, $evidence),
+            $this->line
+        );
     }
 
     /** @return array{file: string, symbol: string, usage_type: string, line: ?int, evidence: list<string>} */
