@@ -104,6 +104,11 @@ final class Blocker
         return $this->confidence;
     }
 
+    public function blocksResolution(): bool
+    {
+        return $this->type !== 'abandoned-package';
+    }
+
     /** @return list<string> */
     public function evidence(): array
     {

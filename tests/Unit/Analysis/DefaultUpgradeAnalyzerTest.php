@@ -10,6 +10,7 @@ use PhpUpgradePreflight\Core\Framework\CompatibilityRule;
 use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
 use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
+use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
@@ -312,6 +313,140 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('dist-2.0.0', $json['transition']['package_changes'][0]['to_dist_reference']);
         self::assertFalse($json['transition']['package_changes'][1]['direct']);
         self::assertSame(['fixture'], $json['transition']['package_changes'][0]['package_families']);
+    }
+
+    public function testCandidateLockAbandonmentMetadataReachesTheCanonicalReport(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
+                'packages' => [[
+                    'name' => 'fixture/dependency',
+                    'version' => '2.0.0',
+                    'abandoned' => 'fixture/replacement',
+                ]],
+                'packages-dev' => [],
+            ], JSON_THROW_ON_ERROR));
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade($request);
+
+        self::assertSame('feasible_with_changes', $report->resolutionStatus());
+        self::assertCount(1, $report->blockers());
+        self::assertSame('abandoned-package', $report->blockers()[0]->type());
+        self::assertSame('fixture/dependency', $report->blockers()[0]->subject());
+        self::assertSame('^2.0', $report->blockers()[0]->requestedConstraint());
+        self::assertSame('2.0.0', $report->blockers()[0]->lockedVersion());
+        self::assertSame(['Replace `fixture/dependency` with `fixture/replacement`.'], $report->blockers()[0]->options());
+        self::assertSame(['lock-metadata-1'], $report->blockers()[0]->evidence());
+        self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence()[0]->evidenceClass());
+        self::assertSame('lock-metadata-1', $report->toArray()['blockers'][0]['evidence'][0]);
+        self::assertSame('medium', $report->risk()->level());
+        self::assertSame(['Abandoned packages require replacement or removal.'], $report->risk()->drivers());
+        self::assertSame(
+            'Address dependency maintenance advisories in the feasible dependency state.',
+            $report->planStages()[1]->summary()
+        );
+        self::assertNotContains(
+            'Rerun the isolated Composer scenarios after resolving the reported blockers.',
+            $report->planStages()[1]->actions()
+        );
+    }
+
+    public function testBlockedAnalysisFallsBackToBaselineAbandonmentMetadata(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => '- Root composer.json requires fixture/dependency ^2.0',
+            ];
+        });
+        $projectPath = $this->createInputProject(
+            json_encode([
+                'require' => ['fixture/dependency' => '^1.0'],
+                'scripts' => ['test' => 'phpunit'],
+            ], JSON_THROW_ON_ERROR),
+            json_encode([
+                'packages' => [
+                    ['name' => 'fixture/dependency', 'version' => '1.0.0'],
+                    ['name' => 'fixture/legacy', 'version' => '1.0.0', 'abandoned' => true],
+                ],
+                'packages-dev' => [],
+            ], JSON_THROW_ON_ERROR)
+        );
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade(
+                new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')])
+            );
+            $abandoned = array_values(array_filter(
+                $report->blockers(),
+                static fn (Blocker $blocker): bool => $blocker->type() === 'abandoned-package'
+            ));
+
+            self::assertSame('blocked', $report->resolutionStatus());
+            self::assertCount(1, $abandoned);
+            self::assertSame('fixture/legacy', $abandoned[0]->subject());
+            self::assertSame('1.0.0', $abandoned[0]->lockedVersion());
+            self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence()[0]->evidenceClass());
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testSelectedCandidateDoesNotReportAnAbandonedBaselinePackageItRemoved(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
+                'packages' => [['name' => 'fixture/dependency', 'version' => '2.0.0']],
+                'packages-dev' => [],
+            ], JSON_THROW_ON_ERROR));
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+        $projectPath = $this->createInputProject(
+            json_encode([
+                'require' => ['fixture/dependency' => '^1.0'],
+                'scripts' => ['test' => 'phpunit'],
+            ], JSON_THROW_ON_ERROR),
+            json_encode([
+                'packages' => [
+                    ['name' => 'fixture/dependency', 'version' => '1.0.0'],
+                    ['name' => 'fixture/legacy', 'version' => '1.0.0', 'abandoned' => true],
+                ],
+                'packages-dev' => [],
+            ], JSON_THROW_ON_ERROR)
+        );
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade(
+                new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')])
+            );
+
+            self::assertSame('feasible_with_changes', $report->resolutionStatus());
+            self::assertSame([], array_values(array_filter(
+                $report->blockers(),
+                static fn (Blocker $blocker): bool => $blocker->type() === 'abandoned-package'
+            )));
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
     }
 
     public function testOperationalFailuresProduceUnknownResolutionAndUncertainties(): void

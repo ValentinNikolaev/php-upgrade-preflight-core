@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Tests\Unit\Analysis;
 
 use PhpUpgradePreflight\Core\Analysis\ReportSectionBuilder;
+use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
@@ -159,5 +160,51 @@ final class ReportSectionBuilderTest extends TestCase
             static fn (Evidence $item): string => $item->id(),
             $evidence->all()
         ));
+    }
+
+    public function testSuccessfulResolutionTreatsAbandonedPackagesAsMaintenanceAdvisories(): void
+    {
+        $projectPath = dirname(__DIR__, 5);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('vendor/package', '^2.0')]);
+        $project = new ProjectState($projectPath, new ComposerJson([
+            'require' => ['vendor/package' => '^1.0'],
+            'scripts' => ['test' => 'phpunit'],
+        ]), new ComposerLock([]));
+        $scenario = new Scenario('exact-target', $request->targets());
+        $evidence = new EvidenceLedger([
+            new Evidence('lock-metadata-1', Evidence::E2_PACKAGE_METADATA, 'Package is abandoned.'),
+        ]);
+        $advisory = new Blocker(
+            'abandoned-package',
+            'vendor/legacy',
+            'Abandoned.',
+            'high',
+            ['lock-metadata-1']
+        );
+
+        $sections = (new ReportSectionBuilder())->build(
+            $request,
+            $project,
+            [new ScenarioResult($scenario, 0, 'Resolved.', '', new ComposerLock([]))],
+            new LockDiff([new PackageChange('vendor/package', 'upgraded', '1.0.0', '2.0.0')]),
+            [$advisory],
+            [],
+            [],
+            [],
+            $evidence
+        );
+
+        self::assertSame(
+            'Address dependency maintenance advisories in the feasible dependency state.',
+            $sections->planStages()[1]->summary()
+        );
+        self::assertSame([
+            'Address the `abandoned-package` advisory affecting `vendor/legacy`.',
+            'Apply and review the smallest successful dependency transition before addressing maintenance advisories.',
+        ], $sections->planStages()[1]->actions());
+        self::assertNotContains(
+            'Rerun the isolated Composer scenarios after resolving the reported blockers.',
+            $sections->planStages()[1]->actions()
+        );
     }
 }

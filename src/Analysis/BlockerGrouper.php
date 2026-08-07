@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
+use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
@@ -13,25 +14,43 @@ use PhpUpgradePreflight\Core\Model\ScenarioResult;
 final class BlockerGrouper
 {
     private ComposerBlockerParser $parser;
+    private AbandonedPackageDetector $abandonedPackageDetector;
 
-    public function __construct(?ComposerBlockerParser $parser = null)
-    {
+    public function __construct(
+        ?ComposerBlockerParser $parser = null,
+        ?AbandonedPackageDetector $abandonedPackageDetector = null
+    ) {
         $this->parser = $parser ?? new ComposerBlockerParser();
+        $this->abandonedPackageDetector = $abandonedPackageDetector ?? new AbandonedPackageDetector();
     }
 
     /**
      * @param list<ScenarioResult> $scenarioResults
+     * @param array<string, string> $requestedConstraints
      * @return list<Blocker>
      */
-    public function group(array $scenarioResults, EvidenceLedger $evidence): array
-    {
+    public function group(
+        array $scenarioResults,
+        EvidenceLedger $evidence,
+        ?ComposerLock $metadataLock = null,
+        array $requestedConstraints = []
+    ): array {
+        $metadataLock = $metadataLock ?? $this->successfulLock($scenarioResults);
+        $blockers = $metadataLock === null
+            ? []
+            : $this->abandonedPackageDetector->detect($metadataLock, $evidence, $requestedConstraints);
+        /** @var array<string, int> $abandonedPackageIndexes */
+        $abandonedPackageIndexes = [];
+        foreach ($blockers as $index => $blocker) {
+            $abandonedPackageIndexes[$blocker->subject()] = $index;
+        }
+
         foreach ($scenarioResults as $result) {
             if ($result->scenario()->determinesTargetFeasibility() && $result->succeeded()) {
-                return [];
+                return $blockers;
             }
         }
 
-        $blockers = [];
         /** @var array<string, int> $rootConflictIndexes */
         $rootConflictIndexes = [];
 
@@ -50,6 +69,13 @@ final class BlockerGrouper
             ])->id();
 
             foreach ($this->parser->parse($result, $evidenceId) as $blocker) {
+                if ($blocker->type() === 'abandoned-package' && isset($abandonedPackageIndexes[$blocker->subject()])) {
+                    $index = $abandonedPackageIndexes[$blocker->subject()];
+                    $blockers[$index] = $blockers[$index]->withAdditionalEvidence($blocker->evidence());
+
+                    continue;
+                }
+
                 $rootConflictKey = $this->rootConflictKey($blocker);
                 if ($rootConflictKey !== null && isset($rootConflictIndexes[$rootConflictKey])) {
                     $index = $rootConflictIndexes[$rootConflictKey];
@@ -61,6 +87,10 @@ final class BlockerGrouper
                 $index = count($blockers);
                 $blockers[] = $blocker;
 
+                if ($blocker->type() === 'abandoned-package') {
+                    $abandonedPackageIndexes[$blocker->subject()] = $index;
+                }
+
                 if ($rootConflictKey !== null) {
                     $rootConflictIndexes[$rootConflictKey] = $index;
                 }
@@ -68,6 +98,18 @@ final class BlockerGrouper
         }
 
         return $blockers;
+    }
+
+    /** @param list<ScenarioResult> $scenarioResults */
+    private function successfulLock(array $scenarioResults): ?ComposerLock
+    {
+        foreach ($scenarioResults as $result) {
+            if ($result->scenario()->determinesTargetFeasibility() && $result->succeeded()) {
+                return $result->lock();
+            }
+        }
+
+        return null;
     }
 
     private function rootConflictKey(Blocker $blocker): ?string

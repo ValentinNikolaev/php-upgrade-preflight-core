@@ -176,7 +176,13 @@ final class UpgradeReport
             }
         }
 
-        return count($this->blockers) > 0 ? 'blocked' : 'unknown';
+        foreach ($this->blockers as $blocker) {
+            if ($blocker->blocksResolution()) {
+                return 'blocked';
+            }
+        }
+
+        return 'unknown';
     }
 
     /** @return array<string, mixed> */

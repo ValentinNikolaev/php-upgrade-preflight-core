@@ -331,6 +331,62 @@ final class BlockerGrouperTest extends TestCase
         self::assertSame([], $evidence->all());
     }
 
+    public function testSuccessfulResolutionRetainsAbandonedPackagesFromCandidateLockMetadata(): void
+    {
+        $lock = new ComposerLock([
+            'packages' => [[
+                'name' => 'vendor/legacy',
+                'version' => '1.2.3',
+                'abandoned' => 'vendor/replacement',
+            ]],
+        ], ['vendor/legacy']);
+        $evidence = new EvidenceLedger();
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult($this->scenario([new UpgradeTarget('vendor/legacy', '^1.0')]), 0, 'Resolved.', '', $lock),
+        ], $evidence, null, ['vendor/legacy' => '^1.0']);
+
+        self::assertCount(1, $blockers);
+        self::assertSame('abandoned-package', $blockers[0]->type());
+        self::assertSame('vendor/legacy', $blockers[0]->subject());
+        self::assertSame('^1.0', $blockers[0]->requestedConstraint());
+        self::assertSame('1.2.3', $blockers[0]->lockedVersion());
+        self::assertSame(['lock-metadata-1'], $blockers[0]->evidence());
+        self::assertSame(Evidence::E2_PACKAGE_METADATA, $evidence->all()[0]->evidenceClass());
+    }
+
+    public function testLockMetadataTakesPrecedenceOverComposerProseAndRetainsBothEvidenceReferences(): void
+    {
+        $lock = new ComposerLock([
+            'packages' => [[
+                'name' => 'vendor/legacy',
+                'version' => '1.2.3',
+                'abandoned' => 'vendor/replacement',
+            ]],
+        ]);
+        $evidence = new EvidenceLedger();
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult(
+                $this->scenario([new UpgradeTarget('vendor/legacy', '^2.0')]),
+                2,
+                '',
+                'Package vendor/legacy is abandoned, you should avoid using it. Use vendor/replacement instead.',
+                null,
+                null,
+                ScenarioResult::FAILURE_SOLVER
+            ),
+        ], $evidence, $lock, ['vendor/legacy' => '^2.0']);
+
+        self::assertCount(1, $blockers);
+        self::assertSame('1.2.3', $blockers[0]->lockedVersion());
+        self::assertSame(['Replace `vendor/legacy` with `vendor/replacement`.'], $blockers[0]->options());
+        self::assertSame(['lock-metadata-1', 'solver-1'], $blockers[0]->evidence());
+        self::assertSame(
+            [Evidence::E2_PACKAGE_METADATA, Evidence::E1_SOLVER],
+            array_map(static fn (Evidence $item): string => $item->evidenceClass(), $evidence->all())
+        );
+        $evidence->validateReferences($blockers[0]->evidence());
+    }
+
     public function testOperationalFailuresDoNotBecomeDependencyBlockers(): void
     {
         $evidence = new EvidenceLedger();

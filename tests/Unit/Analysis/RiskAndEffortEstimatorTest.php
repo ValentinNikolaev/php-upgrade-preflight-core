@@ -50,6 +50,40 @@ final class RiskAndEffortEstimatorTest extends TestCase
         self::assertSame([], $risk->drivers());
     }
 
+    public function testAbandonedPackageAdvisoriesDoNotClaimComposerResolutionIsBlocked(): void
+    {
+        $advisory = new Blocker(
+            'abandoned-package',
+            'vendor/legacy',
+            'Abandoned.',
+            'high',
+            ['lock-metadata-1']
+        );
+
+        $risk = (new RiskAndEffortEstimator())->estimateRisk([$advisory], [], []);
+
+        self::assertFalse($advisory->blocksResolution());
+        self::assertSame('medium', $risk->level());
+        self::assertSame(['Abandoned packages require replacement or removal.'], $risk->drivers());
+    }
+
+    public function testMixedBlockersRetainResolutionAndAdvisoryRiskDrivers(): void
+    {
+        $blockers = [
+            new Blocker('conflict', 'vendor/package', 'Blocked.', 'high', ['solver-1']),
+            new Blocker('abandoned-package', 'vendor/legacy', 'Abandoned.', 'high', ['lock-metadata-1']),
+        ];
+
+        $risk = (new RiskAndEffortEstimator())->estimateRisk($blockers, [], []);
+
+        self::assertTrue($blockers[0]->blocksResolution());
+        self::assertSame('high', $risk->level());
+        self::assertSame([
+            'Composer resolution is blocked.',
+            'Abandoned packages require replacement or removal.',
+        ], $risk->drivers());
+    }
+
     public function testMoreThanTwentyPackageChangesAddTheLargeTransitionDriver(): void
     {
         $changes = [];

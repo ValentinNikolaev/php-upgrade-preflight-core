@@ -21,8 +21,14 @@ final class RiskAndEffortEstimator
     public function estimateRisk(array $blockers, array $changes, array $findings): RiskSummary
     {
         $drivers = [];
-        if ($blockers !== []) {
+        $hasResolutionBlocker = $this->hasResolutionBlocker($blockers);
+        $hasAdvisory = $this->hasAdvisory($blockers);
+
+        if ($hasResolutionBlocker) {
             $drivers[] = 'Composer resolution is blocked.';
+        }
+        if ($hasAdvisory) {
+            $drivers[] = 'Abandoned packages require replacement or removal.';
         }
         if (count($changes) > 20) {
             $drivers[] = 'Large lockfile transition.';
@@ -31,7 +37,9 @@ final class RiskAndEffortEstimator
             $drivers[] = 'Framework compatibility findings require review.';
         }
 
-        $level = $blockers !== [] ? 'high' : (count($changes) > 10 || count($findings) > 2 ? 'medium' : 'low');
+        $level = $hasResolutionBlocker
+            ? 'high'
+            : ($hasAdvisory || count($changes) > 10 || count($findings) > 2 ? 'medium' : 'low');
 
         return new RiskSummary($level, $drivers);
     }
@@ -62,5 +70,29 @@ final class RiskAndEffortEstimator
             ],
             ['Estimate is heuristic until project-specific tests and Composer solver output are reviewed.']
         );
+    }
+
+    /** @param list<Blocker> $blockers */
+    private function hasResolutionBlocker(array $blockers): bool
+    {
+        foreach ($blockers as $blocker) {
+            if ($blocker->blocksResolution()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param list<Blocker> $blockers */
+    private function hasAdvisory(array $blockers): bool
+    {
+        foreach ($blockers as $blocker) {
+            if (!$blocker->blocksResolution()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

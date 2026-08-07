@@ -165,17 +165,30 @@ final class ReportSectionBuilder
         $dependencyActions = [];
         $dependencyEvidence = [$guidanceEvidence];
         foreach ($blockers as $blocker) {
-            $dependencyActions[] = sprintf('Resolve the `%s` blocker affecting `%s`.', $blocker->type(), $blocker->subject());
+            $dependencyActions[] = $blocker->blocksResolution()
+                ? sprintf('Resolve the `%s` blocker affecting `%s`.', $blocker->type(), $blocker->subject())
+                : sprintf('Address the `%s` advisory affecting `%s`.', $blocker->type(), $blocker->subject());
             $dependencyEvidence = array_merge($dependencyEvidence, $blocker->evidence());
         }
         $hasSuccessfulScenario = $this->hasSuccessfulScenario($scenarioResults);
         $hasOperationalFailure = $this->hasOperationalFailure($scenarioResults);
-        if ($blockers !== []) {
+        if ($this->hasResolutionBlocker($blockers)) {
             if ($hasOperationalFailure) {
                 $dependencyActions[] = 'Restore the Composer analysis environment so every scenario can complete.';
             }
             $dependencyActions[] = 'Rerun the isolated Composer scenarios after resolving the reported blockers.';
             $dependencySummary = 'Resolve dependency blockers and review the resulting lockfile transition.';
+        } elseif ($blockers !== [] && $hasSuccessfulScenario) {
+            $dependencyActions[] = $lockDiff->packageChanges() === []
+                ? 'Use the verified dependency state as the baseline for addressing maintenance advisories.'
+                : 'Apply and review the smallest successful dependency transition before addressing maintenance advisories.';
+            $dependencySummary = 'Address dependency maintenance advisories in the feasible dependency state.';
+        } elseif ($blockers !== [] && $hasOperationalFailure) {
+            $dependencyActions[] = 'Restore the Composer analysis environment and rerun the isolated scenarios before changing the lockfile.';
+            $dependencySummary = 'Address dependency maintenance advisories and re-establish analysis confidence.';
+        } elseif ($blockers !== []) {
+            $dependencyActions[] = 'Run the isolated Composer scenarios before changing the lockfile.';
+            $dependencySummary = 'Address dependency maintenance advisories and establish dependency-resolution evidence.';
         } elseif ($hasSuccessfulScenario && $lockDiff->packageChanges() !== []) {
             $dependencyActions[] = 'Regenerate `composer.lock` with the smallest successful dependency transition.';
             $dependencySummary = 'Apply and review the successful dependency transition.';
@@ -328,6 +341,18 @@ final class ReportSectionBuilder
     {
         foreach ($scenarioResults as $result) {
             if ($result->scenario()->determinesTargetFeasibility() && $result->succeeded()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param list<Blocker> $blockers */
+    private function hasResolutionBlocker(array $blockers): bool
+    {
+        foreach ($blockers as $blocker) {
+            if ($blocker->blocksResolution()) {
                 return true;
             }
         }

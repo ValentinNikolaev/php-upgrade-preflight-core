@@ -94,7 +94,16 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $lockDiff = $bestLock === null
             ? new LockDiff([])
             : $this->lockDiffBuilder->build($project->composerLock(), $bestLock, $packageFamilyClassifiers);
-        $blockers = $this->blockerGrouper->group($scenarioResults, $evidence);
+        $requestedConstraints = $project->composerJson()->rootRequirements();
+        foreach ($targets->packageTargets() as $target) {
+            $requestedConstraints[$target->package()] = $target->constraint();
+        }
+        $blockers = $this->blockerGrouper->group(
+            $scenarioResults,
+            $evidence,
+            $bestLock ?? $project->composerLock(),
+            $requestedConstraints
+        );
         $sourceUncertainties = $analysisUncertainties;
         $sourceImpact = $this->sourceUsageScanner->scan(
             $project,

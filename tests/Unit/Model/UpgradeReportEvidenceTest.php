@@ -75,6 +75,20 @@ final class UpgradeReportEvidenceTest extends TestCase
         self::assertSame(['manifest-1'], $report->planStages()[0]->evidence());
     }
 
+    public function testAdvisoriesAloneDoNotMakeAnUnknownResolutionBlocked(): void
+    {
+        $evidence = [new Evidence('lock-metadata-1', Evidence::E2_PACKAGE_METADATA, 'Package is abandoned.')];
+        $advisoryReport = $this->report([
+            new Blocker('abandoned-package', 'vendor/legacy', 'Abandoned.', 'high', ['lock-metadata-1']),
+        ], $evidence);
+        $blockedReport = $this->report([
+            new Blocker('conflict', 'vendor/package', 'Blocked.', 'high', ['solver-1']),
+        ], [new Evidence('solver-1', Evidence::E1_SOLVER, 'Resolution failed.')]);
+
+        self::assertSame('unknown', $advisoryReport->resolutionStatus());
+        self::assertSame('blocked', $blockedReport->resolutionStatus());
+    }
+
     /**
      * @param list<Blocker> $blockers
      * @param list<Evidence> $evidence

@@ -63,12 +63,15 @@ final class ComposerLock
                 }
 
                 $name = strtolower((string) $package['name']);
+                $abandonedAlternative = $this->abandonedAlternative($package);
                 $indexed[$name] = new PackageRef(
                     $name,
                     (string) $package['version'],
                     isset($directPackages[$name]),
                     $this->packageReference($package, 'source'),
-                    $this->packageReference($package, 'dist')
+                    $this->packageReference($package, 'dist'),
+                    ($package['abandoned'] ?? false) === true || $abandonedAlternative !== null,
+                    $abandonedAlternative
                 );
             }
         }
@@ -87,5 +90,18 @@ final class ComposerLock
         $reference = $metadata['reference'] ?? null;
 
         return is_string($reference) ? $reference : null;
+    }
+
+    /** @param array<string, mixed> $package */
+    private function abandonedAlternative(array $package): ?string
+    {
+        $replacement = $package['abandoned'] ?? null;
+        if (!is_string($replacement)) {
+            return null;
+        }
+
+        $replacement = trim($replacement);
+
+        return $replacement === '' ? null : $replacement;
     }
 }
