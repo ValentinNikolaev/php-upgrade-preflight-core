@@ -54,7 +54,7 @@ final class SourceUsageScanner
             $relative = $this->relativePath($project->path(), $file);
 
             try {
-                $detectedUsages = $this->extractAstUsages($contents);
+                $detectedUsages = $this->extractAstUsages($contents, $relative);
             } catch (Error $exception) {
                 $id = $evidence->add('source', Evidence::E3_PROJECT_SOURCE, sprintf('Unable to parse %s.', $relative), 'high', [
                     'file' => $relative,
@@ -182,20 +182,25 @@ final class SourceUsageScanner
     }
 
     /** @return list<array{symbol: string, usage_type: string, line: int}> */
-    private function extractAstUsages(string $contents): array
+    private function extractAstUsages(string $contents, string $file): array
     {
         $nodes = $this->parser->parse($contents, new Throwing()) ?? [];
         $markerTraverser = new NodeTraverser();
         $markerTraverser->addVisitor(new ExplicitFullyQualifiedNameVisitor());
         $nodes = $markerTraverser->traverse($nodes);
 
+        $resolverTraverser = new NodeTraverser();
+        $resolverTraverser->addVisitor(new NameResolver(new Throwing()));
+        $nodes = $resolverTraverser->traverse($nodes);
+
         $traverser = new NodeTraverser();
         $visitor = new SourceUsageVisitor();
-        $traverser->addVisitor(new NameResolver(new Throwing()));
+        $contextualVisitor = new ContextualSourceUsageVisitor($file);
         $traverser->addVisitor($visitor);
+        $traverser->addVisitor($contextualVisitor);
         $traverser->traverse($nodes);
 
-        return $visitor->usages();
+        return array_merge($visitor->usages(), $contextualVisitor->usages());
     }
 
     private function createParser(): Parser
