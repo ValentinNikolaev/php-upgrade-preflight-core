@@ -5,11 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Source;
 
 use PhpParser\Error;
-use PhpParser\Node;
-use PhpParser\Node\Expr;
-use PhpParser\Node\Name;
-use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
+use PhpParser\ErrorHandler\Throwing;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\Parser;
@@ -58,12 +54,14 @@ final class SourceUsageScanner
             $relative = $this->relativePath($project->path(), $file);
 
             try {
-                $detectedUsages = $this->extractSymbols($contents);
+                $detectedUsages = $this->extractAstUsages($contents);
             } catch (Error $exception) {
                 $id = $evidence->add('source', Evidence::E3_PROJECT_SOURCE, sprintf('Unable to parse %s.', $relative), 'high', [
                     'file' => $relative,
                     'line' => $exception->getStartLine(),
                     'error' => $exception->getMessage(),
+                    'parser' => 'nikic/php-parser',
+                    'failure_type' => 'parse_error',
                 ])->id();
                 $uncertainties[] = sprintf('Source file "%s" could not be parsed and was not scanned (%s).', $relative, $id);
                 continue;
@@ -134,7 +132,13 @@ final class SourceUsageScanner
             }
 
             try {
-                $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($resolved, \FilesystemIterator::SKIP_DOTS));
+                $directory = new \RecursiveDirectoryIterator($resolved, \FilesystemIterator::SKIP_DOTS);
+                $filter = new \RecursiveCallbackFilterIterator(
+                    $directory,
+                    fn (\SplFileInfo $entry): bool => !$entry->isDir()
+                        || !$this->isDefaultExcludedDirectory($resolved, $entry->getPathname())
+                );
+                $iterator = new \RecursiveIteratorIterator($filter);
                 foreach ($iterator as $file) {
                     if ($file->isLink()) {
                         $resolvedLink = realpath($file->getPathname());
@@ -178,103 +182,20 @@ final class SourceUsageScanner
     }
 
     /** @return list<array{symbol: string, usage_type: string, line: int}> */
-    private function extractSymbols(string $contents): array
+    private function extractAstUsages(string $contents): array
     {
-        $nodes = $this->parser->parse($contents) ?? [];
+        $nodes = $this->parser->parse($contents, new Throwing()) ?? [];
+        $markerTraverser = new NodeTraverser();
+        $markerTraverser->addVisitor(new ExplicitFullyQualifiedNameVisitor());
+        $nodes = $markerTraverser->traverse($nodes);
+
         $traverser = new NodeTraverser();
-        $traverser->addVisitor(new NameResolver());
-        $nodes = $traverser->traverse($nodes);
-        $usages = [];
+        $visitor = new SourceUsageVisitor();
+        $traverser->addVisitor(new NameResolver(new Throwing()));
+        $traverser->addVisitor($visitor);
+        $traverser->traverse($nodes);
 
-        foreach ((new NodeFinder())->find($nodes, static fn (Node $node): bool => true) as $node) {
-            if ($node instanceof Stmt\Use_) {
-                foreach ($node->uses as $use) {
-                    $type = $use->type === Stmt\Use_::TYPE_UNKNOWN ? $node->type : $use->type;
-                    $this->addUsage($usages, (string) $use->name, $this->importUsageType($type), $use->getStartLine());
-                }
-            } elseif ($node instanceof Stmt\GroupUse) {
-                foreach ($node->uses as $use) {
-                    $type = $use->type === Stmt\Use_::TYPE_UNKNOWN ? $node->type : $use->type;
-                    $this->addUsage(
-                        $usages,
-                        (string) $node->prefix . '\\' . (string) $use->name,
-                        $this->importUsageType($type),
-                        $use->getStartLine()
-                    );
-                }
-            } elseif ($node instanceof Expr\StaticCall || $node instanceof Expr\StaticPropertyFetch || $node instanceof Expr\ClassConstFetch) {
-                if ($node->class instanceof Name) {
-                    $this->addNameUsage($usages, $node->class, 'static_call', $node->getStartLine());
-                }
-            } elseif ($node instanceof Expr\New_) {
-                if ($node->class instanceof Name) {
-                    $this->addNameUsage($usages, $node->class, 'class_reference', $node->getStartLine());
-                }
-            } elseif ($node instanceof Stmt\Class_) {
-                if ($node->extends !== null) {
-                    $this->addNameUsage($usages, $node->extends, 'class_reference', $node->getStartLine());
-                }
-                foreach ($node->implements as $interface) {
-                    $this->addNameUsage($usages, $interface, 'class_reference', $node->getStartLine());
-                }
-            } elseif ($node instanceof Stmt\Interface_) {
-                foreach ($node->extends as $interface) {
-                    $this->addNameUsage($usages, $interface, 'class_reference', $node->getStartLine());
-                }
-            } elseif ($node instanceof Stmt\Enum_) {
-                foreach ($node->implements as $interface) {
-                    $this->addNameUsage($usages, $interface, 'class_reference', $node->getStartLine());
-                }
-            } elseif ($node instanceof Stmt\TraitUse) {
-                foreach ($node->traits as $trait) {
-                    $this->addNameUsage($usages, $trait, 'trait_reference', $node->getStartLine());
-                }
-            } elseif ($node instanceof Node\Attribute) {
-                $this->addNameUsage($usages, $node->name, 'attribute', $node->getStartLine());
-            } elseif ($node instanceof Expr\FuncCall && $node->name instanceof Name) {
-                $this->addNameUsage($usages, $node->name, 'function_call', $node->getStartLine());
-            }
-        }
-
-        return $usages;
-    }
-
-    /** @param list<array{symbol: string, usage_type: string, line: int}> $usages */
-    private function addNameUsage(array &$usages, Name $name, string $usageType, int $line): void
-    {
-        $symbol = (string) $name;
-        if (in_array(strtolower($symbol), ['self', 'static', 'parent'], true)) {
-            return;
-        }
-
-        $this->addUsage($usages, $symbol, $usageType, $line);
-    }
-
-    /** @param list<array{symbol: string, usage_type: string, line: int}> $usages */
-    private function addUsage(array &$usages, string $symbol, string $usageType, int $line): void
-    {
-        if ($symbol === '') {
-            return;
-        }
-
-        $usages[] = [
-            'symbol' => ltrim($symbol, '\\'),
-            'usage_type' => $usageType,
-            'line' => $line,
-        ];
-    }
-
-    private function importUsageType(int $type): string
-    {
-        if ($type === Stmt\Use_::TYPE_FUNCTION) {
-            return 'function_import';
-        }
-
-        if ($type === Stmt\Use_::TYPE_CONSTANT) {
-            return 'constant_import';
-        }
-
-        return 'namespace_import';
+        return $visitor->usages();
     }
 
     private function createParser(): Parser
@@ -314,5 +235,26 @@ final class SourceUsageScanner
         }
 
         return $path === $projectPath || str_starts_with($path, rtrim($projectPath, '/') . '/');
+    }
+
+    private function isDefaultExcludedDirectory(string $scanRoot, string $path): bool
+    {
+        $relative = strtolower(str_replace('\\', '/', $this->relativePath($scanRoot, $path)));
+        $segments = array_values(array_filter(explode('/', trim($relative, '/')), static fn (string $segment): bool => $segment !== ''));
+
+        foreach ($segments as $segment) {
+            if (in_array($segment, ['.git', '.cache', 'generated', 'node_modules', 'vendor'], true)) {
+                return true;
+            }
+        }
+
+        for ($index = 0, $last = count($segments) - 1; $index < $last; ++$index) {
+            $pair = $segments[$index] . '/' . $segments[$index + 1];
+            if (in_array($pair, ['bootstrap/cache', 'storage/framework', 'var/cache'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
