@@ -18,6 +18,14 @@ final class ReportFileWriter
 
     public function write(string $projectPath, string $outputPath, string $contents): string
     {
+        $absolutePath = $this->validateDestination($projectPath, $outputPath);
+        $this->filesystem->dumpFile($absolutePath, $contents);
+
+        return Path::canonicalize($absolutePath);
+    }
+
+    public function validateDestination(string $projectPath, string $outputPath): string
+    {
         if (trim($outputPath) === '') {
             throw new \InvalidArgumentException('Report output path cannot be empty.');
         }
@@ -43,7 +51,13 @@ final class ReportFileWriter
             throw new \InvalidArgumentException(sprintf('Report output path "%s" is a directory.', $outputPath));
         }
 
-        $this->filesystem->dumpFile($absolutePath, $contents);
+        if (is_file($absolutePath) && !is_writable($absolutePath)) {
+            throw new \InvalidArgumentException(sprintf('Report output path "%s" is not writable.', $outputPath));
+        }
+
+        if (!file_exists($absolutePath) && !is_writable(dirname($absolutePath))) {
+            throw new \InvalidArgumentException(sprintf('Report output directory "%s" is not writable.', dirname($absolutePath)));
+        }
 
         return Path::canonicalize($absolutePath);
     }

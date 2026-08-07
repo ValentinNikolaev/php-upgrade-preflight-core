@@ -36,7 +36,7 @@ final class UpgradeReportSchemaTest extends TestCase
 {
     public function testCanonicalV06ReportMatchesTheCommittedSnapshot(): void
     {
-        $projectPath = dirname(__DIR__, 5);
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         $actual = JsonSnapshotNormalizer::normalize(
             (new JsonReportWriter())->render($this->report($projectPath)),
             $projectPath
@@ -49,7 +49,7 @@ final class UpgradeReportSchemaTest extends TestCase
 
     public function testCanonicalV06ReportConformsToThePublishedSchema(): void
     {
-        $projectPath = dirname(__DIR__, 5);
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         $json = (new JsonReportWriter())->render($this->report($projectPath));
 
         $this->assertConformsToSchema($json);
@@ -57,7 +57,7 @@ final class UpgradeReportSchemaTest extends TestCase
 
     public function testRepeatedFrameworkInputProducesACanonicalSchemaConformingReport(): void
     {
-        $projectPath = dirname(__DIR__, 5);
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         $json = (new JsonReportWriter())->render($this->report($projectPath, ['Laravel', 'laravel']));
         /** @var array<string, mixed> $decoded */
         $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
@@ -116,13 +116,14 @@ final class UpgradeReportSchemaTest extends TestCase
             ScenarioResult::supportedOutcomes(),
             $schema['$defs']['scenario']['properties']['outcome']['enum']
         );
-        self::assertSame(array_keys($this->report(dirname(__DIR__, 5))->toArray()), $schema['required']);
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
+        self::assertSame(array_keys($this->report($projectPath)->toArray()), $schema['required']);
         self::assertSame(
-            array_keys($this->report(dirname(__DIR__, 5))->toArray()['transition']['package_changes'][0]),
+            array_keys($this->report($projectPath)->toArray()['transition']['package_changes'][0]),
             $schema['$defs']['packageChange']['required']
         );
         self::assertSame(
-            array_keys($this->report(dirname(__DIR__, 5))->toArray()['blockers'][0]),
+            array_keys($this->report($projectPath)->toArray()['blockers'][0]),
             $schema['$defs']['blocker']['required']
         );
     }

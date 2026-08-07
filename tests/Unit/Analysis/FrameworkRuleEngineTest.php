@@ -50,13 +50,13 @@ final class FrameworkRuleEngineTest extends TestCase
     {
         $integration = new FixtureFrameworkIntegration('fixture', false, ['app'], []);
         $engine = new FrameworkRuleEngine([$integration]);
-        $request = $this->request(['FIXTURE'], ['custom']);
+        $request = $this->request(['FIXTURE'], ['FrameworkRuleEngineTest.php']);
         $project = $this->project();
 
         $active = $engine->activeIntegrations($project, $request);
 
         self::assertSame([$integration], $active);
-        self::assertSame(['custom'], $engine->sourcePaths($project, $request, $active));
+        self::assertSame(['FrameworkRuleEngineTest.php'], $engine->sourcePaths($project, $request, $active));
     }
 
     public function testMultipleActiveIntegrationsMergeOverlappingSourcePathsDeterministically(): void

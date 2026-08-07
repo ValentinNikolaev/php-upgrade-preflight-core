@@ -65,4 +65,14 @@ final class ReportFileWriterTest extends TestCase
 
         (new ReportFileWriter())->write(dirname(__DIR__, 5), $this->outputDirectory . DIRECTORY_SEPARATOR . 'missing' . DIRECTORY_SEPARATOR . 'report.json', "{}\n");
     }
+
+    public function testItCanValidateADestinationWithoutCreatingTheReport(): void
+    {
+        $outputPath = $this->outputDirectory . DIRECTORY_SEPARATOR . 'report.json';
+
+        $validated = (new ReportFileWriter())->validateDestination(dirname(__DIR__, 5), $outputPath);
+
+        self::assertFileDoesNotExist($outputPath);
+        self::assertSame(str_replace('\\', '/', $outputPath), str_replace('\\', '/', $validated));
+    }
 }

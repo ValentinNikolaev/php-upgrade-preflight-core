@@ -42,9 +42,9 @@ final class UpgradeRequest
 
         $this->projectPath = $resolved;
         $this->targets = new UpgradeTargetSet($targets, $targetPhp);
-        $this->fromPhp = $fromPhp;
+        $this->fromPhp = $this->validateCurrentPhp($fromPhp);
         $this->targetPhp = $this->targets->targetPhp();
-        $this->sourcePaths = array_values($sourcePaths);
+        $this->sourcePaths = $this->normalizeSourcePaths($sourcePaths);
         $this->frameworks = $this->normalizeFrameworks($frameworks);
         $this->format = ReportFormat::normalize($format);
         $this->outputPath = $outputPath;
@@ -135,5 +135,73 @@ final class UpgradeRequest
         sort($frameworks, SORT_STRING);
 
         return $frameworks;
+    }
+
+    private function validateCurrentPhp(?string $version): ?string
+    {
+        if ($version === null) {
+            return null;
+        }
+
+        $version = trim($version);
+        if (!preg_match('/^v?\d+(?:\.\d+)?(?:\.\d+)?$/i', $version)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Current PHP version "%s" must be an exact major, major.minor, or major.minor.patch version.',
+                $version
+            ));
+        }
+
+        return $version;
+    }
+
+    /** @param list<string> $sourcePaths @return list<string> */
+    private function normalizeSourcePaths(array $sourcePaths): array
+    {
+        $normalized = [];
+
+        foreach ($sourcePaths as $index => $sourcePath) {
+            if (!is_string($sourcePath) || trim($sourcePath) === '') {
+                throw new \InvalidArgumentException(sprintf('Source path at index %d must not be empty.', $index));
+            }
+
+            $sourcePath = trim($sourcePath);
+            $candidate = $this->isAbsolutePath($sourcePath)
+                ? $sourcePath
+                : $this->projectPath . DIRECTORY_SEPARATOR . $sourcePath;
+            $resolved = realpath($candidate);
+
+            if ($resolved === false || (!is_file($resolved) && !is_dir($resolved))) {
+                throw new \InvalidArgumentException(sprintf('Source path "%s" does not exist.', $sourcePath));
+            }
+
+            if (!$this->isWithinProject($resolved)) {
+                throw new \InvalidArgumentException(sprintf('Source path "%s" must resolve inside the analyzed project.', $sourcePath));
+            }
+
+            $relative = ltrim(str_replace('\\', '/', substr($resolved, strlen($this->projectPath))), '/');
+            $normalized[$relative === '' ? '.' : $relative] = true;
+        }
+
+        return array_keys($normalized);
+    }
+
+    private function isAbsolutePath(string $path): bool
+    {
+        return str_starts_with($path, '/')
+            || str_starts_with($path, '\\')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;
+    }
+
+    private function isWithinProject(string $path): bool
+    {
+        $projectPath = str_replace('\\', '/', $this->projectPath);
+        $path = str_replace('\\', '/', $path);
+
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $projectPath = strtolower($projectPath);
+            $path = strtolower($path);
+        }
+
+        return $path === $projectPath || str_starts_with($path, rtrim($projectPath, '/') . '/');
     }
 }
