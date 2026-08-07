@@ -126,6 +126,47 @@ final class ContextualSourceUsageVisitor extends NodeVisitorAbstract
             if (strtolower($item->key->value) === 'providers') {
                 $this->addClassReferences($item->value, 'service_provider');
             }
+
+            if (strtolower($this->file) === 'config/app.php'
+                && strtolower($item->key->value) === 'aliases') {
+                $this->addAliasReferences($item->value);
+            }
+        }
+    }
+
+    private function addAliasReferences(Node $node): void
+    {
+        if ($node instanceof String_ && strpos($node->value, '\\') !== false) {
+            $this->addUsage($node->value, 'facade_alias', $node->getStartLine());
+
+            return;
+        }
+
+        if ($node instanceof Expr\ClassConstFetch
+            && $node->class instanceof Name
+            && $node->name instanceof Identifier
+            && strtolower((string) $node->name) === 'class') {
+            $this->addUsage((string) $node->class, 'facade_alias', $node->class->getStartLine());
+
+            return;
+        }
+
+        foreach ($node->getSubNodeNames() as $subNodeName) {
+            $value = $node->{$subNodeName};
+            if ($value instanceof Node) {
+                $this->addAliasReferences($value);
+                continue;
+            }
+
+            if (!is_array($value)) {
+                continue;
+            }
+
+            foreach ($value as $child) {
+                if ($child instanceof Node) {
+                    $this->addAliasReferences($child);
+                }
+            }
         }
     }
 

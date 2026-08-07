@@ -141,8 +141,12 @@ final class FixtureCompatibilityRule implements CompatibilityRule
         $this->summary = $summary;
     }
 
-    public function evaluate(ProjectState $project, UpgradeRequest $request, EvidenceLedger $evidence): ?CompatibilityFinding
-    {
+    public function evaluate(
+        ProjectState $project,
+        UpgradeRequest $request,
+        EvidenceLedger $evidence,
+        array $sourceUsages = []
+    ): ?CompatibilityFinding {
         if ($this->summary === null) {
             return null;
         }

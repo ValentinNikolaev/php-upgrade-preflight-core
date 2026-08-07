@@ -7,9 +7,16 @@ namespace PhpUpgradePreflight\Core\Framework;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 
 interface CompatibilityRule
 {
-    public function evaluate(ProjectState $project, UpgradeRequest $request, EvidenceLedger $evidence): ?CompatibilityFinding;
+    /** @param list<SourceUsage> $sourceUsages */
+    public function evaluate(
+        ProjectState $project,
+        UpgradeRequest $request,
+        EvidenceLedger $evidence,
+        array $sourceUsages = []
+    ): ?CompatibilityFinding;
 }

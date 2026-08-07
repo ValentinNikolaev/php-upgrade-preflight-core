@@ -672,8 +672,12 @@ final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration,
 
 final class AnalyzerFixtureCompatibilityRule implements CompatibilityRule
 {
-    public function evaluate(ProjectState $project, UpgradeRequest $request, EvidenceLedger $evidence): CompatibilityFinding
-    {
+    public function evaluate(
+        ProjectState $project,
+        UpgradeRequest $request,
+        EvidenceLedger $evidence,
+        array $sourceUsages = []
+    ): CompatibilityFinding {
         $evidenceId = $evidence->add(
             'framework',
             Evidence::E2_PACKAGE_METADATA,

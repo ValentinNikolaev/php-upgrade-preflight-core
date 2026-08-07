@@ -253,6 +253,10 @@ return [
     'providers' => [
         Vendor\Package\PackageServiceProvider::class,
     ],
+    'aliases' => [
+        'Package' => Vendor\Package\Facades\Package::class,
+        'Legacy' => 'Vendor\\Package\\Facades\\Legacy',
+    ],
 ];
 PHP,
             'bootstrap/providers.php' => <<<'PHP'
@@ -355,6 +359,8 @@ PHP,
             self::assertContains(['src' . DIRECTORY_SEPARATOR . 'Example.php', 'app.timezone', 'config_reference'], $usageTriples);
             self::assertNotContains(['src' . DIRECTORY_SEPARATOR . 'Example.php', 'dynamicKey', 'config_reference'], $usageTriples);
             self::assertContains(['config' . DIRECTORY_SEPARATOR . 'app.php', 'Vendor\Package\PackageServiceProvider', 'service_provider'], $usageTriples);
+            self::assertContains(['config' . DIRECTORY_SEPARATOR . 'app.php', 'Vendor\Package\Facades\Package', 'facade_alias'], $usageTriples);
+            self::assertContains(['config' . DIRECTORY_SEPARATOR . 'app.php', 'Vendor\Package\Facades\Legacy', 'facade_alias'], $usageTriples);
             self::assertContains(['bootstrap' . DIRECTORY_SEPARATOR . 'providers.php', 'App\Providers\BootstrapServiceProvider', 'service_provider'], $usageTriples);
             self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Providers' . DIRECTORY_SEPARATOR . 'AppServiceProvider.php', 'App\Providers\AppServiceProvider', 'service_provider'], $usageTriples);
             self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Console' . DIRECTORY_SEPARATOR . 'Kernel.php', 'Vendor\Package\RuntimeServiceProvider', 'service_provider'], $usageTriples);
@@ -375,7 +381,7 @@ PHP,
             }
 
             foreach ($usages as $usage) {
-                if (in_array($usage->usageType(), ['config_reference', 'service_provider', 'middleware_reference', 'console_command', 'test_double'], true)) {
+                if (in_array($usage->usageType(), ['config_reference', 'service_provider', 'facade_alias', 'middleware_reference', 'console_command', 'test_double'], true)) {
                     self::assertNotNull($usage->line());
                     self::assertNotEmpty($usage->evidence());
 

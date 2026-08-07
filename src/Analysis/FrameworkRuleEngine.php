@@ -9,6 +9,7 @@ use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 
 final class FrameworkRuleEngine
@@ -81,19 +82,21 @@ final class FrameworkRuleEngine
 
     /**
      * @param list<FrameworkIntegration> $frameworks
+     * @param list<SourceUsage> $sourceUsages
      * @return list<CompatibilityFinding>
      */
     public function evaluate(
         array $frameworks,
         ProjectState $project,
         UpgradeRequest $request,
-        EvidenceLedger $evidence
+        EvidenceLedger $evidence,
+        array $sourceUsages = []
     ): array {
         $findings = [];
 
         foreach ($frameworks as $framework) {
             foreach ($framework->rules() as $rule) {
-                $finding = $rule->evaluate($project, $request, $evidence);
+                $finding = $rule->evaluate($project, $request, $evidence, $sourceUsages);
                 if ($finding !== null) {
                     $findings[] = $finding;
                 }
