@@ -115,6 +115,17 @@ final class ComposerBlockerParser
             return $this->blocker('package-not-found', $subject, $this->requestedConstraint($result, $subject), null, null, null, [$subject], $evidenceId, 'high');
         }
 
+        if (preg_match(
+            '~Root composer\.json requires\s+(' . $package . ')\s+([^\s,]+),\s+found\s+\1\[([^\]]+)]\s+but\s+(?:it does|these do) not match the constraint~i',
+            $output,
+            $matches
+        ) === 1) {
+            $subject = strtolower($matches[1]);
+            $requestedConstraint = $this->requestedConstraint($result, $subject) ?? $this->cleanConstraint($matches[2]);
+
+            return $this->blocker('package-not-found', $subject, $requestedConstraint, null, null, null, [$subject], $evidenceId, 'high');
+        }
+
         if (stripos($output, 'minimum-stability') !== false) {
             $subject = $this->firstPackageTarget($result) ?? 'composer';
 

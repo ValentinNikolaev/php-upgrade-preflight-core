@@ -51,8 +51,8 @@ final class BlockerGrouper
             }
         }
 
-        /** @var array<string, int> $rootConflictIndexes */
-        $rootConflictIndexes = [];
+        /** @var array<string, int> $blockerIndexes */
+        $blockerIndexes = [];
 
         foreach ($scenarioResults as $result) {
             if ($result->scenario()->isBaselineValidation() || !$result->isSolverFailure()) {
@@ -76,9 +76,9 @@ final class BlockerGrouper
                     continue;
                 }
 
-                $rootConflictKey = $this->rootConflictKey($blocker);
-                if ($rootConflictKey !== null && isset($rootConflictIndexes[$rootConflictKey])) {
-                    $index = $rootConflictIndexes[$rootConflictKey];
+                $blockerKey = $this->blockerKey($blocker);
+                if (isset($blockerIndexes[$blockerKey])) {
+                    $index = $blockerIndexes[$blockerKey];
                     $blockers[$index] = $blockers[$index]->withAdditionalEvidence($blocker->evidence());
 
                     continue;
@@ -91,9 +91,7 @@ final class BlockerGrouper
                     $abandonedPackageIndexes[$blocker->subject()] = $index;
                 }
 
-                if ($rootConflictKey !== null) {
-                    $rootConflictIndexes[$rootConflictKey] = $index;
-                }
+                $blockerIndexes[$blockerKey] = $index;
             }
         }
 
@@ -112,12 +110,8 @@ final class BlockerGrouper
         return null;
     }
 
-    private function rootConflictKey(Blocker $blocker): ?string
+    private function blockerKey(Blocker $blocker): string
     {
-        if ($blocker->type() !== 'root-constraint-conflict') {
-            return null;
-        }
-
         return serialize([
             $blocker->type(),
             $blocker->subject(),

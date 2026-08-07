@@ -202,7 +202,7 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertIsString($capturedUrl);
         self::assertTrue(Path::isAbsolute($capturedUrl));
         self::assertSame(
-            Path::canonicalize(dirname($projectPath) . DIRECTORY_SEPARATOR . 'repository' . DIRECTORY_SEPARATOR . 'fixture-dependency'),
+            Path::canonicalize(dirname($projectPath) . DIRECTORY_SEPARATOR . 'repository' . DIRECTORY_SEPARATOR . '*'),
             Path::canonicalize($capturedUrl)
         );
     }

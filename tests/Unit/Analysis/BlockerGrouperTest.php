@@ -116,6 +116,16 @@ final class BlockerGrouperTest extends TestCase
                 ],
             ],
             [
+                'Root composer.json requires vendor/missing ^2.0, found vendor/missing[1.0.0, 1.5.0] but these do not match the constraint.',
+                [new UpgradeTarget('vendor/missing', '^2.0')],
+                [
+                    'type' => 'package-not-found',
+                    'subject' => 'vendor/missing',
+                    'requestedConstraint' => '^2.0',
+                    'confidence' => 'high',
+                ],
+            ],
+            [
                 'The package does not match your minimum-stability.',
                 [new UpgradeTarget('vendor/unstable', 'dev-main')],
                 [
@@ -302,6 +312,22 @@ final class BlockerGrouperTest extends TestCase
             ['exact-target', 'all-dependencies'],
             array_map(static fn (Evidence $item): string => $item->context()['scenario'], $evidence->all())
         );
+    }
+
+    public function testItDeduplicatesEquivalentNonRootBlockersAcrossScenariosAndRetainsTheirEvidence(): void
+    {
+        $targets = [new UpgradeTarget('vendor/package', '^2.0')];
+        $output = 'Root composer.json requires vendor/package ^2.0, found vendor/package[1.0.0] but it does not match the constraint.';
+        $evidence = new EvidenceLedger();
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult($this->scenario($targets, 'exact-target'), 2, '', $output, null, null, ScenarioResult::FAILURE_SOLVER),
+            new ScenarioResult($this->scenario($targets, 'all-dependencies'), 2, '', $output, null, null, ScenarioResult::FAILURE_SOLVER),
+        ], $evidence);
+
+        self::assertCount(1, $blockers);
+        self::assertSame('package-not-found', $blockers[0]->type());
+        self::assertSame(['solver-1', 'solver-2'], $blockers[0]->evidence());
+        $evidence->validateReferences($blockers[0]->evidence());
     }
 
     public function testItKeepsDifferentRootConflictsSeparate(): void

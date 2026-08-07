@@ -167,7 +167,8 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertTrue($report->scenarios()[5]->succeeded());
         self::assertSame('blocked', $report->resolutionStatus());
         self::assertSame([], $report->lockDiff()->packageChanges());
-        self::assertCount(3, $report->blockers());
+        self::assertCount(1, $report->blockers());
+        self::assertSame(['solver-1', 'solver-2', 'solver-3'], $report->blockers()[0]->evidence());
     }
 
     public function testPartialScenariosAreSkippedForPhpOnlyTargets(): void
@@ -488,7 +489,8 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('blocked', $report->resolutionStatus());
         self::assertCount(4, $report->scenarios());
         self::assertTrue($report->scenarios()[0]->succeeded());
-        self::assertCount(3, $report->blockers());
+        self::assertCount(1, $report->blockers());
+        self::assertSame(['solver-1', 'solver-2', 'solver-3'], $report->blockers()[0]->evidence());
     }
 
     public function testIdenticalProhibitsDiagnosticsAreReusedWithinEachAnalysis(): void
