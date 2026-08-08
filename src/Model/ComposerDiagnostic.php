@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Model;
 
 use PhpUpgradePreflight\Core\Support\OutputExcerpt;
+use PhpUpgradePreflight\Core\Support\SensitiveOutputRedactor;
 
 final class ComposerDiagnostic
 {
@@ -35,8 +36,8 @@ final class ComposerDiagnostic
         $this->constraint = $constraint;
         $this->command = array_values($command);
         $this->exitCode = $exitCode;
-        $this->stdout = $stdout;
-        $this->stderr = $stderr;
+        $this->stdout = SensitiveOutputRedactor::redact($stdout);
+        $this->stderr = SensitiveOutputRedactor::redact($stderr);
     }
 
     public function package(): string

@@ -12,6 +12,8 @@ final class OutputExcerpt
             throw new \InvalidArgumentException('Output excerpt length cannot be negative.');
         }
 
+        $value = SensitiveOutputRedactor::redact($value);
+
         if (strlen($value) <= $maxBytes) {
             return $value;
         }

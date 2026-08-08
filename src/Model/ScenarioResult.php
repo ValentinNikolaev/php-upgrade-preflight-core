@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Model;
 
 use PhpUpgradePreflight\Core\Support\OutputExcerpt;
+use PhpUpgradePreflight\Core\Support\SensitiveOutputRedactor;
 
 final class ScenarioResult
 {
@@ -98,8 +99,8 @@ final class ScenarioResult
 
         $this->scenario = $scenario;
         $this->exitCode = $exitCode;
-        $this->stdout = $stdout;
-        $this->stderr = $stderr;
+        $this->stdout = SensitiveOutputRedactor::redact($stdout);
+        $this->stderr = SensitiveOutputRedactor::redact($stderr);
         $this->lock = $lock;
         $this->tempPath = $tempPath;
         $this->failureType = $failureType;
