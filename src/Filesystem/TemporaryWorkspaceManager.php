@@ -66,7 +66,7 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
 
             foreach ($iterator as $item) {
                 if ($item->isLink()) {
-                    $this->unlink($item->getPathname());
+                    $this->unlink($item->getPathname(), true);
                 } elseif ($item->isDir()) {
                     $this->removeDirectory($item->getPathname());
                 } else {
@@ -82,7 +82,7 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
         }
     }
 
-    private function unlink(string $path): void
+    private function unlink(string $path, bool $allowDirectoryLinkFallback = false): void
     {
         if ($this->filesystem->unlink($path)) {
             return;
@@ -91,7 +91,7 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
         // PHP removes directory links with rmdir() on Windows, while Unix
         // removes them with unlink(). The fallback removes the link itself;
         // RecursiveDirectoryIterator does not follow directory links here.
-        if (is_dir($path) && $this->filesystem->removeDirectory($path)) {
+        if ($allowDirectoryLinkFallback && $this->filesystem->removeDirectory($path)) {
             return;
         }
 
