@@ -276,7 +276,9 @@ final class ControllableWorkspaceFilesystem implements WorkspaceFilesystem
         if ($this->emulateWindowsDirectoryLinkRemoval && is_link($path)) {
             $this->directoryLinksRemoved[] = $path;
 
-            return $this->native->unlink($path);
+            return DIRECTORY_SEPARATOR === '\\'
+                ? $this->native->removeDirectory($path)
+                : $this->native->unlink($path);
         }
 
         return !$this->failDirectoryRemoval && $this->native->removeDirectory($path);

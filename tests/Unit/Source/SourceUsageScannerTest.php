@@ -54,17 +54,18 @@ final class SourceUsageScannerTest extends TestCase
         self::assertSame([], $uncertainties);
     }
 
-    public function testProjectAliasIsResolvedBeforeSourceContainmentIsChecked(): void
+    public function testMultiHopProjectAliasIsResolvedBeforeSourceContainmentIsChecked(): void
     {
         $projectPath = $this->createProject("<?php\nVendor\\Package\\Client::send();\n");
-        $aliasPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'source-usage-alias-' . bin2hex(random_bytes(8));
+        $firstAliasPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'source-usage-alias-first-' . bin2hex(random_bytes(8));
+        $secondAliasPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'source-usage-alias-second-' . bin2hex(random_bytes(8));
 
         try {
-            if (!@symlink($projectPath, $aliasPath)) {
+            if (!@symlink($projectPath, $firstAliasPath) || !@symlink($firstAliasPath, $secondAliasPath)) {
                 self::markTestSkipped('Directory symlinks are not available in this environment.');
             }
 
-            $project = (new ProjectStateBuilder())->build($aliasPath);
+            $project = (new ProjectStateBuilder())->build($secondAliasPath);
             $evidence = new EvidenceLedger();
             $uncertainties = [];
             $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
@@ -74,7 +75,7 @@ final class SourceUsageScannerTest extends TestCase
             self::assertSame('Vendor\\Package\\Client', $usages[0]->symbol());
             self::assertSame([], $uncertainties);
         } finally {
-            (new Filesystem())->remove([$aliasPath, $projectPath]);
+            (new Filesystem())->remove([$secondAliasPath, $firstAliasPath, $projectPath]);
         }
     }
 

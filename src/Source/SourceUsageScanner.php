@@ -18,6 +18,8 @@ use Symfony\Component\Filesystem\Path;
 
 final class SourceUsageScanner
 {
+    private const MAX_CANONICAL_PATH_EXPANSIONS = 64;
+
     private Parser $parser;
 
     public function __construct(?Parser $parser = null)
@@ -268,9 +270,37 @@ final class SourceUsageScanner
 
     private function canonicalExistingPath(string $path): string
     {
-        $resolved = realpath($path);
+        $resolved = Path::canonicalize($path);
+        $seen = [];
 
-        return Path::canonicalize($resolved === false ? $path : $resolved);
+        for ($depth = 0; $depth < self::MAX_CANONICAL_PATH_EXPANSIONS; ++$depth) {
+            $comparison = DIRECTORY_SEPARATOR === '\\' ? strtolower($resolved) : $resolved;
+            if (isset($seen[$comparison])) {
+                throw new \RuntimeException(sprintf('Unable to canonicalize cyclic path "%s".', $path));
+            }
+
+            $seen[$comparison] = true;
+            $expanded = realpath($resolved);
+            if ($expanded === false) {
+                return $resolved;
+            }
+
+            $expanded = Path::canonicalize($expanded);
+            $isStable = DIRECTORY_SEPARATOR === '\\'
+                ? strcasecmp($resolved, $expanded) === 0
+                : $resolved === $expanded;
+            if ($isStable) {
+                return $expanded;
+            }
+
+            $resolved = $expanded;
+        }
+
+        throw new \RuntimeException(sprintf(
+            'Unable to canonicalize path "%s" after %d expansions.',
+            $path,
+            self::MAX_CANONICAL_PATH_EXPANSIONS
+        ));
     }
 
     private function isDefaultExcludedDirectory(string $scanRoot, string $path): bool
