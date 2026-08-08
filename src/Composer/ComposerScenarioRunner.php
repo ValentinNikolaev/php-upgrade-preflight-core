@@ -249,6 +249,8 @@ final class ComposerScenarioRunner
 
         $command = array_merge($command, self::COMPOSER_SAFETY_OPTIONS);
         $command[] = '--no-install';
+        $command[] = '--no-audit';
+        $command[] = '--no-progress';
         $command[] = '--no-interaction';
 
         return $command;

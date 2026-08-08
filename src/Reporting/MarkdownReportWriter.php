@@ -10,7 +10,12 @@ final class MarkdownReportWriter
 {
     public function render(UpgradeReport $report): string
     {
-        $canonical = $report->toArray();
+        return $this->renderCanonical($report->toArray());
+    }
+
+    /** @param array<string, mixed> $canonical */
+    public function renderCanonical(array $canonical): string
+    {
         /** @var array{schema_version:string, tool:array{name:string, version:string}} $metadata */
         $metadata = $canonical['metadata'];
         /** @var array{project_path:string, targets:list<array{package:string, constraint:string}>, from_php:?string, target_php:?string, source_paths:list<string>, frameworks:list<string>, format:string, output_path:?string} $request */

@@ -143,7 +143,10 @@ final class MarkdownReportWriterTest extends TestCase
             [new TestGuidance('project-test-suite', 'Run regression coverage.', 'composer test', 'required')]
         );
 
-        $markdown = (new MarkdownReportWriter())->render($report);
+        $writer = new MarkdownReportWriter();
+        $markdown = $writer->render($report);
+
+        self::assertSame($markdown, $writer->renderCanonical($report->toArray()));
 
         self::assertStringContainsString('## Composer Scenarios', $markdown);
         self::assertStringContainsString('Schema: `0.6`', $markdown);

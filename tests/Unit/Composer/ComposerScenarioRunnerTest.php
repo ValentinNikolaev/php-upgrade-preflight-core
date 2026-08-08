@@ -64,6 +64,8 @@ final class ComposerScenarioRunnerTest extends TestCase
             '--no-scripts',
             '--no-plugins',
             '--no-install',
+            '--no-audit',
+            '--no-progress',
             '--no-interaction',
         ], $result->command());
         self::assertSame(125, $result->durationMs());
@@ -156,6 +158,8 @@ final class ComposerScenarioRunnerTest extends TestCase
 
         self::assertIsArray($capturedCommand);
         self::assertContains('--no-install', $capturedCommand);
+        self::assertContains('--no-audit', $capturedCommand);
+        self::assertContains('--no-progress', $capturedCommand);
     }
 
     public function testItUpdatesAnExistingDevRequirementWithoutDuplicatingItInRequire(): void
@@ -519,6 +523,8 @@ final class ComposerScenarioRunnerTest extends TestCase
             '--no-scripts',
             '--no-plugins',
             '--no-install',
+            '--no-audit',
+            '--no-progress',
             '--no-interaction',
         ], $result->command());
         self::assertSame(125, $result->durationMs());
