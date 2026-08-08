@@ -15,6 +15,8 @@ use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PhpUpgradePreflight\Core\Reporting\JsonReportWriter;
 use PhpUpgradePreflight\Tests\Support\FixtureSnapshot;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\Process;
 
 final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
 {
@@ -135,15 +137,14 @@ final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
 
     private function composerIsAvailable(): bool
     {
-        $process = proc_open(['composer', '--version'], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
-        if (!is_resource($process)) {
+        $composer = (new ExecutableFinder())->find('composer');
+        if ($composer === null) {
             return false;
         }
 
-        foreach ($pipes as $pipe) {
-            fclose($pipe);
-        }
+        $process = new Process([$composer, '--version']);
+        $process->run();
 
-        return proc_close($process) === 0;
+        return $process->isSuccessful();
     }
 }

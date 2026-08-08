@@ -108,6 +108,7 @@ final class SourceUsageScanner
     private function phpFiles(string $projectPath, array $paths, array &$uncertainties, bool $reportMissingPaths): array
     {
         $files = [];
+        $projectPath = $this->canonicalExistingPath($projectPath);
 
         foreach ($paths as $path) {
             if (trim($path) === '') {
@@ -115,7 +116,8 @@ final class SourceUsageScanner
                 continue;
             }
 
-            $fullPath = $projectPath . DIRECTORY_SEPARATOR . trim($path, '/\\');
+            $relativePath = trim(str_replace('\\', '/', trim($path)), '/');
+            $fullPath = Path::join($projectPath, $relativePath);
             $resolved = realpath($fullPath);
 
             if ($resolved === false) {
@@ -236,15 +238,25 @@ final class SourceUsageScanner
 
     private function relativePath(string $projectPath, string $file): string
     {
-        $prefix = rtrim($projectPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $projectPath = rtrim($this->canonicalExistingPath($projectPath), '/');
+        $file = Path::canonicalize($file);
+        $comparisonProjectPath = $projectPath;
+        $comparisonFile = $file;
 
-        return strpos($file, $prefix) === 0 ? substr($file, strlen($prefix)) : $file;
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $comparisonProjectPath = strtolower($comparisonProjectPath);
+            $comparisonFile = strtolower($comparisonFile);
+        }
+
+        $prefix = $comparisonProjectPath . '/';
+
+        return str_starts_with($comparisonFile, $prefix) ? substr($file, strlen($prefix)) : $file;
     }
 
     private function isWithinProject(string $projectPath, string $path): bool
     {
-        $projectPath = Path::canonicalize($projectPath);
-        $path = Path::canonicalize($path);
+        $projectPath = $this->canonicalExistingPath($projectPath);
+        $path = $this->canonicalExistingPath($path);
 
         if (DIRECTORY_SEPARATOR === '\\') {
             $projectPath = strtolower($projectPath);
@@ -252,6 +264,13 @@ final class SourceUsageScanner
         }
 
         return $path === $projectPath || str_starts_with($path, rtrim($projectPath, '/') . '/');
+    }
+
+    private function canonicalExistingPath(string $path): string
+    {
+        $resolved = realpath($path);
+
+        return Path::canonicalize($resolved === false ? $path : $resolved);
     }
 
     private function isDefaultExcludedDirectory(string $scanRoot, string $path): bool

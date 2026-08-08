@@ -84,7 +84,18 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
 
     private function unlink(string $path): void
     {
-        if (!$this->filesystem->unlink($path) && (is_file($path) || is_link($path))) {
+        if ($this->filesystem->unlink($path)) {
+            return;
+        }
+
+        // PHP removes directory links with rmdir() on Windows, while Unix
+        // removes them with unlink(). The fallback removes the link itself;
+        // RecursiveDirectoryIterator does not follow directory links here.
+        if (is_dir($path) && $this->filesystem->removeDirectory($path)) {
+            return;
+        }
+
+        if (is_file($path) || is_link($path) || is_dir($path)) {
             throw new \RuntimeException(sprintf('Unable to remove temporary workspace file "%s".', $path));
         }
     }

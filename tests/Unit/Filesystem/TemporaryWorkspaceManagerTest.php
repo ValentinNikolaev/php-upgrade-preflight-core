@@ -56,6 +56,35 @@ final class TemporaryWorkspaceManagerTest extends TestCase
         }
     }
 
+    public function testItFallsBackToDirectoryRemovalForDirectoryLinks(): void
+    {
+        $fixturePath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $externalPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-link-target-' . bin2hex(random_bytes(8));
+        $filesystem = new ControllableWorkspaceFilesystem();
+        $filesystem->failLinkUnlink = true;
+        $filesystem->emulateWindowsDirectoryLinkRemoval = true;
+        $workspaces = new TemporaryWorkspaceManager($filesystem);
+        $workspacePath = $workspaces->createFromProject($fixturePath);
+        mkdir($externalPath, 0700, true);
+        file_put_contents($externalPath . DIRECTORY_SEPARATOR . 'marker.txt', 'preserve');
+        mkdir($workspacePath . DIRECTORY_SEPARATOR . 'vendor', 0700, true);
+        $linkPath = $workspacePath . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'dependency';
+
+        try {
+            if (!@symlink($externalPath, $linkPath)) {
+                self::markTestSkipped('Directory symlinks are not available in this environment.');
+            }
+
+            $workspaces->remove($workspacePath);
+
+            self::assertDirectoryDoesNotExist($workspacePath);
+            self::assertFileExists($externalPath . DIRECTORY_SEPARATOR . 'marker.txt');
+            self::assertSame([$linkPath], $filesystem->directoryLinksRemoved);
+        } finally {
+            (new Filesystem())->remove([$workspacePath, $externalPath]);
+        }
+    }
+
     public function testFailedInitializationRemovesThePartialWorkspace(): void
     {
         $projectPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'workspace-source-' . bin2hex(random_bytes(8));
@@ -170,10 +199,14 @@ final class ControllableWorkspaceFilesystem implements WorkspaceFilesystem
 {
     public bool $failDirectoryCreation = false;
     public bool $failDirectoryRemoval = false;
+    public bool $failLinkUnlink = false;
+    public bool $emulateWindowsDirectoryLinkRemoval = false;
     public ?string $copyFailureBasename = null;
     public ?string $createdDirectory = null;
     /** @var list<string> */
     public array $copiedBasenames = [];
+    /** @var list<string> */
+    public array $directoryLinksRemoved = [];
     private NativeWorkspaceFilesystem $native;
 
     public function __construct()
@@ -200,11 +233,21 @@ final class ControllableWorkspaceFilesystem implements WorkspaceFilesystem
 
     public function unlink(string $path): bool
     {
+        if ($this->failLinkUnlink && is_link($path) && is_dir($path)) {
+            return false;
+        }
+
         return $this->native->unlink($path);
     }
 
     public function removeDirectory(string $path): bool
     {
+        if ($this->emulateWindowsDirectoryLinkRemoval && is_link($path) && is_dir($path)) {
+            $this->directoryLinksRemoved[] = $path;
+
+            return $this->native->unlink($path);
+        }
+
         return !$this->failDirectoryRemoval && $this->native->removeDirectory($path);
     }
 }

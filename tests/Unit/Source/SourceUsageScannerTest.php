@@ -54,6 +54,52 @@ final class SourceUsageScannerTest extends TestCase
         self::assertSame([], $uncertainties);
     }
 
+    public function testProjectAliasIsResolvedBeforeSourceContainmentIsChecked(): void
+    {
+        $projectPath = $this->createProject("<?php\nVendor\\Package\\Client::send();\n");
+        $aliasPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'source-usage-alias-' . bin2hex(random_bytes(8));
+
+        try {
+            if (!@symlink($projectPath, $aliasPath)) {
+                self::markTestSkipped('Directory symlinks are not available in this environment.');
+            }
+
+            $project = (new ProjectStateBuilder())->build($aliasPath);
+            $evidence = new EvidenceLedger();
+            $uncertainties = [];
+            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
+
+            self::assertCount(1, $usages);
+            self::assertSame('src/Example.php', $usages[0]->file());
+            self::assertSame('Vendor\\Package\\Client', $usages[0]->symbol());
+            self::assertSame([], $uncertainties);
+        } finally {
+            (new Filesystem())->remove([$aliasPath, $projectPath]);
+        }
+    }
+
+    public function testBackslashSeparatedSourcePathIsJoinedPortably(): void
+    {
+        $projectPath = $this->createProject("<?php\n");
+        $nestedPath = $projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'nested';
+        mkdir($nestedPath, 0700, true);
+        file_put_contents($nestedPath . DIRECTORY_SEPARATOR . 'Portable.php', "<?php\nVendor\\Package\\Portable::run();\n");
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $evidence = new EvidenceLedger();
+            $uncertainties = [];
+            $usages = (new SourceUsageScanner())->scan($project, ['src\\nested'], $evidence, $uncertainties, true);
+
+            self::assertCount(1, $usages);
+            self::assertSame('src/nested/Portable.php', $usages[0]->file());
+            self::assertSame('Vendor\\Package\\Portable', $usages[0]->symbol());
+            self::assertSame([], $uncertainties);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
     public function testAstExtractionClassifiesSupportedUsagesAndIgnoresNonCodeText(): void
     {
         $projectPath = $this->createProject(<<<'PHP'
@@ -166,22 +212,22 @@ PHP);
             $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
 
             self::assertCount(3, $usages);
-            self::assertSame('src' . DIRECTORY_SEPARATOR . 'Example.php', $usages[0]->file());
+            self::assertSame('src/Example.php', $usages[0]->file());
             self::assertSame('Vendor\Package\Client', $usages[0]->symbol());
             self::assertSame('static_call', $usages[0]->usageType());
             self::assertSame(2, $usages[0]->line());
             self::assertSame(['source-1', 'source-2'], $usages[0]->evidence());
             self::assertSame('static_property_access', $usages[1]->usageType());
             self::assertSame(['source-3'], $usages[1]->evidence());
-            self::assertSame('src' . DIRECTORY_SEPARATOR . 'Other.php', $usages[2]->file());
+            self::assertSame('src/Other.php', $usages[2]->file());
             self::assertSame('static_call', $usages[2]->usageType());
             self::assertSame(['source-4'], $usages[2]->evidence());
             self::assertSame(
                 [
-                    ['src' . DIRECTORY_SEPARATOR . 'Example.php', 2, 'static_call'],
-                    ['src' . DIRECTORY_SEPARATOR . 'Example.php', 3, 'static_call'],
-                    ['src' . DIRECTORY_SEPARATOR . 'Example.php', 4, 'static_property_access'],
-                    ['src' . DIRECTORY_SEPARATOR . 'Other.php', 2, 'static_call'],
+                    ['src/Example.php', 2, 'static_call'],
+                    ['src/Example.php', 3, 'static_call'],
+                    ['src/Example.php', 4, 'static_property_access'],
+                    ['src/Other.php', 2, 'static_call'],
                 ],
                 array_map(
                     static fn (Evidence $item): array => [
@@ -217,7 +263,7 @@ PHP);
             self::assertSame('source-1', $evidence->all()[0]->id());
             self::assertSame(Evidence::E3_PROJECT_SOURCE, $evidence->all()[0]->evidenceClass());
             self::assertSame('high', $evidence->all()[0]->confidence());
-            self::assertSame('src' . DIRECTORY_SEPARATOR . 'Example.php', $evidence->all()[0]->context()['file']);
+            self::assertSame('src/Example.php', $evidence->all()[0]->context()['file']);
             self::assertSame(2, $evidence->all()[0]->context()['line']);
             self::assertSame('nikic/php-parser', $evidence->all()[0]->context()['parser']);
             self::assertSame('parse_error', $evidence->all()[0]->context()['failure_type']);
@@ -353,26 +399,26 @@ PHP,
                 $usages
             );
 
-            self::assertContains(['src' . DIRECTORY_SEPARATOR . 'Example.php', 'services.mailgun.domain', 'config_reference'], $usageTriples);
-            self::assertContains(['src' . DIRECTORY_SEPARATOR . 'Example.php', 'services.mailgun.secret', 'config_reference'], $usageTriples);
-            self::assertContains(['src' . DIRECTORY_SEPARATOR . 'Example.php', 'cache.default', 'config_reference'], $usageTriples);
-            self::assertContains(['src' . DIRECTORY_SEPARATOR . 'Example.php', 'app.timezone', 'config_reference'], $usageTriples);
-            self::assertNotContains(['src' . DIRECTORY_SEPARATOR . 'Example.php', 'dynamicKey', 'config_reference'], $usageTriples);
-            self::assertContains(['config' . DIRECTORY_SEPARATOR . 'app.php', 'Vendor\Package\PackageServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['config' . DIRECTORY_SEPARATOR . 'app.php', 'Vendor\Package\Facades\Package', 'facade_alias'], $usageTriples);
-            self::assertContains(['config' . DIRECTORY_SEPARATOR . 'app.php', 'Vendor\Package\Facades\Legacy', 'facade_alias'], $usageTriples);
-            self::assertContains(['bootstrap' . DIRECTORY_SEPARATOR . 'providers.php', 'App\Providers\BootstrapServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Providers' . DIRECTORY_SEPARATOR . 'AppServiceProvider.php', 'App\Providers\AppServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Console' . DIRECTORY_SEPARATOR . 'Kernel.php', 'Vendor\Package\RuntimeServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Http' . DIRECTORY_SEPARATOR . 'Kernel.php', 'App\Http\Middleware\TrustHosts', 'middleware_reference'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Http' . DIRECTORY_SEPARATOR . 'Kernel.php', 'App\Http\Middleware\EncryptCookies', 'middleware_reference'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Http' . DIRECTORY_SEPARATOR . 'Kernel.php', 'App\Http\Middleware\Authenticate', 'middleware_reference'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Console' . DIRECTORY_SEPARATOR . 'Kernel.php', 'App\Console\Commands\RebuildIndex', 'console_command'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Console' . DIRECTORY_SEPARATOR . 'Kernel.php', 'App\Console\Commands\WarmCache', 'console_command'], $usageTriples);
-            self::assertContains(['app' . DIRECTORY_SEPARATOR . 'Console' . DIRECTORY_SEPARATOR . 'Commands' . DIRECTORY_SEPARATOR . 'RebuildIndex.php', 'App\Console\Commands\RebuildIndex', 'console_command'], $usageTriples);
-            self::assertContains(['tests' . DIRECTORY_SEPARATOR . 'ExampleTest.php', 'App\Contracts\Gateway', 'test_double'], $usageTriples);
-            self::assertContains(['tests' . DIRECTORY_SEPARATOR . 'ExampleTest.php', 'App\Services\Mailer', 'test_double'], $usageTriples);
-            self::assertContains(['tests' . DIRECTORY_SEPARATOR . 'ExampleTest.php', 'App\Services\LegacyClient', 'test_double'], $usageTriples);
+            self::assertContains(['src/Example.php', 'services.mailgun.domain', 'config_reference'], $usageTriples);
+            self::assertContains(['src/Example.php', 'services.mailgun.secret', 'config_reference'], $usageTriples);
+            self::assertContains(['src/Example.php', 'cache.default', 'config_reference'], $usageTriples);
+            self::assertContains(['src/Example.php', 'app.timezone', 'config_reference'], $usageTriples);
+            self::assertNotContains(['src/Example.php', 'dynamicKey', 'config_reference'], $usageTriples);
+            self::assertContains(['config/app.php', 'Vendor\Package\PackageServiceProvider', 'service_provider'], $usageTriples);
+            self::assertContains(['config/app.php', 'Vendor\Package\Facades\Package', 'facade_alias'], $usageTriples);
+            self::assertContains(['config/app.php', 'Vendor\Package\Facades\Legacy', 'facade_alias'], $usageTriples);
+            self::assertContains(['bootstrap/providers.php', 'App\Providers\BootstrapServiceProvider', 'service_provider'], $usageTriples);
+            self::assertContains(['app/Providers/AppServiceProvider.php', 'App\Providers\AppServiceProvider', 'service_provider'], $usageTriples);
+            self::assertContains(['app/Console/Kernel.php', 'Vendor\Package\RuntimeServiceProvider', 'service_provider'], $usageTriples);
+            self::assertContains(['app/Http/Kernel.php', 'App\Http\Middleware\TrustHosts', 'middleware_reference'], $usageTriples);
+            self::assertContains(['app/Http/Kernel.php', 'App\Http\Middleware\EncryptCookies', 'middleware_reference'], $usageTriples);
+            self::assertContains(['app/Http/Kernel.php', 'App\Http\Middleware\Authenticate', 'middleware_reference'], $usageTriples);
+            self::assertContains(['app/Console/Kernel.php', 'App\Console\Commands\RebuildIndex', 'console_command'], $usageTriples);
+            self::assertContains(['app/Console/Kernel.php', 'App\Console\Commands\WarmCache', 'console_command'], $usageTriples);
+            self::assertContains(['app/Console/Commands/RebuildIndex.php', 'App\Console\Commands\RebuildIndex', 'console_command'], $usageTriples);
+            self::assertContains(['tests/ExampleTest.php', 'App\Contracts\Gateway', 'test_double'], $usageTriples);
+            self::assertContains(['tests/ExampleTest.php', 'App\Services\Mailer', 'test_double'], $usageTriples);
+            self::assertContains(['tests/ExampleTest.php', 'App\Services\LegacyClient', 'test_double'], $usageTriples);
             self::assertSame([], $uncertainties);
 
             $evidenceById = [];
