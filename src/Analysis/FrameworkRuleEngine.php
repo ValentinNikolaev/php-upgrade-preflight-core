@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Framework\FrameworkTransitionProvider;
 use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\FrameworkGuidance;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
@@ -82,7 +84,44 @@ final class FrameworkRuleEngine
 
     /**
      * @param list<FrameworkIntegration> $frameworks
+     * @return list<FrameworkGuidance>
+     */
+    public function assessTransitions(
+        array $frameworks,
+        ProjectState $project,
+        UpgradeRequest $request,
+        EvidenceLedger $evidence
+    ): array {
+        $guidance = [];
+
+        foreach ($frameworks as $framework) {
+            if ($framework instanceof FrameworkTransitionProvider) {
+                $assessment = $framework->assessTransition($project, $request, $evidence);
+                if ($assessment !== null) {
+                    $guidance[] = $assessment;
+                }
+            }
+        }
+
+        usort($guidance, static function (FrameworkGuidance $left, FrameworkGuidance $right): int {
+            return [
+                $left->framework(),
+                $left->sourceMajor() ?? PHP_INT_MAX,
+                $left->targetMajor() ?? PHP_INT_MAX,
+            ] <=> [
+                $right->framework(),
+                $right->sourceMajor() ?? PHP_INT_MAX,
+                $right->targetMajor() ?? PHP_INT_MAX,
+            ];
+        });
+
+        return $guidance;
+    }
+
+    /**
+     * @param list<FrameworkIntegration> $frameworks
      * @param list<SourceUsage> $sourceUsages
+     * @param list<FrameworkGuidance> $guidance
      * @return list<CompatibilityFinding>
      */
     public function evaluate(
@@ -90,15 +129,23 @@ final class FrameworkRuleEngine
         ProjectState $project,
         UpgradeRequest $request,
         EvidenceLedger $evidence,
-        array $sourceUsages = []
+        array $sourceUsages = [],
+        array $guidance = []
     ): array {
         $findings = [];
+        $hopReferences = [];
+        foreach ($guidance as $assessment) {
+            $hopReferences[$assessment->framework()] = $assessment->supportedHopReferences();
+        }
 
         foreach ($frameworks as $framework) {
             foreach ($framework->rules() as $rule) {
                 $finding = $rule->evaluate($project, $request, $evidence, $sourceUsages);
                 if ($finding !== null) {
-                    $findings[] = $finding;
+                    $references = $hopReferences[strtolower($finding->framework())] ?? [];
+                    $findings[] = $finding->appliesToHops() === [] && count($references) === 1
+                        ? $finding->withAppliesToHops($references)
+                        : $finding;
                 }
             }
         }

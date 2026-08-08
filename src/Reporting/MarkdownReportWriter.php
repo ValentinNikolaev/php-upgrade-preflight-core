@@ -22,6 +22,8 @@ final class MarkdownReportWriter
         $request = $canonical['request_summary'];
         /** @var array{path:string, platform_php:?string, root_requirements:array<string, string>|\stdClass, locked_packages:int} $project */
         $project = $canonical['project_state'];
+        /** @var array{analyzer:array{php_version:string, provenance:string}, current_php:array{version:?string, provenance:string}, target_php:array{version:?string, provenance:string}, extensions:array{provenance:string, explicitly_modeled:bool, completeness:string, unmodeled_provenance:?string, assumptions:list<array{name:string, state:string, version:?string, provenance:string}>}} $platform */
+        $platform = $canonical['platform'];
         /** @var array{status:string, scenarios:list<array<string, mixed>>} $resolution */
         $resolution = $canonical['resolution'];
 
@@ -52,6 +54,40 @@ final class MarkdownReportWriter
             foreach ($request['targets'] as $target) {
                 $lines[] = sprintf('  - %s: %s', $this->code($target['package']), $this->code($target['constraint']));
             }
+        }
+
+        $lines[] = '';
+        $lines[] = '## Platform Provenance';
+        $lines[] = sprintf(
+            '- Analyzer PHP: %s (provenance: %s)',
+            $this->code($platform['analyzer']['php_version']),
+            $this->code($platform['analyzer']['provenance'])
+        );
+        $lines[] = sprintf(
+            '- Current project PHP: %s (provenance: %s)',
+            $this->code($platform['current_php']['version'] ?? 'unknown'),
+            $this->code($platform['current_php']['provenance'])
+        );
+        $lines[] = sprintf(
+            '- Target PHP: %s (provenance: %s)',
+            $this->code($platform['target_php']['version'] ?? 'unknown'),
+            $this->code($platform['target_php']['provenance'])
+        );
+        $lines[] = sprintf(
+            '- Extensions: provenance %s; explicitly modeled: %s; completeness: %s; unmodeled values: %s',
+            $this->code($platform['extensions']['provenance']),
+            $platform['extensions']['explicitly_modeled'] ? 'yes' : 'no',
+            $this->code($platform['extensions']['completeness']),
+            $this->code($platform['extensions']['unmodeled_provenance'] ?? 'none')
+        );
+        foreach ($platform['extensions']['assumptions'] as $assumption) {
+            $lines[] = sprintf(
+                '  - %s: %s%s (provenance: %s)',
+                $this->code($assumption['name']),
+                $this->code($assumption['state']),
+                $assumption['version'] === null ? '' : ' at ' . $this->code($assumption['version']),
+                $this->code($assumption['provenance'])
+            );
         }
 
         $lines[] = '';
@@ -119,7 +155,7 @@ final class MarkdownReportWriter
             }
         }
 
-        /** @var array{package_changes:list<array<string, mixed>>, root_constraint_changes:list<array<string, mixed>>} $transition */
+        /** @var array{package_changes:list<array<string, mixed>>, root_constraint_changes:list<array<string, mixed>>, framework_guidance:list<array<string, mixed>>} $transition */
         $transition = $canonical['transition'];
         $lines[] = '';
         $lines[] = '## Package Changes';
@@ -153,6 +189,36 @@ final class MarkdownReportWriter
                     $this->code($change['from_dist_reference'] ?? '-'),
                     $this->code($change['to_dist_reference'] ?? '-')
                 );
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = '## Framework Transition Guidance';
+        if ($transition['framework_guidance'] === []) {
+            $lines[] = '- No framework transition assessment was produced.';
+        } else {
+            foreach ($transition['framework_guidance'] as $guidance) {
+                $lines[] = sprintf(
+                    '- %s: %s (%s -> %s; evidence: %s)',
+                    $this->code((string) $guidance['framework']),
+                    $this->code((string) $guidance['status']),
+                    $this->code($guidance['source_major'] === null ? 'unknown' : (string) $guidance['source_major']),
+                    $this->code($guidance['target_major'] === null ? 'unknown' : (string) $guidance['target_major']),
+                    $this->references($guidance['evidence'])
+                );
+                foreach ($guidance['hops'] as $hop) {
+                    $lines[] = sprintf(
+                        '  - hop %s -> %s: %s; rule pack %s (evidence: %s)',
+                        $this->code((string) $hop['from_major']),
+                        $this->code((string) $hop['to_major']),
+                        $this->code($hop['status']),
+                        $this->code($hop['rule_pack'] ?? 'none'),
+                        $this->references($hop['evidence'])
+                    );
+                }
+                foreach ($guidance['uncertainties'] as $uncertainty) {
+                    $lines[] = '  - uncertainty: ' . $this->singleLine($uncertainty);
+                }
             }
         }
 
@@ -215,14 +281,14 @@ final class MarkdownReportWriter
             }
         }
 
-        /** @var list<array{file:string, symbol:string, usage_type:string, line:?int, evidence:list<string>}> $sourceImpact */
-        $sourceImpact = $canonical['source_impact'];
+        /** @var list<array{file:string, symbol:string, usage_type:string, line:?int, evidence:list<string>}> $sourceInventory */
+        $sourceInventory = $canonical['source_inventory'];
         $lines[] = '';
-        $lines[] = '## Source Impact';
-        if ($sourceImpact === []) {
+        $lines[] = '## Source Inventory';
+        if ($sourceInventory === []) {
             $lines[] = '- None detected.';
         } else {
-            foreach ($sourceImpact as $usage) {
+            foreach ($sourceInventory as $usage) {
                 $location = $usage['line'] === null ? $usage['file'] : sprintf('%s:%d', $usage['file'], $usage['line']);
                 $lines[] = sprintf(
                     '- %s %s in %s (evidence: %s)',
@@ -234,7 +300,37 @@ final class MarkdownReportWriter
             }
         }
 
-        /** @var list<array{framework:string, severity:string, summary:string, evidence:list<string>}> $frameworkFindings */
+        /** @var list<array{affected_package:?string, ownership:string, relevance:string, reason:string, severity:string, occurrences:list<array{file:string, symbol:string, usage_type:string, line:?int, evidence:list<string>}>, evidence:list<string>}> $sourceImpact */
+        $sourceImpact = $canonical['source_impact'];
+        $lines[] = '';
+        $lines[] = '## Actionable Source Impact';
+        if ($sourceImpact === []) {
+            $lines[] = '- None detected.';
+        } else {
+            foreach ($sourceImpact as $finding) {
+                $lines[] = sprintf(
+                    '- %s impact for %s (%s ownership; %s): %s (evidence: %s)',
+                    $this->code($finding['severity']),
+                    $this->code($finding['affected_package'] ?? 'package unknown'),
+                    $this->code($finding['ownership']),
+                    $this->code($finding['relevance']),
+                    $this->singleLine($finding['reason']),
+                    $this->references($finding['evidence'])
+                );
+                foreach ($finding['occurrences'] as $usage) {
+                    $location = $usage['line'] === null ? $usage['file'] : sprintf('%s:%d', $usage['file'], $usage['line']);
+                    $lines[] = sprintf(
+                        '  - %s %s in %s (evidence: %s)',
+                        $this->code($usage['usage_type']),
+                        $this->code($usage['symbol']),
+                        $this->code($location),
+                        $this->references($usage['evidence'])
+                    );
+                }
+            }
+        }
+
+        /** @var list<array{framework:string, severity:string, summary:string, applies_to_hops:list<array{from_major:int, to_major:int}>, evidence:list<string>}> $frameworkFindings */
         $frameworkFindings = $canonical['framework_findings'];
         $lines[] = '';
         $lines[] = '## Framework Findings';
@@ -249,6 +345,12 @@ final class MarkdownReportWriter
                     $this->singleLine($finding['summary']),
                     $this->references($finding['evidence'])
                 );
+                if ($finding['applies_to_hops'] !== []) {
+                    $lines[] = '  - applies to hops: ' . implode(', ', array_map(
+                        fn (array $hop): string => $this->code($hop['from_major'] . ' -> ' . $hop['to_major']),
+                        $finding['applies_to_hops']
+                    ));
+                }
             }
         }
 

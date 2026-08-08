@@ -16,6 +16,8 @@ use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\FrameworkGuidance;
+use PhpUpgradePreflight\Core\Model\FrameworkHop;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\ProjectState;
@@ -34,20 +36,24 @@ use Symfony\Component\Filesystem\Filesystem;
 
 final class UpgradeReportSchemaTest extends TestCase
 {
-    public function testCanonicalV06ReportMatchesTheCommittedSnapshot(): void
+    public function testCanonicalV07ReportMatchesTheCommittedSnapshot(): void
     {
         $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         $actual = JsonSnapshotNormalizer::normalize(
             (new JsonReportWriter())->render($this->report($projectPath)),
             $projectPath
         );
-        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.6.json');
+        $snapshotPath = dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.7.json';
+        if (getenv('PHP_UPGRADE_PREFLIGHT_UPDATE_SNAPSHOTS') === '1') {
+            file_put_contents($snapshotPath, $actual);
+        }
+        $snapshot = file_get_contents($snapshotPath);
 
         self::assertIsString($snapshot);
         self::assertSame($snapshot, $actual);
     }
 
-    public function testCanonicalV06ReportConformsToThePublishedSchema(): void
+    public function testCanonicalV07ReportConformsToThePublishedSchema(): void
     {
         $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         $json = (new JsonReportWriter())->render($this->report($projectPath));
@@ -64,6 +70,22 @@ final class UpgradeReportSchemaTest extends TestCase
 
         self::assertSame(['laravel'], $decoded['request_summary']['frameworks']);
         $this->assertConformsToSchema($json);
+    }
+
+    public function testPartiallyModeledExtensionsExposeMixedHostProvenance(): void
+    {
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
+        $report = $this->report($projectPath, ['laravel'], true);
+        $canonical = $report->toArray();
+
+        self::assertSame('mixed', $canonical['platform']['extensions']['provenance']);
+        self::assertSame('partial', $canonical['platform']['extensions']['completeness']);
+        self::assertSame('analyzer_runtime', $canonical['platform']['extensions']['unmodeled_provenance']);
+        self::assertContains(
+            'Composer modeled only the listed extension assumptions; every unlisted extension still came from the analyzer runtime.',
+            $report->uncertainties()
+        );
+        $this->assertConformsToSchema((new JsonReportWriter())->render($report));
     }
 
     public function testStructuredProjectInputFailureConformsToThePublishedSchema(): void
@@ -88,14 +110,14 @@ final class UpgradeReportSchemaTest extends TestCase
 
     public function testPublishedSchemaAndRuntimeMetadataDescribeTheSameContractVersion(): void
     {
-        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.6.schema.json');
+        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.7.schema.json');
 
         self::assertIsString($contents);
         /** @var array<string, mixed> $schema */
         $schema = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('https://json-schema.org/draft/2020-12/schema', $schema['$schema']);
-        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.6', $schema['$id']);
+        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.7', $schema['$id']);
         self::assertSame(
             ReportMetadata::SCHEMA_VERSION,
             $schema['$defs']['metadata']['properties']['schema_version']['const']
@@ -126,6 +148,28 @@ final class UpgradeReportSchemaTest extends TestCase
             array_keys($this->report($projectPath)->toArray()['blockers'][0]),
             $schema['$defs']['blocker']['required']
         );
+        self::assertSame(
+            array_keys($this->report($projectPath)->toArray()['source_impact'][0]),
+            $schema['$defs']['sourceImpactFinding']['required']
+        );
+        self::assertSame(
+            array_keys($this->report($projectPath)->toArray()['framework_findings'][0]),
+            $schema['$defs']['frameworkFinding']['required']
+        );
+        self::assertSame(1, $schema['$defs']['frameworkFinding']['properties']['applies_to_hops']['minItems']);
+        self::assertSame(
+            array_keys($this->report($projectPath)->toArray()['platform']['extensions']),
+            $schema['$defs']['platformProvenance']['properties']['extensions']['required']
+        );
+        self::assertNotSame([], $this->report($projectPath)->toArray()['transition']['framework_guidance']);
+    }
+
+    public function testCanonicalV06SnapshotStillConformsToThePreservedSchema(): void
+    {
+        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.6.json');
+
+        self::assertIsString($snapshot);
+        $this->assertConformsToSchema($snapshot, '0.6');
     }
 
     public function testPublishedV05BlockerContractRemainsUnchanged(): void
@@ -242,7 +286,7 @@ final class UpgradeReportSchemaTest extends TestCase
     }
 
     /** @param list<string> $frameworks */
-    private function report(string $projectPath, array $frameworks = ['laravel']): UpgradeReport
+    private function report(string $projectPath, array $frameworks = ['laravel'], bool $partialExtensions = false): UpgradeReport
     {
         $request = new UpgradeRequest(
             $projectPath,
@@ -255,6 +299,10 @@ final class UpgradeReportSchemaTest extends TestCase
             ['app'],
             $frameworks
         );
+        $platform = ['php' => '7.4.33'];
+        if ($partialExtensions) {
+            $platform['ext-json'] = '8.0.0';
+        }
         $project = new ProjectState(
             $projectPath,
             new ComposerJson([
@@ -266,9 +314,7 @@ final class UpgradeReportSchemaTest extends TestCase
                     'phpunit/phpunit' => '^8.5',
                 ],
                 'config' => [
-                    'platform' => [
-                        'php' => '7.4.33',
-                    ],
+                    'platform' => $platform,
                 ],
                 'scripts' => [
                     'test' => 'phpunit',
@@ -321,6 +367,9 @@ final class UpgradeReportSchemaTest extends TestCase
                 'package' => 'legacy/package',
                 'locked_version' => '1.0.0',
             ]),
+            new Evidence('transition-1', Evidence::E4_MAINTAINER_DOCUMENTATION, 'Laravel 7 to 9 guidance is available.', 'medium', [
+                'source' => 'https://laravel.com/docs/9.x/upgrade',
+            ]),
         ];
 
         return (new ReportAssembler())->assemble(
@@ -361,7 +410,13 @@ final class UpgradeReportSchemaTest extends TestCase
                 new SourceUsage('app/Example.php', 'Legacy\\Facade', 'static_call', ['source-1'], 17),
             ],
             [
-                new CompatibilityFinding('laravel', 'medium', 'Legacy package requires review.', ['package-1']),
+                new CompatibilityFinding(
+                    'laravel',
+                    'medium',
+                    'Legacy package requires review.',
+                    ['package-1', 'source-1'],
+                    [['from_major' => 7, 'to_major' => 9]]
+                ),
             ],
             new RiskSummary('high', [
                 'A root dependency constraint conflicts with the requested target.',
@@ -378,11 +433,20 @@ final class UpgradeReportSchemaTest extends TestCase
                 ['The project test suite is available and representative.']
             ),
             [],
-            new EvidenceLedger($evidence)
+            new EvidenceLedger($evidence),
+            [new FrameworkGuidance(
+                'laravel',
+                7,
+                9,
+                FrameworkGuidance::SUPPORTED,
+                [new FrameworkHop(7, 9, FrameworkHop::SUPPORTED, 'laravel-7-to-9-direct', ['transition-1'])],
+                [],
+                ['transition-1']
+            )]
         );
     }
 
-    private function assertConformsToSchema(string $json, string $schemaVersion = '0.6'): void
+    private function assertConformsToSchema(string $json, string $schemaVersion = '0.7'): void
     {
         $schemaContents = file_get_contents(sprintf(
             '%s/resources/schema/upgrade-report-v%s.schema.json',

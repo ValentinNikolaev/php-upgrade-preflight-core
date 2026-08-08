@@ -11,6 +11,8 @@ use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
+use PhpUpgradePreflight\Core\Model\FrameworkGuidance;
+use PhpUpgradePreflight\Core\Model\FrameworkHop;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\PlanStage;
@@ -121,7 +123,13 @@ final class MarkdownReportWriterTest extends TestCase
                 ['Upgrade or replace `fixture/blocker`.']
             )],
             [new SourceUsage('src/Example.php', 'Vendor\\Package\\Client', 'static_call', ['source-1'], 12)],
-            [new CompatibilityFinding('laravel', 'warning', 'Framework migration guidance requires review.', ['source-1'])],
+            [new CompatibilityFinding(
+                'laravel',
+                'warning',
+                'Framework migration guidance requires review.',
+                ['source-1'],
+                [['from_major' => 7, 'to_major' => 9]]
+            )],
             new RiskSummary('low', ['A framework finding requires review.']),
             new EffortEstimate(
                 [1, 2],
@@ -140,7 +148,17 @@ final class MarkdownReportWriterTest extends TestCase
                 ['source-1']
             )],
             [new PlanStage('dependencies', 'Resolve the dependency transition.', ['Regenerate the lock file.'], ['source-1'])],
-            [new TestGuidance('project-test-suite', 'Run regression coverage.', 'composer test', 'required')]
+            [new TestGuidance('project-test-suite', 'Run regression coverage.', 'composer test', 'required')],
+            [],
+            [new FrameworkGuidance(
+                'laravel',
+                7,
+                9,
+                FrameworkGuidance::SUPPORTED,
+                [new FrameworkHop(7, 9, FrameworkHop::SUPPORTED, 'laravel-7-to-9-direct', ['source-1'])],
+                [],
+                ['source-1']
+            )]
         );
 
         $writer = new MarkdownReportWriter();
@@ -149,8 +167,8 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertSame($markdown, $writer->renderCanonical($report->toArray()));
 
         self::assertStringContainsString('## Composer Scenarios', $markdown);
-        self::assertStringContainsString('Schema: `0.6`', $markdown);
-        self::assertStringContainsString('Tool: `php-upgrade-preflight 0.1.0`', $markdown);
+        self::assertStringContainsString('Schema: `0.7`', $markdown);
+        self::assertStringContainsString('Tool: `php-upgrade-preflight 0.2.0-dev`', $markdown);
         self::assertStringContainsString('## Analysis Request', $markdown);
         self::assertStringContainsString('Current PHP: `7.4`', $markdown);
         self::assertStringContainsString('Target PHP: `8.2.0`', $markdown);
@@ -160,6 +178,7 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('Output destination: `upgrade-report.md`', $markdown);
         self::assertStringContainsString('## Project State', $markdown);
         self::assertStringContainsString('Composer platform PHP: `7.4.33`', $markdown);
+        self::assertStringContainsString('completeness: `none`', $markdown);
         self::assertStringContainsString('`fixture/dependency`: `^1.0`', $markdown);
         self::assertStringContainsString('Composer executable unavailable.', $markdown);
         self::assertStringContainsString($longStdoutLine, $markdown);
@@ -183,9 +202,12 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('`vendor/transitive`: added `-` -> `1.0.0` (transitive dependency)', $markdown);
         self::assertStringContainsString('source reference: `source-before` -> `source-after`', $markdown);
         self::assertStringContainsString('dist reference: `dist-before` -> `dist-after`', $markdown);
-        self::assertStringContainsString('## Source Impact', $markdown);
+        self::assertStringContainsString('## Source Inventory', $markdown);
+        self::assertStringContainsString('## Actionable Source Impact', $markdown);
         self::assertStringContainsString('src/Example.php:12', $markdown);
         self::assertStringContainsString('## Framework Findings', $markdown);
+        self::assertStringContainsString('## Framework Transition Guidance', $markdown);
+        self::assertStringContainsString('hop `7` -> `9`: `supported`', $markdown);
         self::assertStringContainsString('`laravel` `warning`', $markdown);
         self::assertStringContainsString('Framework migration guidance requires review.', $markdown);
         self::assertStringContainsString('## Root Constraint Changes', $markdown);

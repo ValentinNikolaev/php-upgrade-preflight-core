@@ -8,6 +8,7 @@ use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\FrameworkGuidance;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
@@ -19,10 +20,14 @@ use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 final class ReportAssembler
 {
     private ReportSectionBuilder $sectionBuilder;
+    private SourceImpactBuilder $sourceImpactBuilder;
 
-    public function __construct(?ReportSectionBuilder $sectionBuilder = null)
-    {
+    public function __construct(
+        ?ReportSectionBuilder $sectionBuilder = null,
+        ?SourceImpactBuilder $sourceImpactBuilder = null
+    ) {
         $this->sectionBuilder = $sectionBuilder ?? new ReportSectionBuilder();
+        $this->sourceImpactBuilder = $sourceImpactBuilder ?? new SourceImpactBuilder();
     }
 
     /**
@@ -31,6 +36,7 @@ final class ReportAssembler
      * @param list<SourceUsage> $sourceImpact
      * @param list<CompatibilityFinding> $frameworkFindings
      * @param list<string> $sourceUncertainties
+     * @param list<FrameworkGuidance> $frameworkGuidance
      */
     public function assemble(
         UpgradeRequest $request,
@@ -43,7 +49,8 @@ final class ReportAssembler
         RiskSummary $risk,
         EffortEstimate $effort,
         array $sourceUncertainties,
-        EvidenceLedger $evidence
+        EvidenceLedger $evidence,
+        array $frameworkGuidance = []
     ): UpgradeReport {
         $sections = $this->sectionBuilder->build(
             $request,
@@ -71,7 +78,9 @@ final class ReportAssembler
             $evidence->all(),
             $sections->rootConstraintChanges(),
             $sections->planStages(),
-            $sections->tests()
+            $sections->tests(),
+            $this->sourceImpactBuilder->build($sourceImpact, $frameworkFindings),
+            $frameworkGuidance
         );
     }
 }

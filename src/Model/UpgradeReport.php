@@ -9,6 +9,7 @@ final class UpgradeReport
     private ReportMetadata $metadata;
     private UpgradeRequest $request;
     private ProjectState $projectState;
+    private PlatformProvenance $platform;
     /** @var list<ScenarioResult> */
     private array $scenarios;
     private LockDiff $lockDiff;
@@ -16,6 +17,10 @@ final class UpgradeReport
     private array $blockers;
     /** @var list<SourceUsage> */
     private array $sourceImpact;
+    /** @var list<SourceImpactFinding> */
+    private array $actionableSourceImpact;
+    /** @var list<FrameworkGuidance> */
+    private array $frameworkGuidance;
     /** @var list<CompatibilityFinding> */
     private array $frameworkFindings;
     private RiskSummary $risk;
@@ -41,6 +46,8 @@ final class UpgradeReport
      * @param list<RootConstraintChange> $rootConstraintChanges
      * @param list<PlanStage> $planStages
      * @param list<TestGuidance> $tests
+     * @param list<SourceImpactFinding> $actionableSourceImpact
+     * @param list<FrameworkGuidance> $frameworkGuidance
      */
     public function __construct(
         UpgradeRequest $request,
@@ -56,23 +63,33 @@ final class UpgradeReport
         array $evidence,
         array $rootConstraintChanges = [],
         array $planStages = [],
-        array $tests = []
+        array $tests = [],
+        array $actionableSourceImpact = [],
+        array $frameworkGuidance = []
     ) {
         $this->metadata = new ReportMetadata();
         $this->request = $request;
         $this->projectState = $projectState;
+        $this->platform = new PlatformProvenance($request, $projectState);
         $this->scenarios = array_values($scenarios);
         $this->lockDiff = $lockDiff;
         $this->blockers = array_values($blockers);
         $this->sourceImpact = array_values($sourceImpact);
+        $this->actionableSourceImpact = array_values($actionableSourceImpact);
+        $this->frameworkGuidance = array_values($frameworkGuidance);
         $this->frameworkFindings = array_values($frameworkFindings);
         $this->risk = $risk;
         $this->effort = $effort;
         $this->rootConstraintChanges = array_values($rootConstraintChanges);
         $this->planStages = array_values($planStages);
         $this->tests = array_values($tests);
-        $this->uncertainties = array_values($uncertainties);
+        $this->uncertainties = array_values(array_unique(array_merge(
+            $uncertainties,
+            $this->platformUncertainties()
+        )));
         $this->evidence = array_values($evidence);
+
+        $this->validateFrameworkFindingScopes();
 
         $ledger = new EvidenceLedger($this->evidence);
         $ledger->validateReferences($this->evidenceReferences());
@@ -91,6 +108,11 @@ final class UpgradeReport
     public function projectState(): ProjectState
     {
         return $this->projectState;
+    }
+
+    public function platform(): PlatformProvenance
+    {
+        return $this->platform;
     }
 
     /** @return list<ScenarioResult> */
@@ -114,6 +136,24 @@ final class UpgradeReport
     public function sourceImpact(): array
     {
         return $this->sourceImpact;
+    }
+
+    /** @return list<SourceUsage> */
+    public function sourceInventory(): array
+    {
+        return $this->sourceImpact;
+    }
+
+    /** @return list<SourceImpactFinding> */
+    public function actionableSourceImpact(): array
+    {
+        return $this->actionableSourceImpact;
+    }
+
+    /** @return list<FrameworkGuidance> */
+    public function frameworkGuidance(): array
+    {
+        return $this->frameworkGuidance;
     }
 
     /** @return list<CompatibilityFinding> */
@@ -192,6 +232,7 @@ final class UpgradeReport
             'metadata' => $this->metadata->toArray(),
             'request_summary' => $this->request->toArray(),
             'project_state' => $this->projectState->toArray(),
+            'platform' => $this->platform->toArray(),
             'resolution' => [
                 'status' => $this->resolutionStatus(),
                 'scenarios' => array_map(static fn (ScenarioResult $scenario): array => $scenario->toArray(), $this->scenarios),
@@ -202,9 +243,17 @@ final class UpgradeReport
                     static fn (RootConstraintChange $change): array => $change->toArray(),
                     $this->rootConstraintChanges
                 ),
+                'framework_guidance' => array_map(
+                    static fn (FrameworkGuidance $guidance): array => $guidance->toArray(),
+                    $this->frameworkGuidance
+                ),
             ],
             'blockers' => array_map(static fn (Blocker $blocker): array => $blocker->toArray(), $this->blockers),
-            'source_impact' => array_map(static fn (SourceUsage $usage): array => $usage->toArray(), $this->sourceImpact),
+            'source_inventory' => array_map(static fn (SourceUsage $usage): array => $usage->toArray(), $this->sourceImpact),
+            'source_impact' => array_map(
+                static fn (SourceImpactFinding $finding): array => $finding->toArray(),
+                $this->actionableSourceImpact
+            ),
             'framework_findings' => array_map(static fn (CompatibilityFinding $finding): array => $finding->toArray(), $this->frameworkFindings),
             'plan' => [
                 'stages' => array_map(static fn (PlanStage $stage): array => $stage->toArray(), $this->planStages),
@@ -227,11 +276,30 @@ final class UpgradeReport
         }
 
         foreach ($this->sourceImpact as $index => $usage) {
-            $references = $this->appendFindingReferences($references, $usage->evidence(), sprintf('Source usage at index %d', $index));
+            $references = $this->appendFindingReferences($references, $usage->evidence(), sprintf('Source inventory item at index %d', $index));
+        }
+
+        foreach ($this->actionableSourceImpact as $index => $finding) {
+            $references = $this->appendFindingReferences($references, $finding->evidence(), sprintf('Source impact at index %d', $index));
         }
 
         foreach ($this->frameworkFindings as $index => $finding) {
             $references = $this->appendFindingReferences($references, $finding->evidence(), sprintf('Framework finding at index %d', $index));
+        }
+
+        foreach ($this->frameworkGuidance as $index => $guidance) {
+            $references = $this->appendFindingReferences(
+                $references,
+                $guidance->evidence(),
+                sprintf('Framework guidance at index %d', $index)
+            );
+            foreach ($guidance->hops() as $hopIndex => $hop) {
+                $references = $this->appendFindingReferences(
+                    $references,
+                    $hop->evidence(),
+                    sprintf('Framework guidance hop at index %d:%d', $index, $hopIndex)
+                );
+            }
         }
 
         foreach ($this->rootConstraintChanges as $index => $change) {
@@ -252,6 +320,46 @@ final class UpgradeReport
         }
 
         return $references;
+    }
+
+    /** @return list<string> */
+    private function platformUncertainties(): array
+    {
+        if ($this->scenarios === []) {
+            return [];
+        }
+
+        foreach ($this->scenarios as $scenario) {
+            if ($scenario->scenario()->name() !== 'project-input') {
+                return $this->platform->uncertainties();
+            }
+        }
+
+        return [];
+    }
+
+    private function validateFrameworkFindingScopes(): void
+    {
+        $supportedHops = [];
+        foreach ($this->frameworkGuidance as $guidance) {
+            foreach ($guidance->supportedHopReferences() as $hop) {
+                $supportedHops[$guidance->framework()][serialize($hop)] = true;
+            }
+        }
+
+        foreach ($this->frameworkFindings as $index => $finding) {
+            if ($finding->appliesToHops() === []) {
+                throw new \LogicException(sprintf('Framework finding at index %d must identify at least one applicable hop.', $index));
+            }
+            foreach ($finding->appliesToHops() as $hop) {
+                if (!isset($supportedHops[strtolower($finding->framework())][serialize($hop)])) {
+                    throw new \LogicException(sprintf(
+                        'Framework finding at index %d references a hop without supported framework guidance.',
+                        $index
+                    ));
+                }
+            }
+        }
     }
 
     /** @param list<string> $references @param list<string> $findingReferences @return list<string> */

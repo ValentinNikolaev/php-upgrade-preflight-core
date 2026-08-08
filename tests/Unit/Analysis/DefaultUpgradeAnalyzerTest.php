@@ -9,11 +9,14 @@ use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
 use PhpUpgradePreflight\Core\Framework\CompatibilityRule;
 use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Framework\FrameworkTransitionProvider;
 use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\FrameworkGuidance;
+use PhpUpgradePreflight\Core\Model\FrameworkHop;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
@@ -46,7 +49,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
             self::assertTrue($report->scenarios()[0]->isOperationalFailure());
             self::assertStringContainsString('Invalid JSON', $report->scenarios()[0]->stderr());
             self::assertSame([], $report->planStages());
-            self::assertSame('0.6', $report->metadata()->schemaVersion());
+            self::assertSame('0.7', $report->metadata()->schemaVersion());
         } finally {
             (new Filesystem())->remove($projectPath);
         }
@@ -308,7 +311,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
         /** @var array<string, mixed> $json */
         $json = json_decode((new JsonReportWriter())->render($report), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('0.6', $json['metadata']['schema_version']);
+        self::assertSame('0.7', $json['metadata']['schema_version']);
         self::assertTrue($json['transition']['package_changes'][0]['direct']);
         self::assertSame('source-2.0.0', $json['transition']['package_changes'][0]['to_source_reference']);
         self::assertSame('dist-2.0.0', $json['transition']['package_changes'][0]['to_dist_reference']);
@@ -463,7 +466,11 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertSame([], $report->blockers());
         self::assertSame('low', $report->risk()->level());
-        self::assertCount(6, $report->uncertainties());
+        self::assertCount(7, $report->uncertainties());
+        self::assertContains(
+            'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.',
+            $report->uncertainties()
+        );
         self::assertStringContainsString('"baseline-validation"', $report->uncertainties()[0]);
         self::assertStringContainsString('analysis-environment failure', $report->uncertainties()[0]);
     }
@@ -583,7 +590,11 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertCount(1, $report->blockers());
-        self::assertCount(5, $report->uncertainties());
+        self::assertCount(6, $report->uncertainties());
+        self::assertContains(
+            'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.',
+            $report->uncertainties()
+        );
     }
 
     public function testUnavailableRequestedFrameworkIsRejected(): void
@@ -619,8 +630,10 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertCount(1, $report->frameworkFindings());
         self::assertSame('Detected framework requires review.', $report->frameworkFindings()[0]->summary());
         self::assertSame(['framework-1'], $report->frameworkFindings()[0]->evidence());
-        self::assertCount(3, $report->evidence());
-        self::assertSame('framework-1', $report->evidence()[0]->id());
+        self::assertSame([['from_major' => 1, 'to_major' => 2]], $report->frameworkFindings()[0]->appliesToHops());
+        self::assertCount(1, $report->frameworkGuidance());
+        self::assertCount(4, $report->evidence());
+        self::assertSame('fixture-transition-1', $report->evidence()[0]->id());
         self::assertSame(Evidence::E2_PACKAGE_METADATA, $report->evidence()[0]->evidenceClass());
         self::assertSame(['framework-1'], $report->toArray()['framework_findings'][0]['evidence']);
     }
@@ -638,7 +651,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
     }
 }
 
-final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration, PackageFamilyClassifier
+final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration, FrameworkTransitionProvider, PackageFamilyClassifier
 {
     public int $detectionCount = 0;
 
@@ -667,6 +680,28 @@ final class AnalyzerFixtureFrameworkIntegration implements FrameworkIntegration,
     public function packageFamilies(string $packageName): array
     {
         return strpos($packageName, 'fixture/') === 0 ? ['fixture'] : [];
+    }
+
+    public function assessTransition(
+        ProjectState $project,
+        UpgradeRequest $request,
+        EvidenceLedger $evidence
+    ): FrameworkGuidance {
+        $evidenceId = $evidence->add(
+            'fixture-transition',
+            Evidence::E2_PACKAGE_METADATA,
+            'Fixture framework transition metadata matched.'
+        )->id();
+
+        return new FrameworkGuidance(
+            'fixture',
+            1,
+            2,
+            FrameworkGuidance::SUPPORTED,
+            [new FrameworkHop(1, 2, FrameworkHop::SUPPORTED, 'fixture-1-to-2', [$evidenceId])],
+            [],
+            [$evidenceId]
+        );
     }
 }
 

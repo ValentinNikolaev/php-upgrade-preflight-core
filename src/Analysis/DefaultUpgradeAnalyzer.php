@@ -112,12 +112,19 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $sourceUncertainties,
             $request->sourcePaths() !== []
         );
+        $frameworkGuidance = $this->frameworkRuleEngine->assessTransitions(
+            $activeFrameworks,
+            $project,
+            $request,
+            $evidence
+        );
         $frameworkFindings = $this->frameworkRuleEngine->evaluate(
             $activeFrameworks,
             $project,
             $request,
             $evidence,
-            $sourceImpact
+            $sourceImpact,
+            $frameworkGuidance
         );
         $risk = $this->riskAndEffortEstimator->estimateRisk($blockers, $lockDiff->packageChanges(), $frameworkFindings);
         $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges(), $sourceImpact, $frameworkFindings);
@@ -133,7 +140,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $risk,
             $effort,
             $sourceUncertainties,
-            $evidence
+            $evidence,
+            $frameworkGuidance
         );
     }
 

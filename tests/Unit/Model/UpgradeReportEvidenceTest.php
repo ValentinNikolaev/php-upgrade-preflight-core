@@ -7,6 +7,7 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Model;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
+use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\LockDiff;
@@ -89,19 +90,36 @@ final class UpgradeReportEvidenceTest extends TestCase
         self::assertSame('blocked', $blockedReport->resolutionStatus());
     }
 
+    public function testItRejectsAFrameworkFindingWithoutAnAssessedHop(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('must identify at least one applicable hop');
+
+        $this->report(
+            [],
+            [new Evidence('framework-1', Evidence::E2_PACKAGE_METADATA, 'Framework metadata matched.')],
+            [],
+            [],
+            [],
+            [new CompatibilityFinding('fixture', 'medium', 'Review the framework.', ['framework-1'])]
+        );
+    }
+
     /**
      * @param list<Blocker> $blockers
      * @param list<Evidence> $evidence
      * @param list<string> $uncertainties
      * @param list<RootConstraintChange> $rootConstraintChanges
      * @param list<PlanStage> $planStages
+     * @param list<CompatibilityFinding> $frameworkFindings
      */
     private function report(
         array $blockers,
         array $evidence,
         array $uncertainties = [],
         array $rootConstraintChanges = [],
-        array $planStages = []
+        array $planStages = [],
+        array $frameworkFindings = []
     ): UpgradeReport {
         $projectPath = dirname(__DIR__, 5);
         $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
@@ -113,7 +131,7 @@ final class UpgradeReportEvidenceTest extends TestCase
             new LockDiff([]),
             $blockers,
             [],
-            [],
+            $frameworkFindings,
             new RiskSummary('low', []),
             new EffortEstimate([0, 0], 'high', [], []),
             $uncertainties,
