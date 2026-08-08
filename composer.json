@@ -2,7 +2,24 @@
   "name": "php-upgrade-preflight/core",
   "description": "Deterministic Composer/PHP upgrade analysis core.",
   "type": "library",
-  "license": "proprietary",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "composer",
+    "dependency-analysis",
+    "php",
+    "static-analysis",
+    "upgrade"
+  ],
+  "homepage": "https://github.com/ValentinNikolaev/php-upgrade-preflight",
+  "authors": [
+    {
+      "name": "Valentin Nikolaev"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/ValentinNikolaev/php-upgrade-preflight/issues",
+    "source": "https://github.com/ValentinNikolaev/php-upgrade-preflight/tree/main/packages/core"
+  },
   "require": {
     "php": "^8.0",
     "composer/semver": "^3.4",
@@ -19,6 +36,11 @@
   "autoload-dev": {
     "psr-4": {
       "PhpUpgradePreflight\\Core\\Tests\\": "tests/"
+    }
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-main": "0.1.x-dev"
     }
   }
 }

@@ -83,6 +83,29 @@ JSON;
         self::assertStringNotContainsString('deadbeef', $normalized);
     }
 
+    public function testItNormalizesRelativeWindowsPathsWithoutChangingPhpSymbols(): void
+    {
+        $json = json_encode([
+            'source_impact' => [[
+                'file' => 'app\\Http\\Kernel.php',
+                'symbol' => 'App\\Http\\Kernel',
+            ]],
+            'evidence' => [[
+                'context' => [
+                    'file' => 'config\\app.php',
+                    'class' => 'App\\Providers\\AppServiceProvider',
+                ],
+            ]],
+        ], JSON_THROW_ON_ERROR);
+
+        $normalized = JsonSnapshotNormalizer::normalize($json, 'C:\\workspace\\project');
+
+        self::assertStringContainsString('"file": "app/Http/Kernel.php"', $normalized);
+        self::assertStringContainsString('"file": "config/app.php"', $normalized);
+        self::assertStringContainsString('"symbol": "App\\\\Http\\\\Kernel"', $normalized);
+        self::assertStringContainsString('"class": "App\\\\Providers\\\\AppServiceProvider"', $normalized);
+    }
+
     public function testItRejectsInvalidJson(): void
     {
         $this->expectException(\JsonException::class);
