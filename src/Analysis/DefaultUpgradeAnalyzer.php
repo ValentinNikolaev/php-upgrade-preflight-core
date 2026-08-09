@@ -18,6 +18,7 @@ use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
@@ -70,6 +71,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         }
 
         $project = $projectLoad->project();
+        $platform = TargetPlatform::fromRequest($request, $project);
         $targets = $this->targetNormalizer->normalize($request->targets()->packageTargets(), $request->targetPhp());
         $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
         $packageFamilyClassifiers = $this->frameworkRuleEngine->packageFamilyClassifiers($activeFrameworks);
@@ -85,7 +87,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $this->scenarioRunner->resetDiagnosticCache();
         $scenarioResults = [];
         foreach ($scenarios as $scenario) {
-            $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario);
+            $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario, $platform);
         }
 
         $bestResult = $this->bestSuccessfulResult($project->composerLock(), $scenarioResults);
@@ -102,7 +104,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $scenarioResults,
             $evidence,
             $bestLock ?? $project->composerLock(),
-            $requestedConstraints
+            $requestedConstraints,
+            $platform
         );
         $sourceUncertainties = $analysisUncertainties;
         $sourceImpact = $this->sourceUsageScanner->scan(
@@ -141,7 +144,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $effort,
             $sourceUncertainties,
             $evidence,
-            $frameworkGuidance
+            $frameworkGuidance,
+            $platform
         );
     }
 

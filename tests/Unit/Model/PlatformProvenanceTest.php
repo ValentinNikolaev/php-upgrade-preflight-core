@@ -6,8 +6,11 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Model;
 
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
+use PhpUpgradePreflight\Core\Model\ExtensionAssumption;
+use PhpUpgradePreflight\Core\Model\HostExtension;
 use PhpUpgradePreflight\Core\Model\PlatformProvenance;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PHPUnit\Framework\TestCase;
@@ -69,5 +72,36 @@ final class PlatformProvenanceTest extends TestCase
             'assumptions' => [],
         ], $platform->toArray()['extensions']);
         self::assertNotSame([], $platform->uncertainties());
+    }
+
+    public function testRequestAssumptionsOverrideComposerConfigWithoutBecomingHostEvidence(): void
+    {
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('php', '8.2')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromAbsenceInput('ext-json'), ExtensionAssumption::fromPresenceInput('ext-intl')]
+        );
+        $project = new ProjectState(
+            $projectPath,
+            new ComposerJson(['config' => ['platform' => ['ext-json' => '8.1.0']]]),
+            new ComposerLock([])
+        );
+        $target = TargetPlatform::fromRequest($request, $project, [new HostExtension('json', '8.3.0')], '8.3.0');
+        $platform = new PlatformProvenance($request, $project, $target);
+
+        self::assertSame('ext-json', $target->hostExtensions()[0]->name());
+        self::assertSame([
+            ['name' => 'ext-intl', 'state' => 'present', 'version' => null, 'provenance' => 'request'],
+            ['name' => 'ext-json', 'state' => 'absent', 'version' => null, 'provenance' => 'request'],
+        ], $platform->toArray()['extensions']['assumptions']);
+        self::assertStringContainsString('presence-only sentinel', implode(' ', $platform->uncertainties()));
     }
 }

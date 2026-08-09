@@ -65,12 +65,13 @@ final class UpgradeReport
         array $planStages = [],
         array $tests = [],
         array $actionableSourceImpact = [],
-        array $frameworkGuidance = []
+        array $frameworkGuidance = [],
+        ?TargetPlatform $targetPlatform = null
     ) {
         $this->metadata = new ReportMetadata();
         $this->request = $request;
         $this->projectState = $projectState;
-        $this->platform = new PlatformProvenance($request, $projectState);
+        $this->platform = new PlatformProvenance($request, $projectState, $targetPlatform);
         $this->scenarios = array_values($scenarios);
         $this->lockDiff = $lockDiff;
         $this->blockers = array_values($blockers);

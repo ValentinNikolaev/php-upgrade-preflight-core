@@ -6,51 +6,36 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class PlatformProvenance
 {
-    private string $analyzerPhp;
-    private ?string $currentPhp;
-    private string $currentPhpSource;
-    private ?string $targetPhp;
-    private string $targetPhpSource;
-    /** @var list<array{name: string, state: string, version: ?string, provenance: string}> */
-    private array $extensionAssumptions;
+    private TargetPlatform $platform;
 
-    public function __construct(UpgradeRequest $request, ProjectState $project)
+    public function __construct(UpgradeRequest $request, ProjectState $project, ?TargetPlatform $platform = null)
     {
-        $configuredPhp = $project->composerJson()->platformPhp();
-
-        $this->analyzerPhp = PHP_VERSION;
-        $this->currentPhp = $request->fromPhp() ?? $configuredPhp;
-        $this->currentPhpSource = $request->fromPhp() !== null
-            ? 'request'
-            : ($configuredPhp !== null ? 'composer_config' : 'unknown');
-        $this->targetPhp = $request->targetPhp();
-        $this->targetPhpSource = $request->targetPhp() === null ? 'unknown' : 'request';
-        $this->extensionAssumptions = $project->composerJson()->configuredExtensions();
+        $this->platform = $platform ?? TargetPlatform::fromRequest($request, $project);
     }
 
     public function analyzerPhp(): string
     {
-        return $this->analyzerPhp;
+        return $this->platform->analyzerPhp();
     }
 
     public function currentPhp(): ?string
     {
-        return $this->currentPhp;
+        return $this->platform->currentPhp();
     }
 
     public function currentPhpSource(): string
     {
-        return $this->currentPhpSource;
+        return $this->platform->currentPhpProvenance();
     }
 
     public function targetPhp(): ?string
     {
-        return $this->targetPhp;
+        return $this->platform->targetPhp();
     }
 
     public function targetPhpSource(): string
     {
-        return $this->targetPhpSource;
+        return $this->platform->targetPhpProvenance();
     }
 
     /**
@@ -63,25 +48,30 @@ final class PlatformProvenance
      */
     public function toArray(): array
     {
+        $assumptions = $this->platform->extensionAssumptions();
+
         return [
             'analyzer' => [
-                'php_version' => $this->analyzerPhp,
+                'php_version' => $this->platform->analyzerPhp(),
                 'provenance' => 'runtime',
             ],
             'current_php' => [
-                'version' => $this->currentPhp,
-                'provenance' => $this->currentPhpSource,
+                'version' => $this->platform->currentPhp(),
+                'provenance' => $this->platform->currentPhpProvenance(),
             ],
             'target_php' => [
-                'version' => $this->targetPhp,
-                'provenance' => $this->targetPhpSource,
+                'version' => $this->platform->targetPhp(),
+                'provenance' => $this->platform->targetPhpProvenance(),
             ],
             'extensions' => [
-                'provenance' => $this->extensionAssumptions !== [] ? 'mixed' : 'analyzer_runtime',
-                'explicitly_modeled' => $this->extensionAssumptions !== [],
-                'completeness' => $this->extensionAssumptions !== [] ? 'partial' : 'none',
+                'provenance' => $assumptions !== [] ? 'mixed' : 'analyzer_runtime',
+                'explicitly_modeled' => $assumptions !== [],
+                'completeness' => $assumptions !== [] ? 'partial' : 'none',
                 'unmodeled_provenance' => 'analyzer_runtime',
-                'assumptions' => $this->extensionAssumptions,
+                'assumptions' => array_map(
+                    static fn (ExtensionAssumption $assumption): array => $assumption->toArray(),
+                    $assumptions
+                ),
             ],
         ];
     }
@@ -89,14 +79,22 @@ final class PlatformProvenance
     /** @return list<string> */
     public function uncertainties(): array
     {
-        if ($this->extensionAssumptions === []) {
-            return [
-                'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.',
-            ];
+        $uncertainties = [];
+        if ($this->platform->extensionAssumptions() === []) {
+            $uncertainties[] =
+                'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.';
+        } else {
+            $uncertainties[] =
+                'Composer modeled only the listed extension assumptions; every unlisted extension still came from the analyzer runtime.';
         }
 
-        return [
-            'Composer modeled only the listed extension assumptions; every unlisted extension still came from the analyzer runtime.',
-        ];
+        foreach ($this->platform->presenceOnlyExtensions() as $name) {
+            $uncertainties[] = sprintf(
+                'Extension %s was assumed present without a version; Composer used a conservative presence-only sentinel, so exact extension version compatibility remains uncertain and related solver failures are advisory rather than reproducible blockers.',
+                $name
+            );
+        }
+
+        return $uncertainties;
     }
 }

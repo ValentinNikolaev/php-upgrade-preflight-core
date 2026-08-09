@@ -15,6 +15,7 @@ use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
@@ -22,6 +23,7 @@ use Symfony\Component\Process\Process;
 
 final class ComposerScenarioRunner
 {
+    private const ABSENT_EXTENSION_MIN_COMPOSER_VERSION = '2.2.0';
     private const LOCKED_DIAGNOSTIC_MIN_COMPOSER_VERSION = '2.4.0';
     /** @var list<string> */
     private const COMPOSER_SAFETY_OPTIONS = ['--no-scripts', '--no-plugins'];
@@ -73,11 +75,39 @@ final class ComposerScenarioRunner
             : \Closure::fromCallable($clock);
     }
 
-    public function run(ProjectState $project, UpgradeRequest $request, Scenario $scenario): ScenarioResult
-    {
+    public function run(
+        ProjectState $project,
+        UpgradeRequest $request,
+        Scenario $scenario,
+        ?TargetPlatform $platform = null
+    ): ScenarioResult {
+        $platform = $platform ?? TargetPlatform::fromRequest($request, $project);
         $tempPath = null;
         $command = $this->buildCommand($scenario);
         $composerVersion = $this->resolveComposerVersion();
+        if (!$scenario->isBaselineValidation()
+            && $platform->hasAbsentExtensionAssumptions()
+            && !$this->supportsAbsentExtensionOverrides($composerVersion)) {
+            return new ScenarioResult(
+                $scenario,
+                1,
+                '',
+                sprintf(
+                    'Composer %s cannot simulate absent extensions; Composer %s or newer is required.',
+                    $composerVersion,
+                    self::ABSENT_EXTENSION_MIN_COMPOSER_VERSION
+                ),
+                null,
+                null,
+                ScenarioResult::FAILURE_OPERATIONAL,
+                $composerVersion,
+                $command,
+                0,
+                null,
+                [],
+                ScenarioResult::OUTCOME_PROCESS_FAILURE
+            );
+        }
         $durationMs = 0;
         $startedAt = null;
         $phase = 'workspace';
@@ -87,7 +117,7 @@ final class ComposerScenarioRunner
             $tempPath = $this->workspaces->createFromProject($project->path());
             $phase = 'preparation';
             if (!$scenario->isBaselineValidation()) {
-                $this->applyTemporaryComposerChanges($tempPath, $project->path(), $scenario);
+                $this->applyTemporaryComposerChanges($tempPath, $project->path(), $scenario, $platform);
             }
             $phase = 'process';
             $startedAt = ($this->clock)();
@@ -128,7 +158,7 @@ final class ComposerScenarioRunner
             }
 
             if ($failureType === ScenarioResult::FAILURE_SOLVER) {
-                $diagnostics = $this->runTargetDiagnostics($project, $request, $scenario, $tempPath);
+                $diagnostics = $this->runTargetDiagnostics($project, $request, $scenario, $tempPath, $platform);
             }
 
             $result = new ScenarioResult(
@@ -331,8 +361,12 @@ final class ComposerScenarioRunner
         return max(0, (int) round(((float) ($this->clock)() - $startedAt) * 1000));
     }
 
-    private function applyTemporaryComposerChanges(string $tempPath, string $projectPath, Scenario $scenario): void
-    {
+    private function applyTemporaryComposerChanges(
+        string $tempPath,
+        string $projectPath,
+        Scenario $scenario,
+        TargetPlatform $platform
+    ): void {
         $composerPath = $tempPath . DIRECTORY_SEPARATOR . 'composer.json';
         $data = $this->reader->read($composerPath);
 
@@ -354,6 +388,10 @@ final class ComposerScenarioRunner
 
         if ($scenario->targets()->targetPhp() !== null) {
             $data['config']['platform']['php'] = $scenario->targets()->targetPhp();
+        }
+
+        foreach ($platform->composerPlatformOverrides() as $extension => $value) {
+            $data['config']['platform'][$extension] = $value;
         }
 
         $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
@@ -440,7 +478,8 @@ final class ComposerScenarioRunner
         ProjectState $project,
         UpgradeRequest $request,
         Scenario $scenario,
-        string $workingDirectory
+        string $workingDirectory,
+        TargetPlatform $platform
     ): array {
         $diagnostics = [];
 
@@ -449,7 +488,13 @@ final class ComposerScenarioRunner
                 continue;
             }
 
-            $cacheKey = $this->diagnosticCacheKey($project, $scenario, $target->package(), $target->constraint());
+            $cacheKey = $this->diagnosticCacheKey(
+                $project,
+                $scenario,
+                $target->package(),
+                $target->constraint(),
+                $platform
+            );
             if (isset($this->diagnosticCache[$cacheKey])) {
                 $diagnostics[] = $this->diagnosticCache[$cacheKey];
                 continue;
@@ -458,7 +503,8 @@ final class ComposerScenarioRunner
             $diagnostic = $this->runTargetDiagnostic(
                 $target->package(),
                 $target->constraint(),
-                $workingDirectory
+                $workingDirectory,
+                $platform
             );
             $this->diagnosticCache[$cacheKey] = $diagnostic;
             $diagnostics[] = $diagnostic;
@@ -467,8 +513,12 @@ final class ComposerScenarioRunner
         return $diagnostics;
     }
 
-    private function runTargetDiagnostic(string $package, string $constraint, string $workingDirectory): ComposerDiagnostic
-    {
+    private function runTargetDiagnostic(
+        string $package,
+        string $constraint,
+        string $workingDirectory,
+        TargetPlatform $platform
+    ): ComposerDiagnostic {
         if (!$this->supportsLockedDiagnostics()) {
             return new ComposerDiagnostic(
                 $package,
@@ -526,17 +576,36 @@ final class ComposerScenarioRunner
         return version_compare($this->composerVersion, self::LOCKED_DIAGNOSTIC_MIN_COMPOSER_VERSION, '>=');
     }
 
+    private function supportsAbsentExtensionOverrides(?string $composerVersion): bool
+    {
+        if ($composerVersion === null
+            || preg_match('/^(\d+)\.(\d+)/', $composerVersion, $matches) !== 1) {
+            return true;
+        }
+
+        return version_compare(
+            sprintf('%d.%d.0', (int) $matches[1], (int) $matches[2]),
+            self::ABSENT_EXTENSION_MIN_COMPOSER_VERSION,
+            '>='
+        );
+    }
+
     private function diagnosticCacheKey(
         ProjectState $project,
         Scenario $scenario,
         string $package,
-        string $constraint
+        string $constraint,
+        TargetPlatform $platform
     ): string {
         return hash('sha256', serialize([
             $project->path(),
             $scenario->targets()->toArray(),
             $package,
             $constraint,
+            array_map(
+                static fn ($assumption): array => $assumption->toArray(),
+                $platform->extensionAssumptions()
+            ),
         ]));
     }
 

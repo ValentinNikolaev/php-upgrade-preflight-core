@@ -7,11 +7,16 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Analysis;
 use PhpUpgradePreflight\Core\Analysis\BlockerGrouper;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
+use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\ExtensionAssumption;
+use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
+use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PhpUpgradePreflight\Core\Model\UpgradeTargetSet;
 use PHPUnit\Framework\TestCase;
@@ -422,6 +427,69 @@ final class BlockerGrouperTest extends TestCase
 
         self::assertSame([], $blockers);
         self::assertSame([], $evidence->all());
+    }
+
+    public function testPresenceOnlyExtensionVersionConflictRemainsANonBlockingAdvisory(): void
+    {
+        $projectPath = dirname(__DIR__, 5);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('vendor/package', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromPresenceInput('ext-fixture')]
+        );
+        $project = new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([]));
+        $platform = TargetPlatform::fromRequest($request, $project, []);
+        $evidence = new EvidenceLedger();
+        $output = 'vendor/package 2.0.0 requires ext-fixture >=1 -> your ext-fixture version (0; overridden via config.platform) does not satisfy that requirement.';
+
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult($this->scenario([new UpgradeTarget('vendor/package', '^2.0')]), 2, '', $output, null, null, ScenarioResult::FAILURE_SOLVER),
+        ], $evidence, null, [], $platform);
+
+        self::assertCount(1, $blockers);
+        self::assertSame('extension-version-unknown', $blockers[0]->type());
+        self::assertSame('ext-fixture', $blockers[0]->subject());
+        self::assertSame('>=1', $blockers[0]->conflict());
+        self::assertSame('medium', $blockers[0]->confidence());
+        self::assertFalse($blockers[0]->blocksResolution());
+        self::assertStringContainsString('exact version', implode(' ', $blockers[0]->options()));
+    }
+
+    public function testExactExtensionVersionConflictRemainsAResolutionBlocker(): void
+    {
+        $projectPath = dirname(__DIR__, 5);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('vendor/package', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromPresenceInput('ext-fixture:0')]
+        );
+        $project = new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([]));
+        $platform = TargetPlatform::fromRequest($request, $project, []);
+        $evidence = new EvidenceLedger();
+        $output = 'vendor/package 2.0.0 requires ext-fixture >=1 -> your ext-fixture version (0; overridden via config.platform) does not satisfy that requirement.';
+
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult($this->scenario([new UpgradeTarget('vendor/package', '^2.0')]), 2, '', $output, null, null, ScenarioResult::FAILURE_SOLVER),
+        ], $evidence, null, [], $platform);
+
+        self::assertCount(1, $blockers);
+        self::assertSame('extension-version-incompatible', $blockers[0]->type());
+        self::assertTrue($blockers[0]->blocksResolution());
+        self::assertStringContainsString('modeled', $blockers[0]->summary());
     }
 
     /** @param list<UpgradeTarget> $targets */

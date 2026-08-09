@@ -17,11 +17,13 @@ final class UpgradeRequest
     private string $format;
     private ?string $outputPath;
     private bool $debug;
+    private ExtensionAssumptionSet $extensionAssumptions;
 
     /**
      * @param list<UpgradeTarget> $targets
      * @param list<string> $sourcePaths
      * @param list<string> $frameworks
+     * @param list<ExtensionAssumption> $extensionAssumptions
      */
     public function __construct(
         string $projectPath,
@@ -32,7 +34,8 @@ final class UpgradeRequest
         array $frameworks = [],
         string $format = ReportFormat::JSON,
         ?string $outputPath = null,
-        bool $debug = false
+        bool $debug = false,
+        array $extensionAssumptions = []
     ) {
         $resolved = realpath($projectPath);
 
@@ -49,6 +52,7 @@ final class UpgradeRequest
         $this->format = ReportFormat::normalize($format);
         $this->outputPath = $outputPath;
         $this->debug = $debug;
+        $this->extensionAssumptions = new ExtensionAssumptionSet($extensionAssumptions);
     }
 
     public function projectPath(): string
@@ -96,6 +100,12 @@ final class UpgradeRequest
     public function debug(): bool
     {
         return $this->debug;
+    }
+
+    /** @return list<ExtensionAssumption> */
+    public function extensionAssumptions(): array
+    {
+        return $this->extensionAssumptions->all();
     }
 
     /** @return array{project_path: string, targets: list<array{package: string, constraint: string}>, from_php: ?string, target_php: ?string, source_paths: list<string>, frameworks: list<string>, format: string, output_path: ?string} */

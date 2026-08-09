@@ -14,6 +14,7 @@ use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 
@@ -50,7 +51,8 @@ final class ReportAssembler
         EffortEstimate $effort,
         array $sourceUncertainties,
         EvidenceLedger $evidence,
-        array $frameworkGuidance = []
+        array $frameworkGuidance = [],
+        ?TargetPlatform $platform = null
     ): UpgradeReport {
         $sections = $this->sectionBuilder->build(
             $request,
@@ -80,7 +82,8 @@ final class ReportAssembler
             $sections->planStages(),
             $sections->tests(),
             $this->sourceImpactBuilder->build($sourceImpact, $frameworkFindings),
-            $frameworkGuidance
+            $frameworkGuidance,
+            $platform
         );
     }
 }

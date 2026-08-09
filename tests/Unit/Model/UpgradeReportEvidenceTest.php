@@ -82,11 +82,15 @@ final class UpgradeReportEvidenceTest extends TestCase
         $advisoryReport = $this->report([
             new Blocker('abandoned-package', 'vendor/legacy', 'Abandoned.', 'high', ['lock-metadata-1']),
         ], $evidence);
+        $extensionAdvisoryReport = $this->report([
+            new Blocker('extension-version-unknown', 'ext-fixture', 'Version unknown.', 'medium', ['solver-1']),
+        ], [new Evidence('solver-1', Evidence::E1_SOLVER, 'Extension version could not be reproduced.')]);
         $blockedReport = $this->report([
             new Blocker('conflict', 'vendor/package', 'Blocked.', 'high', ['solver-1']),
         ], [new Evidence('solver-1', Evidence::E1_SOLVER, 'Resolution failed.')]);
 
         self::assertSame('unknown', $advisoryReport->resolutionStatus());
+        self::assertSame('unknown', $extensionAdvisoryReport->resolutionStatus());
         self::assertSame('blocked', $blockedReport->resolutionStatus());
     }
 

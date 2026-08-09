@@ -9,6 +9,7 @@ use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
 use PhpUpgradePreflight\Core\Filesystem\TemporaryWorkspaceManager;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceManager;
 use PhpUpgradePreflight\Core\Filesystem\WorkspaceCleanupException;
+use PhpUpgradePreflight\Core\Model\ExtensionAssumption;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
@@ -187,6 +188,57 @@ final class ComposerScenarioRunnerTest extends TestCase
         $package = $lock->package('phpunit/phpunit');
         self::assertNotNull($package);
         self::assertTrue($package->isDirect());
+    }
+
+    public function testItAppliesExtensionAssumptionsOnlyInsideTheTemporaryWorkspace(): void
+    {
+        $capturedComposer = null;
+        $capturedCommand = null;
+        $runner = new ComposerScenarioRunner(
+            null,
+            null,
+            static function (array $command, string $directory) use (&$capturedComposer, &$capturedCommand): array {
+                $capturedCommand = $command;
+                $capturedComposer = json_decode(
+                    (string) file_get_contents($directory . DIRECTORY_SEPARATOR . 'composer.json'),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+
+                return ['exit_code' => 1, 'stdout' => '', 'stderr' => 'Synthetic operational stop.'];
+            },
+            static fn (): string => '2.2.0'
+        );
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $composerPath = $projectPath . DIRECTORY_SEPARATOR . 'composer.json';
+        $originalComposer = file_get_contents($composerPath);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('fixture/dependency', '^2.0')],
+            null,
+            '8.2',
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [
+                ExtensionAssumption::fromPresenceInput('ext-intl:72.1'),
+                ExtensionAssumption::fromPresenceInput('ext-json'),
+                ExtensionAssumption::fromAbsenceInput('ext-xdebug'),
+            ]
+        );
+
+        $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
+
+        self::assertIsArray($capturedComposer);
+        self::assertSame('72.1', $capturedComposer['config']['platform']['ext-intl']);
+        self::assertFalse($capturedComposer['config']['platform']['ext-xdebug']);
+        self::assertSame('0', $capturedComposer['config']['platform']['ext-json']);
+        self::assertIsArray($capturedCommand);
+        self::assertNotContains('--ignore-platform-req=ext-json', $capturedCommand);
+        self::assertSame($originalComposer, file_get_contents($composerPath));
     }
 
     public function testItRebasesRelativePathRepositoriesAgainstTheOriginalProject(): void
@@ -404,6 +456,52 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertCount(1, $calls);
     }
 
+    public function testPresenceOnlyAssumptionsRemainDeterministicDuringDiagnostics(): void
+    {
+        $calls = [];
+        $diagnosticPlatform = null;
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory) use (&$calls, &$diagnosticPlatform): array {
+            $calls[] = $command;
+
+            if ($command[1] === 'prohibits') {
+                $composer = json_decode(
+                    (string) file_get_contents($directory . DIRECTORY_SEPARATOR . 'composer.json'),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                $diagnosticPlatform = $composer['config']['platform']['ext-json'] ?? null;
+            }
+
+            return [
+                'exit_code' => 2,
+                'stdout' => '',
+                'stderr' => 'Your requirements could not be resolved to an installable set of packages.',
+            ];
+        });
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('fixture/dependency', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromPresenceInput('ext-json')]
+        );
+
+        $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+
+        self::assertSame(ScenarioResult::FAILURE_SOLVER, $result->failureType());
+        self::assertCount(1, $result->diagnostics());
+        self::assertCount(2, $calls);
+        self::assertSame('0', $diagnosticPlatform);
+    }
+
     public function testDiagnosticFailureDoesNotReplaceThePrimarySolverOutcome(): void
     {
         $runner = new ComposerScenarioRunner(null, null, static function (array $command): array {
@@ -458,6 +556,46 @@ final class ComposerScenarioRunnerTest extends TestCase
         self::assertCount(1, $result->diagnostics());
         self::assertSame([], $result->diagnostics()[0]->command());
         self::assertStringContainsString('Composer 2.4.0 or newer is required', $result->diagnostics()[0]->stderr());
+    }
+
+    public function testComposerBefore22RejectsAbsentExtensionSimulationBeforeCreatingAWorkspace(): void
+    {
+        $workspaceManager = new FailingCreateWorkspaceManager();
+        $processCalls = 0;
+        $runner = new ComposerScenarioRunner(
+            $workspaceManager,
+            null,
+            static function () use (&$processCalls): array {
+                ++$processCalls;
+
+                throw new \LogicException('The process must not run for an unsupported absence simulation.');
+            },
+            static fn (): string => '2.1.14'
+        );
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('fixture/dependency', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromAbsenceInput('ext-xdebug')]
+        );
+
+        $result = $runner->run($project, $request, new Scenario('exact-target', $request->targets()));
+
+        self::assertSame(ScenarioResult::FAILURE_OPERATIONAL, $result->failureType());
+        self::assertSame(ScenarioResult::OUTCOME_PROCESS_FAILURE, $result->outcome());
+        self::assertSame('2.1.14', $result->composerVersion());
+        self::assertStringContainsString('Composer 2.2.0 or newer is required', $result->stderr());
+        self::assertSame(0, $processCalls);
+        self::assertSame(0, $workspaceManager->createCalls);
+        self::assertSame(0, $workspaceManager->removeCalls);
     }
 
     public function testItSeparatesBaselineValidationAndOperationalFailures(): void
@@ -782,10 +920,13 @@ final class ComposerScenarioRunnerTest extends TestCase
 
 final class FailingCreateWorkspaceManager implements WorkspaceManager
 {
+    public int $createCalls = 0;
     public int $removeCalls = 0;
 
     public function createFromProject(string $projectPath): string
     {
+        ++$this->createCalls;
+
         throw new \RuntimeException('Unable to create test workspace.');
     }
 
