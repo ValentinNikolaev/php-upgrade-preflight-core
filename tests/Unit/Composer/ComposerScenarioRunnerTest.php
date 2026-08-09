@@ -14,6 +14,7 @@ use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
+use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
@@ -265,24 +266,109 @@ final class ComposerScenarioRunnerTest extends TestCase
 
     public function testItPreservesEnvironmentVariablesInPathRepositories(): void
     {
-        foreach (['$HOME/git/pkg', '${HOME}/git/pkg', '%USERPROFILE%/git/pkg'] as $url) {
+        foreach (['$HOME/git/pkg', '${HOME}/git/pkg', '%USERPROFILE%/git/pkg', '~/git/pkg'] as $url) {
             $projectPath = $this->createProjectWithPathRepository($url);
             $capturedUrl = null;
-            $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory) use (&$capturedUrl): array {
+            $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory) use (&$capturedUrl, $url): array {
                 $composer = json_decode((string) file_get_contents($directory . DIRECTORY_SEPARATOR . 'composer.json'), true, 512, JSON_THROW_ON_ERROR);
                 $capturedUrl = $composer['repositories'][0]['url'];
 
-                return ['exit_code' => 1, 'stdout' => '', 'stderr' => 'Synthetic operational stop.'];
+                return ['exit_code' => 1, 'stdout' => '', 'stderr' => 'Repository root: ' . $url];
             });
             $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^1.0')]);
 
             try {
-                $runner->run((new ProjectStateBuilder())->build($projectPath), $request, new Scenario('test', $request->targets()));
+                $result = $runner->run(
+                    (new ProjectStateBuilder())->build($projectPath),
+                    $request,
+                    new Scenario('test', $request->targets())
+                );
 
                 self::assertSame($url, $capturedUrl);
+                self::assertStringContainsString(PathExposurePolicy::LOCAL_REPOSITORY, $result->stderr());
+                self::assertStringNotContainsString($url, $result->stderr());
             } finally {
                 (new Filesystem())->remove($projectPath);
             }
+        }
+    }
+
+    public function testItRedactsArtifactAndFileRepositoryRoots(): void
+    {
+        $artifactProject = $this->createProjectWithPathRepository('../private-artifacts', 'artifact');
+        $artifactRoot = Path::makeAbsolute('../private-artifacts', $artifactProject);
+        $artifactRunner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 1,
+            'stdout' => 'Artifact repository: ' . $artifactRoot,
+            'stderr' => 'Synthetic operational stop.',
+        ]);
+        $artifactRequest = new UpgradeRequest(
+            $artifactProject,
+            [new UpgradeTarget('fixture/dependency', '^1.0')]
+        );
+
+        try {
+            $artifactResult = $artifactRunner->run(
+                (new ProjectStateBuilder())->build($artifactProject),
+                $artifactRequest,
+                new Scenario('artifact-repository', $artifactRequest->targets())
+            );
+
+            self::assertStringContainsString(PathExposurePolicy::LOCAL_REPOSITORY, $artifactResult->stdout());
+            self::assertStringNotContainsString($artifactRoot, $artifactResult->stdout());
+        } finally {
+            (new Filesystem())->remove($artifactProject);
+        }
+
+        $fileRoot = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR . 'private-file-repository';
+        $normalizedFileRoot = str_replace('\\', '/', $fileRoot);
+        $fileUrl = preg_match('/^[A-Za-z]:\//', $normalizedFileRoot) === 1
+            ? 'file:///' . $normalizedFileRoot
+            : 'file://' . $normalizedFileRoot;
+        $fileProject = $this->createProjectWithPathRepository($fileUrl, 'composer');
+        $fileRunner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 1,
+            'stdout' => 'File repository: ' . $fileUrl . ' at ' . $fileRoot,
+            'stderr' => 'Synthetic operational stop.',
+        ]);
+        $fileRequest = new UpgradeRequest($fileProject, [new UpgradeTarget('fixture/dependency', '^1.0')]);
+
+        try {
+            $fileResult = $fileRunner->run(
+                (new ProjectStateBuilder())->build($fileProject),
+                $fileRequest,
+                new Scenario('file-repository', $fileRequest->targets())
+            );
+
+            self::assertSame(2, substr_count($fileResult->stdout(), PathExposurePolicy::LOCAL_REPOSITORY));
+            self::assertStringNotContainsString($fileUrl, $fileResult->stdout());
+            self::assertStringNotContainsString($fileRoot, $fileResult->stdout());
+        } finally {
+            (new Filesystem())->remove($fileProject);
+        }
+
+        $vcsRoot = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR . 'private-vcs-repository';
+        $vcsProject = $this->createProjectWithPathRepository($vcsRoot, 'vcs');
+        $vcsRunner = new ComposerScenarioRunner(null, null, static fn (): array => [
+            'exit_code' => 1,
+            'stdout' => 'VCS repository: ' . $vcsRoot,
+            'stderr' => 'Synthetic operational stop.',
+        ]);
+        $vcsRequest = new UpgradeRequest($vcsProject, [new UpgradeTarget('fixture/dependency', '^1.0')]);
+
+        try {
+            $vcsResult = $vcsRunner->run(
+                (new ProjectStateBuilder())->build($vcsProject),
+                $vcsRequest,
+                new Scenario('vcs-repository', $vcsRequest->targets())
+            );
+
+            self::assertStringContainsString(PathExposurePolicy::LOCAL_REPOSITORY, $vcsResult->stdout());
+            self::assertStringNotContainsString($vcsRoot, $vcsResult->stdout());
+        } finally {
+            (new Filesystem())->remove($vcsProject);
         }
     }
 
@@ -765,6 +851,7 @@ final class ComposerScenarioRunnerTest extends TestCase
             self::assertCount(1, $workspaceManager->createdPaths);
             self::assertSame([], $workspaceManager->removedPaths);
             self::assertSame($workspaceManager->createdPaths[0], $result->tempPath());
+            self::assertSame($workspaceManager->createdPaths[0], $result->toArray()['temp_path']);
             self::assertDirectoryExists($result->tempPath());
         } finally {
             $workspaceManager->forceCleanup();
@@ -798,6 +885,7 @@ final class ComposerScenarioRunnerTest extends TestCase
             self::assertCount(1, $workspaceManager->createdPaths);
             self::assertSame([], $workspaceManager->removedPaths);
             self::assertSame($workspaceManager->createdPaths[0], $result->tempPath());
+            self::assertSame($workspaceManager->createdPaths[0], $result->toArray()['temp_path']);
             self::assertDirectoryExists($result->tempPath());
         } finally {
             $workspaceManager->forceCleanup();
@@ -821,6 +909,7 @@ final class ComposerScenarioRunnerTest extends TestCase
             self::assertSame(ScenarioResult::OUTCOME_CLEANUP_FAILURE, $result->outcome());
             self::assertTrue($result->isOperationalFailure());
             self::assertSame($workspaceManager->workspacePath, $result->tempPath());
+            self::assertSame(PathExposurePolicy::ANALYZER_WORKSPACE, $result->toArray()['temp_path']);
             self::assertSame(0, $workspaceManager->removeCalls);
         } finally {
             $workspaceManager->forceCleanup();
@@ -851,6 +940,7 @@ final class ComposerScenarioRunnerTest extends TestCase
             self::assertSame(0, $result->exitCode());
             self::assertStringContainsString('cleanup failed', $result->stderr());
             self::assertNotNull($result->tempPath());
+            self::assertSame(PathExposurePolicy::ANALYZER_WORKSPACE, $result->toArray()['temp_path']);
             self::assertNotNull($result->candidateLockEvidence());
         } finally {
             $workspaceManager->forceCleanup();
@@ -891,13 +981,68 @@ final class ComposerScenarioRunnerTest extends TestCase
         }
     }
 
-    private function createProjectWithPathRepository(string $url): string
+    public function testCredentialBearingRepositoryFailureIsSanitizedBeforeResultStorage(): void
+    {
+        $fixtureContents = file_get_contents(
+            dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR
+            . 'fixtures' . DIRECTORY_SEPARATOR . 'security' . DIRECTORY_SEPARATOR
+            . 'composer-output-with-secrets.json'
+        );
+        self::assertIsString($fixtureContents);
+        $fixture = json_decode($fixtureContents, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($fixture);
+        self::assertIsArray($fixture['canaries'] ?? null);
+        self::assertIsArray($fixture['repository_failure'] ?? null);
+
+        $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR
+            . 'fixtures' . DIRECTORY_SEPARATOR . 'path-repository' . DIRECTORY_SEPARATOR . 'project';
+        $repositoryPath = dirname($projectPath) . DIRECTORY_SEPARATOR . 'repository';
+        $failure = $fixture['repository_failure'];
+        self::assertIsInt($failure['exit_code'] ?? null);
+        self::assertIsString($failure['stdout'] ?? null);
+        self::assertIsString($failure['stderr'] ?? null);
+        $exitCode = $failure['exit_code'];
+        $stdout = $failure['stdout'];
+        $stderr = $failure['stderr'];
+        $runner = new ComposerScenarioRunner(
+            null,
+            null,
+            static function (array $command, string $workspace) use ($exitCode, $stdout, $stderr, $projectPath, $repositoryPath): array {
+                return [
+                    'exit_code' => $exitCode,
+                    'stdout' => $stdout . "\nProject: " . $projectPath . "\nWorkspace: " . $workspace,
+                    'stderr' => $stderr . "\nRepository: " . $repositoryPath . DIRECTORY_SEPARATOR . 'private',
+                ];
+            },
+            static fn (): string => '2.8.12'
+        );
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')]);
+
+        $result = $runner->run($project, $request, new Scenario('credential-repository', $request->targets()));
+        $stored = $result->stdout() . "\n" . $result->stderr() . "\n"
+            . json_encode($result->toArray(), JSON_THROW_ON_ERROR);
+
+        self::assertSame(ScenarioResult::OUTCOME_PROCESS_FAILURE, $result->outcome());
+        self::assertNull($result->tempPath());
+        self::assertStringContainsString(PathExposurePolicy::PROJECT_ROOT, $stored);
+        self::assertStringContainsString(PathExposurePolicy::ANALYZER_WORKSPACE, $stored);
+        self::assertStringContainsString(PathExposurePolicy::LOCAL_REPOSITORY, $stored);
+        self::assertStringContainsString('[REDACTED_URL]', $stored);
+        foreach ($fixture['canaries'] as $label => $canary) {
+            if (str_contains($stored, $canary)) {
+                self::fail(sprintf('Sensitive canary %s reached the stored repository failure.', $label));
+            }
+        }
+    }
+
+    private function createProjectWithPathRepository(string $url, string $type = 'path'): string
     {
         $projectPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-test-' . bin2hex(random_bytes(8));
         mkdir($projectPath, 0700, true);
         file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'composer.json', json_encode([
             'name' => 'fixture/environment-path-project',
-            'repositories' => [['type' => 'path', 'url' => $url]],
+            'repositories' => [['type' => $type, 'url' => $url]],
             'require' => ['php' => '^8.0'],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
         file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([

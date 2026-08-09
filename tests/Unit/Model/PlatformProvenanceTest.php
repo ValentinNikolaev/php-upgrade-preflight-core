@@ -104,4 +104,47 @@ final class PlatformProvenanceTest extends TestCase
         ], $platform->toArray()['extensions']['assumptions']);
         self::assertStringContainsString('presence-only sentinel', implode(' ', $platform->uncertainties()));
     }
+
+    public function testExplicitAssumptionsHaveEquivalentNormalizedProvenanceAcrossHostInventories(): void
+    {
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('php', '8.2')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromPresenceInput('ext-intl:72.1')]
+        );
+        $project = new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([]));
+        $jsonHost = TargetPlatform::fromRequest(
+            $request,
+            $project,
+            [new HostExtension('json', '8.3.0')],
+            '8.3.0'
+        );
+        $curlHost = TargetPlatform::fromRequest(
+            $request,
+            $project,
+            [new HostExtension('curl', '8.4.0')],
+            '8.3.0'
+        );
+
+        $jsonCanonical = (new PlatformProvenance($request, $project, $jsonHost))->toArray();
+        $curlCanonical = (new PlatformProvenance($request, $project, $curlHost))->toArray();
+
+        self::assertSame($jsonCanonical, $curlCanonical);
+        self::assertSame('partial', $jsonCanonical['extensions']['completeness']);
+        self::assertSame('analyzer_runtime', $jsonCanonical['extensions']['unmodeled_provenance']);
+        self::assertSame([[
+            'name' => 'ext-intl',
+            'state' => 'present',
+            'version' => '72.1',
+            'provenance' => 'request',
+        ]], $jsonCanonical['extensions']['assumptions']);
+    }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Model;
 
+use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
+
 final class UpgradeReport
 {
     private ReportMetadata $metadata;
@@ -229,7 +231,7 @@ final class UpgradeReport
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return [
+        $canonical = [
             'metadata' => $this->metadata->toArray(),
             'request_summary' => $this->request->toArray(),
             'project_state' => $this->projectState->toArray(),
@@ -265,6 +267,16 @@ final class UpgradeReport
             'uncertainties' => $this->uncertainties,
             'evidence' => array_map(static fn (Evidence $evidence): array => $evidence->toArray(), $this->evidence),
         ];
+
+        return PathExposurePolicy::sanitizeCanonicalReport(
+            $canonical,
+            $this->request->projectPath(),
+            $this->request->outputPath(),
+            PathExposurePolicy::localRepositoryPaths(
+                $this->projectState->composerJson()->data(),
+                $this->projectState->path()
+            )
+        );
     }
 
     /** @return list<string> */

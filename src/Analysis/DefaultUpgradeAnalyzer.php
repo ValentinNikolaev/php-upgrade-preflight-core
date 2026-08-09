@@ -22,6 +22,7 @@ use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
+use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 
 final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
 {
@@ -164,12 +165,17 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $outcome = ScenarioResult::OUTCOME_WORKSPACE_FAILURE;
         }
 
+        $safeFailureMessage = PathExposurePolicy::redactComposerText(
+            $failure->getMessage(),
+            $request->projectPath()
+        );
+
         $scenario = new Scenario('project-input', $request->targets(), false);
         $scenarioResult = new ScenarioResult(
             $scenario,
             1,
             '',
-            $failure->getMessage(),
+            $safeFailureMessage,
             null,
             null,
             ScenarioResult::FAILURE_OPERATIONAL,
@@ -196,7 +202,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
                 [],
                 ['Upgrade effort was not estimated because Composer project input could not be loaded.']
             ),
-            [sprintf('Composer project input could not be loaded: %s', $failure->getMessage())],
+            [sprintf('Composer project input could not be loaded: %s', $safeFailureMessage)],
             []
         );
     }

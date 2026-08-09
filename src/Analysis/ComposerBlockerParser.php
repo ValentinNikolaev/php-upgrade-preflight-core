@@ -106,7 +106,24 @@ final class ComposerBlockerParser
             return new Blocker('abandoned-package', $subject, 'Composer reported an abandoned package.', 'high', [$evidenceId], $this->requestedConstraint($result, $subject), null, null, null, [$subject], $options);
         }
 
-        if (preg_match('~(?:(' . $package . ')\s+([^\s]+)\s+requires\s+)?(ext-[a-z0-9_.-]+)\s+([^\s,;)]+).*?(?:missing from your system|is missing)~is', $output, $matches) === 1) {
+        if (preg_match('~Root composer\.json requires(?: PHP extension)?\s+(ext-[a-z0-9_.-]+)\s+([^\s,;)]+).*?disabled by your platform config~is', $output, $matches) === 1) {
+            $subject = strtolower($matches[1]);
+            $type = $this->extensionType($subject, $targetPlatform);
+
+            return $this->blocker(
+                $type,
+                $subject,
+                $this->requestedConstraint($result, $subject),
+                null,
+                null,
+                $this->cleanConstraint($matches[2]),
+                [$subject],
+                $evidenceId,
+                $type === 'extension-version-unknown' ? 'medium' : 'high'
+            );
+        }
+
+        if (preg_match('~(?:(' . $package . ')\s+([^\s]+)\s+requires\s+)?(ext-[a-z0-9_.-]+)\s+([^\s,;)]+).*?(?:missing from your system|is missing|disabled by your platform config)~is', $output, $matches) === 1) {
             $subject = strtolower($matches[3]);
             $blockingPackage = $matches[1] !== '' ? strtolower($matches[1]) : null;
             $type = $this->extensionType($subject, $targetPlatform);

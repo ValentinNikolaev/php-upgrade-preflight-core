@@ -19,19 +19,22 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
         $tempPath = $base . bin2hex(random_bytes(8));
 
         if (!$this->filesystem->createDirectory($tempPath, 0700, true) && !is_dir($tempPath)) {
-            throw new \RuntimeException(sprintf('Unable to create temporary workspace "%s".', $tempPath));
+            throw new \RuntimeException('Unable to create temporary workspace.');
         }
 
         try {
             foreach (['composer.json', 'composer.lock'] as $file) {
                 $source = $projectPath . DIRECTORY_SEPARATOR . $file;
                 if (!is_file($source)) {
-                    throw new \RuntimeException(sprintf('Required file "%s" was not found.', $source));
+                    throw new \RuntimeException(sprintf('Required Composer file "%s" was not found.', $file));
                 }
 
                 $destination = $tempPath . DIRECTORY_SEPARATOR . $file;
                 if (!$this->filesystem->copy($source, $destination)) {
-                    throw new \RuntimeException(sprintf('Unable to copy "%s" to temporary workspace "%s".', $source, $destination));
+                    throw new \RuntimeException(sprintf(
+                        'Unable to copy Composer file "%s" into the temporary workspace.',
+                        $file
+                    ));
                 }
             }
         } catch (\Throwable $exception) {
@@ -39,9 +42,8 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
                 $this->remove($tempPath);
             } catch (\Throwable $cleanupException) {
                 throw new WorkspaceCleanupException($tempPath, sprintf(
-                    '%s Cleanup of partial workspace "%s" also failed: %s',
+                    '%s Cleanup of partial workspace also failed: %s',
                     $exception->getMessage(),
-                    $tempPath,
                     $cleanupException->getMessage()
                 ), $cleanupException);
             }
@@ -96,14 +98,14 @@ final class TemporaryWorkspaceManager implements WorkspaceManager
         }
 
         if (is_file($path) || is_link($path) || is_dir($path)) {
-            throw new \RuntimeException(sprintf('Unable to remove temporary workspace file "%s".', $path));
+            throw new \RuntimeException('Unable to remove temporary workspace file.');
         }
     }
 
     private function removeDirectory(string $path): void
     {
         if (!$this->filesystem->removeDirectory($path) && is_dir($path)) {
-            throw new \RuntimeException(sprintf('Unable to remove temporary workspace directory "%s".', $path));
+            throw new \RuntimeException('Unable to remove temporary workspace directory.');
         }
     }
 }

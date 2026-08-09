@@ -78,7 +78,9 @@ final class MarkdownReportWriterTest extends TestCase
                         0,
                         'fixture/blocker 1.0.0 requires fixture/dependency (^1.0)',
                         ''
-                    )]
+                    )],
+                    ScenarioResult::OUTCOME_PROCESS_FAILURE,
+                    true
                 ),
                 new ScenarioResult(
                     $scenario,
@@ -175,7 +177,8 @@ final class MarkdownReportWriterTest extends TestCase
         self::assertStringContainsString('Source paths: `packages/core/src`', $markdown);
         self::assertStringContainsString('Framework integrations: `laravel`', $markdown);
         self::assertStringContainsString('Requested format: `markdown`', $markdown);
-        self::assertStringContainsString('Output destination: `upgrade-report.md`', $markdown);
+        self::assertStringContainsString('Project: `[PROJECT_ROOT]`', $markdown);
+        self::assertStringContainsString('Output destination: `[REPORT_OUTPUT]`', $markdown);
         self::assertStringContainsString('## Project State', $markdown);
         self::assertStringContainsString('Composer platform PHP: `7.4.33`', $markdown);
         self::assertStringContainsString('completeness: `none`', $markdown);

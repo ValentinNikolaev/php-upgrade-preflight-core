@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Model;
 
 use PhpUpgradePreflight\Core\Support\OutputExcerpt;
-use PhpUpgradePreflight\Core\Support\SensitiveOutputRedactor;
+use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 
 final class ScenarioResult
 {
@@ -39,6 +39,7 @@ final class ScenarioResult
     private ?CandidateLockEvidence $candidateLockEvidence;
     /** @var list<ComposerDiagnostic> */
     private array $diagnostics;
+    private bool $exposeTempPath;
 
     public function __construct(
         Scenario $scenario,
@@ -53,7 +54,8 @@ final class ScenarioResult
         int $durationMs = 0,
         ?CandidateLockEvidence $candidateLockEvidence = null,
         array $diagnostics = [],
-        ?string $outcome = null
+        ?string $outcome = null,
+        bool $exposeTempPath = false
     ) {
         if ($failureType !== null && !in_array($failureType, [self::FAILURE_SOLVER, self::FAILURE_OPERATIONAL, self::FAILURE_VALIDATION], true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported scenario failure type "%s".', $failureType));
@@ -99,8 +101,8 @@ final class ScenarioResult
 
         $this->scenario = $scenario;
         $this->exitCode = $exitCode;
-        $this->stdout = SensitiveOutputRedactor::redact($stdout);
-        $this->stderr = SensitiveOutputRedactor::redact($stderr);
+        $this->stdout = PathExposurePolicy::redactComposerText($stdout, null, $tempPath);
+        $this->stderr = PathExposurePolicy::redactComposerText($stderr, null, $tempPath);
         $this->lock = $lock;
         $this->tempPath = $tempPath;
         $this->failureType = $failureType;
@@ -110,6 +112,7 @@ final class ScenarioResult
         $this->durationMs = $durationMs;
         $this->candidateLockEvidence = $candidateLockEvidence ?? ($lock === null ? null : CandidateLockEvidence::fromLock($lock));
         $this->diagnostics = array_values($diagnostics);
+        $this->exposeTempPath = $exposeTempPath;
     }
 
     public function scenario(): Scenario
@@ -202,10 +205,34 @@ final class ScenarioResult
     /** @return array{name: string, composer_version: ?string, command: list<string>, duration_ms: int, exit_code: int, succeeded: bool, outcome: string, failure_type: ?string, stdout_excerpt: string, stderr_excerpt: string, candidate_lock: ?array{sha256: string, content_hash: ?string, package_count: int}, diagnostics: list<array{package: string, constraint: string, command: list<string>, exit_code: int, stdout_excerpt: string, stderr_excerpt: string}>, temp_path: ?string} */
     public function toArray(): array
     {
+        $command = array_map(
+            fn (string $argument): string => PathExposurePolicy::redactComposerText($argument, null, $this->tempPath),
+            $this->command
+        );
+        $diagnostics = array_map(function (ComposerDiagnostic $diagnostic): array {
+            $canonical = $diagnostic->toArray();
+            $canonical['command'] = array_map(
+                fn (string $argument): string => PathExposurePolicy::redactComposerText($argument, null, $this->tempPath),
+                $canonical['command']
+            );
+            $canonical['stdout_excerpt'] = PathExposurePolicy::redactComposerText(
+                $canonical['stdout_excerpt'],
+                null,
+                $this->tempPath
+            );
+            $canonical['stderr_excerpt'] = PathExposurePolicy::redactComposerText(
+                $canonical['stderr_excerpt'],
+                null,
+                $this->tempPath
+            );
+
+            return $canonical;
+        }, $this->diagnostics);
+
         return [
             'name' => $this->scenario->name(),
             'composer_version' => $this->composerVersion,
-            'command' => $this->command,
+            'command' => $command,
             'duration_ms' => $this->durationMs,
             'exit_code' => $this->exitCode,
             'succeeded' => $this->succeeded(),
@@ -214,8 +241,8 @@ final class ScenarioResult
             'stdout_excerpt' => OutputExcerpt::bounded($this->stdout),
             'stderr_excerpt' => OutputExcerpt::bounded($this->stderr),
             'candidate_lock' => $this->candidateLockEvidence === null ? null : $this->candidateLockEvidence->toArray(),
-            'diagnostics' => array_map(static fn (ComposerDiagnostic $diagnostic): array => $diagnostic->toArray(), $this->diagnostics),
-            'temp_path' => $this->tempPath,
+            'diagnostics' => $diagnostics,
+            'temp_path' => PathExposurePolicy::workspaceForReport($this->tempPath, $this->exposeTempPath),
         ];
     }
 

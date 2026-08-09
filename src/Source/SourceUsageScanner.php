@@ -49,7 +49,7 @@ final class SourceUsageScanner
         }
 
         foreach ($files as $file) {
-            $contents = file_get_contents($file);
+            $contents = @file_get_contents($file);
             if ($contents === false) {
                 $uncertainties[] = sprintf('Source file "%s" could not be read and was not scanned.', $this->relativePath($project->path(), $file));
                 continue;

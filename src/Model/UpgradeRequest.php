@@ -40,7 +40,7 @@ final class UpgradeRequest
         $resolved = realpath($projectPath);
 
         if ($resolved === false || !is_dir($resolved)) {
-            throw new \InvalidArgumentException(sprintf('Project path "%s" does not exist.', $projectPath));
+            throw new \InvalidArgumentException('Project path does not exist.');
         }
 
         $this->projectPath = $resolved;
@@ -181,11 +181,14 @@ final class UpgradeRequest
             $resolved = realpath($candidate);
 
             if ($resolved === false || (!is_file($resolved) && !is_dir($resolved))) {
-                throw new \InvalidArgumentException(sprintf('Source path "%s" does not exist.', $sourcePath));
+                throw new \InvalidArgumentException(sprintf('Source path at index %d does not exist.', $index));
             }
 
             if (!$this->isWithinProject($resolved)) {
-                throw new \InvalidArgumentException(sprintf('Source path "%s" must resolve inside the analyzed project.', $sourcePath));
+                throw new \InvalidArgumentException(sprintf(
+                    'Source path at index %d must resolve inside the analyzed project.',
+                    $index
+                ));
             }
 
             $relative = ltrim(str_replace('\\', '/', substr($resolved, strlen($this->projectPath))), '/');

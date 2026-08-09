@@ -17,6 +17,7 @@ use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
+use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
@@ -83,6 +84,10 @@ final class ComposerScenarioRunner
     ): ScenarioResult {
         $platform = $platform ?? TargetPlatform::fromRequest($request, $project);
         $tempPath = null;
+        $repositoryPaths = PathExposurePolicy::localRepositoryPaths(
+            $project->composerJson()->data(),
+            $project->path()
+        );
         $command = $this->buildCommand($scenario);
         $composerVersion = $this->resolveComposerVersion();
         if (!$scenario->isBaselineValidation()
@@ -122,6 +127,12 @@ final class ComposerScenarioRunner
             $phase = 'process';
             $startedAt = ($this->clock)();
             $process = ($this->processRunner)($command, $tempPath);
+            $process = $this->sanitizeProcessResult(
+                $process,
+                $project->path(),
+                $tempPath,
+                $repositoryPaths
+            );
             $durationMs = $this->elapsedMilliseconds($startedAt);
 
             $lock = null;
@@ -158,7 +169,14 @@ final class ComposerScenarioRunner
             }
 
             if ($failureType === ScenarioResult::FAILURE_SOLVER) {
-                $diagnostics = $this->runTargetDiagnostics($project, $request, $scenario, $tempPath, $platform);
+                $diagnostics = $this->runTargetDiagnostics(
+                    $project,
+                    $request,
+                    $scenario,
+                    $tempPath,
+                    $platform,
+                    $repositoryPaths
+                );
             }
 
             $result = new ScenarioResult(
@@ -174,7 +192,8 @@ final class ComposerScenarioRunner
                 $durationMs,
                 $candidateLockEvidence,
                 $diagnostics,
-                $outcome
+                $outcome,
+                $request->debug()
             );
         } catch (\Throwable $exception) {
             if ($exception instanceof WorkspaceCleanupException) {
@@ -202,6 +221,19 @@ final class ComposerScenarioRunner
                 $exitCode = $timedOutProcess->getExitCode() ?? 1;
             }
 
+            $stdout = PathExposurePolicy::redactComposerText(
+                $stdout,
+                $project->path(),
+                $tempPath,
+                $repositoryPaths
+            );
+            $stderr = PathExposurePolicy::redactComposerText(
+                $stderr,
+                $project->path(),
+                $tempPath,
+                $repositoryPaths
+            );
+
             $result = new ScenarioResult(
                 $scenario,
                 $exitCode,
@@ -215,7 +247,8 @@ final class ComposerScenarioRunner
                 $durationMs,
                 null,
                 [],
-                $this->exceptionOutcome($exception, $phase)
+                $this->exceptionOutcome($exception, $phase),
+                $request->debug()
             );
         }
 
@@ -227,7 +260,15 @@ final class ComposerScenarioRunner
                     $scenario,
                     $result->exitCode(),
                     $result->stdout(),
-                    trim($result->stderr() . PHP_EOL . sprintf('Temporary workspace cleanup failed: %s', $exception->getMessage())),
+                    trim($result->stderr() . PHP_EOL . sprintf(
+                        'Temporary workspace cleanup failed: %s',
+                        PathExposurePolicy::redactComposerText(
+                            $exception->getMessage(),
+                            $project->path(),
+                            $tempPath,
+                            $repositoryPaths
+                        )
+                    )),
                     null,
                     $tempPath,
                     ScenarioResult::FAILURE_OPERATIONAL,
@@ -236,7 +277,8 @@ final class ComposerScenarioRunner
                     $result->durationMs(),
                     $result->candidateLockEvidence(),
                     $result->diagnostics(),
-                    ScenarioResult::OUTCOME_CLEANUP_FAILURE
+                    ScenarioResult::OUTCOME_CLEANUP_FAILURE,
+                    $request->debug()
                 );
             }
         }
@@ -395,8 +437,8 @@ final class ComposerScenarioRunner
         }
 
         $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
-        if (file_put_contents($composerPath, $encoded) === false) {
-            throw new \RuntimeException(sprintf('Unable to write temporary Composer manifest "%s".', $composerPath));
+        if (@file_put_contents($composerPath, $encoded) === false) {
+            throw new \RuntimeException('Unable to write the temporary Composer manifest.');
         }
     }
 
@@ -408,7 +450,11 @@ final class ComposerScenarioRunner
         }
 
         foreach ($data['repositories'] as $key => $repository) {
-            if (!is_array($repository) || ($repository['type'] ?? null) !== 'path' || !isset($repository['url']) || !is_string($repository['url'])) {
+            if (!is_array($repository)
+                || !in_array($repository['type'] ?? null, ['path', 'artifact'], true)
+                || !isset($repository['url'])
+                || !is_string($repository['url'])
+            ) {
                 continue;
             }
 
@@ -427,6 +473,34 @@ final class ComposerScenarioRunner
     private function containsEnvironmentVariable(string $path): bool
     {
         return preg_match('/\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)|%[A-Za-z_][A-Za-z0-9_]*%/', $path) === 1;
+    }
+
+    /**
+     * @param array{exit_code: int, stdout: string, stderr: string} $process
+     * @param list<string> $repositoryPaths
+     * @return array{exit_code: int, stdout: string, stderr: string}
+     */
+    private function sanitizeProcessResult(
+        array $process,
+        string $projectPath,
+        string $workspacePath,
+        array $repositoryPaths
+    ): array {
+        return [
+            'exit_code' => $process['exit_code'],
+            'stdout' => PathExposurePolicy::redactComposerText(
+                $process['stdout'],
+                $projectPath,
+                $workspacePath,
+                $repositoryPaths
+            ),
+            'stderr' => PathExposurePolicy::redactComposerText(
+                $process['stderr'],
+                $projectPath,
+                $workspacePath,
+                $repositoryPaths
+            ),
+        ];
     }
 
     private function isSolverFailure(string $stdout, string $stderr): bool
@@ -473,13 +547,14 @@ final class ComposerScenarioRunner
         return preg_match('/(?:composer(?:\.bat|\.phar)?(?: executable)? (?:was |is )?(?:unavailable|missing|not found)|composer:\s*(?:command\s+)?not found|[\'\"]composer[\'\"] is not recognized|could not open input file:\s*composer|createprocess failed[^\n]*error=2|the system cannot find the file specified)/i', $output) === 1;
     }
 
-    /** @return list<ComposerDiagnostic> */
+    /** @param list<string> $repositoryPaths @return list<ComposerDiagnostic> */
     private function runTargetDiagnostics(
         ProjectState $project,
         UpgradeRequest $request,
         Scenario $scenario,
         string $workingDirectory,
-        TargetPlatform $platform
+        TargetPlatform $platform,
+        array $repositoryPaths
     ): array {
         $diagnostics = [];
 
@@ -504,7 +579,9 @@ final class ComposerScenarioRunner
                 $target->package(),
                 $target->constraint(),
                 $workingDirectory,
-                $platform
+                $platform,
+                $project->path(),
+                $repositoryPaths
             );
             $this->diagnosticCache[$cacheKey] = $diagnostic;
             $diagnostics[] = $diagnostic;
@@ -513,11 +590,14 @@ final class ComposerScenarioRunner
         return $diagnostics;
     }
 
+    /** @param list<string> $repositoryPaths */
     private function runTargetDiagnostic(
         string $package,
         string $constraint,
         string $workingDirectory,
-        TargetPlatform $platform
+        TargetPlatform $platform,
+        string $projectPath,
+        array $repositoryPaths
     ): ComposerDiagnostic {
         if (!$this->supportsLockedDiagnostics()) {
             return new ComposerDiagnostic(
@@ -546,6 +626,12 @@ final class ComposerScenarioRunner
 
         try {
             $process = ($this->processRunner)($command, $workingDirectory);
+            $process = $this->sanitizeProcessResult(
+                $process,
+                $projectPath,
+                $workingDirectory,
+                $repositoryPaths
+            );
 
             return new ComposerDiagnostic(
                 $package,
@@ -562,7 +648,12 @@ final class ComposerScenarioRunner
                 $command,
                 1,
                 '',
-                $exception->getMessage()
+                PathExposurePolicy::redactComposerText(
+                    $exception->getMessage(),
+                    $projectPath,
+                    $workingDirectory,
+                    $repositoryPaths
+                )
             );
         }
     }

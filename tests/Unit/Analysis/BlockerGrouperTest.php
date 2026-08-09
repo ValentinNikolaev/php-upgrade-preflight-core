@@ -462,6 +462,41 @@ final class BlockerGrouperTest extends TestCase
         self::assertStringContainsString('exact version', implode(' ', $blockers[0]->options()));
     }
 
+    public function testRootDisabledExtensionOutputRemainsAReproducibleMissingExtensionBlocker(): void
+    {
+        $projectPath = dirname(__DIR__, 5);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('vendor/package', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromAbsenceInput('ext-json')]
+        );
+        $project = new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([]));
+        $platform = TargetPlatform::fromRequest($request, $project, []);
+        $evidence = new EvidenceLedger();
+        $output = 'Your requirements could not be resolved to an installable set of packages.' . "\n"
+            . 'Problem 1' . "\n"
+            . '- Root composer.json requires PHP extension ext-json * but the ext-json package is disabled by your platform config.';
+
+        $blockers = (new BlockerGrouper())->group([
+            new ScenarioResult($this->scenario([new UpgradeTarget('vendor/package', '^2.0')]), 2, '', $output, null, null, ScenarioResult::FAILURE_SOLVER),
+        ], $evidence, null, [], $platform);
+
+        self::assertCount(1, $blockers);
+        self::assertSame('extension-missing', $blockers[0]->type());
+        self::assertSame('ext-json', $blockers[0]->subject());
+        self::assertSame('*', $blockers[0]->conflict());
+        self::assertSame(['ext-json'], $blockers[0]->dependencyPath());
+        self::assertSame('high', $blockers[0]->confidence());
+        self::assertTrue($blockers[0]->blocksResolution());
+    }
+
     public function testExactExtensionVersionConflictRemainsAResolutionBlocker(): void
     {
         $projectPath = dirname(__DIR__, 5);
