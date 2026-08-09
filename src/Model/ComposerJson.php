@@ -37,6 +37,34 @@ final class ComposerJson
         return is_string($platform) ? $platform : null;
     }
 
+    public function packageName(): ?string
+    {
+        $name = $this->data['name'] ?? null;
+
+        return is_string($name) && trim($name) !== '' ? strtolower(trim($name)) : null;
+    }
+
+    /** @return array<string, mixed> */
+    public function autoload(): array
+    {
+        return $this->arrayValue($this->data['autoload'] ?? null);
+    }
+
+    /** @return array<string, mixed> */
+    public function autoloadDev(): array
+    {
+        return $this->arrayValue($this->data['autoload-dev'] ?? null);
+    }
+
+    public function vendorDirectory(): string
+    {
+        $vendorDirectory = $this->data['config']['vendor-dir'] ?? null;
+
+        return is_string($vendorDirectory) && trim($vendorDirectory) !== ''
+            ? trim($vendorDirectory)
+            : 'vendor';
+    }
+
     /** @return list<array{name: string, state: string, version: ?string, provenance: string}> */
     public function configuredExtensions(): array
     {
@@ -77,5 +105,11 @@ final class ComposerJson
         }
 
         return $map;
+    }
+
+    /** @param mixed $value @return array<string, mixed> */
+    private function arrayValue(mixed $value): array
+    {
+        return is_array($value) ? $value : [];
     }
 }

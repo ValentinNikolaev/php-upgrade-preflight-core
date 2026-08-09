@@ -22,6 +22,7 @@ use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
+use PhpUpgradePreflight\Core\Source\AutoloadOwnershipIndexBuilder;
 use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 
 final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
@@ -36,6 +37,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     private FrameworkRuleEngine $frameworkRuleEngine;
     private RiskAndEffortEstimator $riskAndEffortEstimator;
     private ReportAssembler $reportAssembler;
+    private AutoloadOwnershipIndexBuilder $ownershipIndexBuilder;
+    private SourceImpactBuilder $sourceImpactBuilder;
 
     /** @param list<FrameworkIntegration> $frameworks */
     public function __construct(
@@ -49,7 +52,9 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         ?FrameworkRuleEngine $frameworkRuleEngine = null,
         ?RiskAndEffortEstimator $riskAndEffortEstimator = null,
         ?ReportAssembler $reportAssembler = null,
-        ?ScenarioSelector $scenarioSelector = null
+        ?ScenarioSelector $scenarioSelector = null,
+        ?AutoloadOwnershipIndexBuilder $ownershipIndexBuilder = null,
+        ?SourceImpactBuilder $sourceImpactBuilder = null
     ) {
         $this->projectStateBuilder = $projectStateBuilder ?? new ProjectStateBuilder();
         $this->scenarioRunner = $scenarioRunner ?? new ComposerScenarioRunner();
@@ -61,6 +66,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $this->frameworkRuleEngine = $frameworkRuleEngine ?? new FrameworkRuleEngine($frameworks);
         $this->riskAndEffortEstimator = $riskAndEffortEstimator ?? new RiskAndEffortEstimator();
         $this->reportAssembler = $reportAssembler ?? new ReportAssembler();
+        $this->ownershipIndexBuilder = $ownershipIndexBuilder ?? new AutoloadOwnershipIndexBuilder();
+        $this->sourceImpactBuilder = $sourceImpactBuilder ?? new SourceImpactBuilder();
     }
 
     public function analyzeUpgrade(UpgradeRequest $request): UpgradeReport
@@ -109,7 +116,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $platform
         );
         $sourceUncertainties = $analysisUncertainties;
-        $sourceImpact = $this->sourceUsageScanner->scan(
+        $sourceInventory = $this->sourceUsageScanner->scan(
             $project,
             $sourcePaths,
             $evidence,
@@ -127,11 +134,28 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $project,
             $request,
             $evidence,
-            $sourceImpact,
+            $sourceInventory,
             $frameworkGuidance
         );
-        $risk = $this->riskAndEffortEstimator->estimateRisk($blockers, $lockDiff->packageChanges(), $frameworkFindings);
-        $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges(), $sourceImpact, $frameworkFindings);
+        $ownershipIndex = $this->ownershipIndexBuilder->build(
+            $project,
+            $sourceUncertainties,
+            array_map(static fn ($usage): string => $usage->symbol(), $sourceInventory)
+        );
+        $actionableSourceImpact = $this->sourceImpactBuilder->build(
+            $sourceInventory,
+            $frameworkFindings,
+            $lockDiff->packageChanges(),
+            $ownershipIndex,
+            $evidence
+        );
+        $risk = $this->riskAndEffortEstimator->estimateRisk(
+            $blockers,
+            $lockDiff->packageChanges(),
+            $frameworkFindings,
+            $actionableSourceImpact
+        );
+        $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges(), $actionableSourceImpact, $frameworkFindings);
 
         return $this->reportAssembler->assemble(
             $request,
@@ -139,14 +163,15 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $scenarioResults,
             $lockDiff,
             $blockers,
-            $sourceImpact,
+            $sourceInventory,
             $frameworkFindings,
             $risk,
             $effort,
             $sourceUncertainties,
             $evidence,
             $frameworkGuidance,
-            $platform
+            $platform,
+            $actionableSourceImpact
         );
     }
 

@@ -18,6 +18,7 @@ use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\RootConstraintChange;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\SourceImpactFinding;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -43,7 +44,15 @@ final class ReportSectionBuilderTest extends TestCase
             new Evidence('source-1', Evidence::E3_PROJECT_SOURCE, 'Detected source usage.'),
             new Evidence('framework-1', Evidence::E2_PACKAGE_METADATA, 'Detected framework issue.'),
         ]);
-        $sourceImpact = [new SourceUsage('src/Example.php', 'Vendor\\Package', 'namespace_import', ['source-1'], 4)];
+        $sourceImpact = [new SourceImpactFinding(
+            'vendor/package',
+            'exact',
+            'package_change',
+            'The package changes in the selected transition.',
+            'high',
+            [new SourceUsage('src/Example.php', 'Vendor\\Package', 'namespace_import', ['source-1'], 4)],
+            ['source-1']
+        )];
         $frameworkFindings = [new CompatibilityFinding('fixture', 'medium', 'Review the framework integration.', ['framework-1'])];
         $scenario = new Scenario('exact-target', $request->targets());
 

@@ -52,15 +52,17 @@ final class ReportAssembler
         array $sourceUncertainties,
         EvidenceLedger $evidence,
         array $frameworkGuidance = [],
-        ?TargetPlatform $platform = null
+        ?TargetPlatform $platform = null,
+        ?array $actionableSourceImpact = null
     ): UpgradeReport {
+        $actionableSourceImpact = $actionableSourceImpact ?? $this->sourceImpactBuilder->build($sourceImpact, $frameworkFindings);
         $sections = $this->sectionBuilder->build(
             $request,
             $project,
             $scenarioResults,
             $lockDiff,
             $blockers,
-            $sourceImpact,
+            $actionableSourceImpact,
             $frameworkFindings,
             $sourceUncertainties,
             $evidence
@@ -81,7 +83,7 @@ final class ReportAssembler
             $sections->rootConstraintChanges(),
             $sections->planStages(),
             $sections->tests(),
-            $this->sourceImpactBuilder->build($sourceImpact, $frameworkFindings),
+            $actionableSourceImpact,
             $frameworkGuidance,
             $platform
         );

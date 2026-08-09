@@ -78,7 +78,12 @@ final class SourceUsageScanner
                     'usage_type' => $detectedUsage['usage_type'],
                 ])->id();
 
-                $usageKey = serialize([$relative, $detectedUsage['symbol'], $detectedUsage['usage_type']]);
+                $usageKey = serialize([
+                    $relative,
+                    $detectedUsage['symbol'],
+                    $detectedUsage['usage_type'],
+                    $detectedUsage['line'],
+                ]);
                 if (isset($usageIndexes[$usageKey])) {
                     $index = $usageIndexes[$usageKey];
                     $usages[$index] = $usages[$index]->withAdditionalEvidence([$id]);

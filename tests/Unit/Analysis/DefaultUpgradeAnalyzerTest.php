@@ -638,6 +638,63 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame(['framework-1'], $report->toArray()['framework_findings'][0]['evidence']);
     }
 
+    public function testPackageOwnedInventoryBecomesActionableOnlyForARelevantLockChange(): void
+    {
+        $runner = new ComposerScenarioRunner(null, null, static function (array $command, string $directory): array {
+            if ($command[1] === 'validate') {
+                return ['exit_code' => 0, 'stdout' => 'Valid.', 'stderr' => ''];
+            }
+
+            file_put_contents($directory . DIRECTORY_SEPARATOR . 'composer.lock', json_encode([
+                'packages' => [[
+                    'name' => 'fixture/dependency',
+                    'version' => '2.0.0',
+                    'autoload' => ['psr-4' => ['Fixture\\Dependency\\' => 'src/']],
+                ]],
+                'packages-dev' => [],
+            ], JSON_THROW_ON_ERROR));
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+        $projectPath = $this->createInputProject(
+            json_encode([
+                'name' => 'fixture/application',
+                'require' => ['fixture/dependency' => '^1.0'],
+                'scripts' => ['test' => 'phpunit'],
+            ], JSON_THROW_ON_ERROR),
+            json_encode([
+                'packages' => [[
+                    'name' => 'fixture/dependency',
+                    'version' => '1.0.0',
+                    'autoload' => ['psr-4' => ['Fixture\\Dependency\\' => 'src/']],
+                ]],
+                'packages-dev' => [],
+            ], JSON_THROW_ON_ERROR)
+        );
+        mkdir($projectPath . DIRECTORY_SEPARATOR . 'src', 0700, true);
+        file_put_contents(
+            $projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Example.php',
+            "<?php\n\nnew \\Fixture\\Dependency\\Client();\n"
+        );
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer([], null, $runner))->analyzeUpgrade(
+                new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, null, ['src'])
+            );
+
+            self::assertCount(1, $report->sourceInventory());
+            self::assertCount(1, $report->actionableSourceImpact());
+            self::assertSame('fixture/dependency', $report->actionableSourceImpact()[0]->affectedPackage());
+            self::assertSame('exact', $report->actionableSourceImpact()[0]->ownership());
+            self::assertSame('package_change', $report->actionableSourceImpact()[0]->relevance());
+            self::assertSame('high', $report->actionableSourceImpact()[0]->severity());
+            self::assertSame('application', $report->planStages()[2]->name());
+            self::assertSame('ownership-1', $report->actionableSourceImpact()[0]->evidence()[1]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
     private function createInputProject(string $composerJson, ?string $composerLock = null): string
     {
         $projectPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-input-' . bin2hex(random_bytes(8));

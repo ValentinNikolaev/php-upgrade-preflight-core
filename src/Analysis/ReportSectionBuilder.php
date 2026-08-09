@@ -15,7 +15,7 @@ use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\ReportSections;
 use PhpUpgradePreflight\Core\Model\RootConstraintChange;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
-use PhpUpgradePreflight\Core\Model\SourceUsage;
+use PhpUpgradePreflight\Core\Model\SourceImpactFinding;
 use PhpUpgradePreflight\Core\Model\TestGuidance;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 
@@ -24,7 +24,7 @@ final class ReportSectionBuilder
     /**
      * @param list<ScenarioResult> $scenarioResults
      * @param list<Blocker> $blockers
-     * @param list<SourceUsage> $sourceImpact
+     * @param list<SourceImpactFinding> $sourceImpact
      * @param list<CompatibilityFinding> $frameworkFindings
      * @param list<string> $sourceUncertainties
      */
@@ -111,7 +111,7 @@ final class ReportSectionBuilder
      * @param list<RootConstraintChange> $rootConstraintChanges
      * @param list<ScenarioResult> $scenarioResults
      * @param list<Blocker> $blockers
-     * @param list<SourceUsage> $sourceImpact
+     * @param list<SourceImpactFinding> $sourceImpact
      * @param list<CompatibilityFinding> $frameworkFindings
      * @return list<PlanStage>
      */
@@ -252,7 +252,7 @@ final class ReportSectionBuilder
     }
 
     /**
-     * @param list<SourceUsage> $sourceImpact
+     * @param list<SourceImpactFinding> $sourceImpact
      * @param list<CompatibilityFinding> $frameworkFindings
      * @return list<TestGuidance>
      */
@@ -418,7 +418,7 @@ final class ReportSectionBuilder
         return is_array($scripts) && array_key_exists($name, $scripts);
     }
 
-    /** @param list<SourceUsage> $sourceImpact @return list<string> */
+    /** @param list<SourceImpactFinding> $sourceImpact @return list<string> */
     private function sourceEvidence(array $sourceImpact): array
     {
         $references = [];
