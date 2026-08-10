@@ -177,6 +177,45 @@ final class FrameworkRuleEngine
             }
         }
 
-        return $findings;
+        return $this->deduplicateFindings($findings);
+    }
+
+    /**
+     * Adjacent rule packs may independently reach the same conclusion. Keep one
+     * finding while retaining every evidence record and hop that established it.
+     *
+     * @param list<CompatibilityFinding> $findings
+     * @return list<CompatibilityFinding>
+     */
+    private function deduplicateFindings(array $findings): array
+    {
+        $deduplicated = [];
+        $indexes = [];
+
+        foreach ($findings as $finding) {
+            $key = implode("\0", [
+                strtolower($finding->framework()),
+                $finding->severity(),
+                $finding->summary(),
+            ]);
+            if (!isset($indexes[$key])) {
+                $indexes[$key] = count($deduplicated);
+                $deduplicated[] = $finding;
+
+                continue;
+            }
+
+            $index = $indexes[$key];
+            $existing = $deduplicated[$index];
+            $deduplicated[$index] = new CompatibilityFinding(
+                $existing->framework(),
+                $existing->severity(),
+                $existing->summary(),
+                array_values(array_unique(array_merge($existing->evidence(), $finding->evidence()))),
+                array_merge($existing->appliesToHops(), $finding->appliesToHops())
+            );
+        }
+
+        return $deduplicated;
     }
 }

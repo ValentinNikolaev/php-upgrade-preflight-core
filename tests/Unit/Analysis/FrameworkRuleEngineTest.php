@@ -81,6 +81,25 @@ final class FrameworkRuleEngineTest extends TestCase
         (new FrameworkRuleEngine())->activeIntegrations($this->project(), $this->request(['missing']));
     }
 
+    public function testItDeduplicatesRepeatedFindingsAndRetainsEveryHopAndEvidenceRecord(): void
+    {
+        $integration = new FixtureFrameworkIntegration('fixture', true, ['src'], [
+            new FixtureCompatibilityRule('Review the shared constraint.', [['from_major' => 10, 'to_major' => 11]]),
+            new FixtureCompatibilityRule('Review the shared constraint.', [['from_major' => 11, 'to_major' => 12]]),
+        ]);
+        $engine = new FrameworkRuleEngine([$integration]);
+        $evidence = new EvidenceLedger();
+
+        $findings = $engine->evaluate([$integration], $this->project(), $this->request(), $evidence);
+
+        self::assertCount(1, $findings);
+        self::assertCount(2, $findings[0]->evidence());
+        self::assertSame([
+            ['from_major' => 10, 'to_major' => 11],
+            ['from_major' => 11, 'to_major' => 12],
+        ], $findings[0]->appliesToHops());
+    }
+
     /** @param list<string> $frameworks @param list<string> $sourcePaths */
     private function request(array $frameworks = [], array $sourcePaths = []): UpgradeRequest
     {
@@ -135,10 +154,14 @@ final class FixtureFrameworkIntegration implements FrameworkIntegration
 final class FixtureCompatibilityRule implements CompatibilityRule
 {
     private ?string $summary;
+    /** @var list<array{from_major: int, to_major: int}> */
+    private array $hops;
 
-    public function __construct(?string $summary)
+    /** @param list<array{from_major: int, to_major: int}> $hops */
+    public function __construct(?string $summary, array $hops = [])
     {
         $this->summary = $summary;
+        $this->hops = $hops;
     }
 
     public function evaluate(
@@ -153,6 +176,6 @@ final class FixtureCompatibilityRule implements CompatibilityRule
 
         $evidenceId = $evidence->add('framework', Evidence::E2_PACKAGE_METADATA, 'Framework metadata matched.')->id();
 
-        return new CompatibilityFinding('fixture', 'medium', $this->summary, [$evidenceId]);
+        return new CompatibilityFinding('fixture', 'medium', $this->summary, [$evidenceId], $this->hops);
     }
 }
