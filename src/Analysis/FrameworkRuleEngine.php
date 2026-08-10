@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
 use PhpUpgradePreflight\Core\Framework\FrameworkTransitionProvider;
+use PhpUpgradePreflight\Core\Framework\HopAwareCompatibilityRule;
 use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
@@ -130,19 +131,45 @@ final class FrameworkRuleEngine
         UpgradeRequest $request,
         EvidenceLedger $evidence,
         array $sourceUsages = [],
-        array $guidance = []
+        array $guidance = [],
+        ?string $composerVersion = null
     ): array {
         $findings = [];
-        $hopReferences = [];
+        $guidanceByFramework = [];
         foreach ($guidance as $assessment) {
-            $hopReferences[$assessment->framework()] = $assessment->supportedHopReferences();
+            $guidanceByFramework[strtolower($assessment->framework())] = $assessment;
         }
 
         foreach ($frameworks as $framework) {
             foreach ($framework->rules() as $rule) {
+                $assessment = $guidanceByFramework[strtolower($framework->name())] ?? null;
+                if ($rule instanceof HopAwareCompatibilityRule && $assessment !== null) {
+                    foreach ($assessment->hops() as $hop) {
+                        if (!$hop->isSupported()) {
+                            continue;
+                        }
+
+                        $finding = $rule->evaluateForHop(
+                            $project,
+                            $request,
+                            $evidence,
+                            $hop,
+                            $composerVersion,
+                            $sourceUsages
+                        );
+                        if ($finding !== null) {
+                            $findings[] = $finding->appliesToHops() === []
+                                ? $finding->withAppliesToHops([$hop->reference()])
+                                : $finding;
+                        }
+                    }
+
+                    continue;
+                }
+
                 $finding = $rule->evaluate($project, $request, $evidence, $sourceUsages);
                 if ($finding !== null) {
-                    $references = $hopReferences[strtolower($finding->framework())] ?? [];
+                    $references = $assessment === null ? [] : $assessment->supportedHopReferences();
                     $findings[] = $finding->appliesToHops() === [] && count($references) === 1
                         ? $finding->withAppliesToHops($references)
                         : $finding;

@@ -135,7 +135,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $request,
             $evidence,
             $sourceInventory,
-            $frameworkGuidance
+            $frameworkGuidance,
+            $this->composerVersion($scenarioResults)
         );
         $ownershipIndex = $this->ownershipIndexBuilder->build(
             $project,
@@ -257,5 +258,17 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         });
 
         return $candidates[0][3];
+    }
+
+    /** @param list<ScenarioResult> $scenarioResults */
+    private function composerVersion(array $scenarioResults): ?string
+    {
+        foreach ($scenarioResults as $result) {
+            if ($result->composerVersion() !== null) {
+                return $result->composerVersion();
+            }
+        }
+
+        return null;
     }
 }
