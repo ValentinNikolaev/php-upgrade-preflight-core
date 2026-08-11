@@ -151,8 +151,8 @@ final class SensitiveOutputRedactorTest extends TestCase
     public function testItRedactsAdditionalProviderTokensAndDelimitedCredentialValues(): void
     {
         $secrets = [
-            'xapp-1-FixtureSlackApplicationToken0123456789',
-            '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456789',
+            'xapp-1-UnitSlackApplicationToken0123456789',
+            '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789',
             'comma-prefix-fixture',
             'comma-suffix-fixture',
             'semicolon-prefix-fixture',
