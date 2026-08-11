@@ -106,7 +106,7 @@ final class Blocker
 
     public function blocksResolution(): bool
     {
-        return $this->type !== 'abandoned-package';
+        return !in_array($this->type, ['abandoned-package', 'extension-version-unknown'], true);
     }
 
     /** @return list<string> */

@@ -9,7 +9,9 @@ use Composer\Semver\Intervals;
 use Composer\Semver\VersionParser;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
+use PhpUpgradePreflight\Core\Model\ExtensionAssumption;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
 
 final class ComposerBlockerParser
 {
@@ -17,12 +19,12 @@ final class ComposerBlockerParser
     private const PLATFORM_PATTERN = '(?:php(?:-64bit|-ipv6)?|ext-[a-z0-9_.-]+|lib-[a-z0-9_.-]+|composer(?:-plugin-api|-runtime-api)?)';
 
     /** @return list<Blocker> */
-    public function parse(ScenarioResult $result, string $evidenceId): array
+    public function parse(ScenarioResult $result, string $evidenceId, ?TargetPlatform $platform = null): array
     {
         $blockers = [];
 
         foreach ($result->diagnostics() as $diagnostic) {
-            $blocker = $this->fromDiagnostic($diagnostic, $evidenceId);
+            $blocker = $this->fromDiagnostic($diagnostic, $evidenceId, $platform);
             if ($blocker !== null) {
                 $blockers[] = $blocker;
             }
@@ -35,13 +37,16 @@ final class ComposerBlockerParser
         $output = trim($result->stdout() . "\n" . $result->stderr());
 
         return array_map(
-            fn (string $problem): Blocker => $this->fromOutput($problem, $result, $evidenceId),
+            fn (string $problem): Blocker => $this->fromOutput($problem, $result, $evidenceId, $platform),
             $this->problemSections($output)
         );
     }
 
-    private function fromDiagnostic(ComposerDiagnostic $diagnostic, string $evidenceId): ?Blocker
-    {
+    private function fromDiagnostic(
+        ComposerDiagnostic $diagnostic,
+        string $evidenceId,
+        ?TargetPlatform $platform
+    ): ?Blocker {
         $output = trim($diagnostic->stdout() . "\n" . $diagnostic->stderr());
         if ($output === '') {
             return null;
@@ -62,7 +67,13 @@ final class ComposerBlockerParser
         }
         $relation = $relation ?? $relations[0];
         $subject = $relation['dependency'];
-        $type = $this->relationType($relation['operation'], $subject, $diagnostic->constraint(), $relation['constraint']);
+        $type = $this->relationType(
+            $relation['operation'],
+            $subject,
+            $diagnostic->constraint(),
+            $relation['constraint'],
+            $platform
+        );
 
         return $this->blocker(
             $type,
@@ -73,12 +84,16 @@ final class ComposerBlockerParser
             $relation['constraint'],
             $this->dependencyPath($relations, $subject),
             $evidenceId,
-            'high'
+            $type === 'extension-version-unknown' ? 'medium' : 'high'
         );
     }
 
-    private function fromOutput(string $output, ScenarioResult $result, string $evidenceId): Blocker
-    {
+    private function fromOutput(
+        string $output,
+        ScenarioResult $result,
+        string $evidenceId,
+        ?TargetPlatform $targetPlatform
+    ): Blocker {
         $package = self::PACKAGE_PATTERN;
         $platform = self::PLATFORM_PATTERN;
 
@@ -91,11 +106,29 @@ final class ComposerBlockerParser
             return new Blocker('abandoned-package', $subject, 'Composer reported an abandoned package.', 'high', [$evidenceId], $this->requestedConstraint($result, $subject), null, null, null, [$subject], $options);
         }
 
-        if (preg_match('~(?:(' . $package . ')\s+([^\s]+)\s+requires\s+)?(ext-[a-z0-9_.-]+)\s+([^\s,;)]+).*?(?:missing from your system|is missing)~is', $output, $matches) === 1) {
+        if (preg_match('~Root composer\.json requires(?: PHP extension)?\s+(ext-[a-z0-9_.-]+)\s+([^\s,;)]+).*?disabled by your platform config~is', $output, $matches) === 1) {
+            $subject = strtolower($matches[1]);
+            $type = $this->extensionType($subject, $targetPlatform);
+
+            return $this->blocker(
+                $type,
+                $subject,
+                $this->requestedConstraint($result, $subject),
+                null,
+                null,
+                $this->cleanConstraint($matches[2]),
+                [$subject],
+                $evidenceId,
+                $type === 'extension-version-unknown' ? 'medium' : 'high'
+            );
+        }
+
+        if (preg_match('~(?:(' . $package . ')\s+([^\s]+)\s+requires\s+)?(ext-[a-z0-9_.-]+)\s+([^\s,;)]+).*?(?:missing from your system|is missing|disabled by your platform config)~is', $output, $matches) === 1) {
             $subject = strtolower($matches[3]);
             $blockingPackage = $matches[1] !== '' ? strtolower($matches[1]) : null;
+            $type = $this->extensionType($subject, $targetPlatform);
 
-            return $this->blocker('extension-missing', $subject, $this->requestedConstraint($result, $subject), $blockingPackage, $matches[2] !== '' ? $matches[2] : null, $this->cleanConstraint($matches[4]), $blockingPackage === null ? [$subject] : [$blockingPackage, $subject], $evidenceId, 'high');
+            return $this->blocker($type, $subject, $this->requestedConstraint($result, $subject), $blockingPackage, $matches[2] !== '' ? $matches[2] : null, $this->cleanConstraint($matches[4]), $blockingPackage === null ? [$subject] : [$blockingPackage, $subject], $evidenceId, $type === 'extension-version-unknown' ? 'medium' : 'high');
         }
 
         if (preg_match('~(' . $package . ')(?:\s+([^\s]+))?\s+requires\s+php(?:-64bit)?\s+(.+?)(?=\s+->|\R|$)~i', $output, $matches) === 1) {
@@ -165,9 +198,15 @@ final class ComposerBlockerParser
         if ($relations !== []) {
             $relation = $relations[0];
             $requested = $this->requestedConstraint($result, $relation['dependency']);
-            $type = $this->relationType($relation['operation'], $relation['dependency'], $requested, $relation['constraint']);
+            $type = $this->relationType(
+                $relation['operation'],
+                $relation['dependency'],
+                $requested,
+                $relation['constraint'],
+                $targetPlatform
+            );
 
-            return $this->blocker($type, $relation['dependency'], $requested, $relation['package'], $relation['version'], $relation['constraint'], $this->dependencyPath($relations, $relation['dependency']), $evidenceId, 'high');
+            return $this->blocker($type, $relation['dependency'], $requested, $relation['package'], $relation['version'], $relation['constraint'], $this->dependencyPath($relations, $relation['dependency']), $evidenceId, $type === 'extension-version-unknown' ? 'medium' : 'high');
         }
 
         $subject = $this->firstPackageTarget($result) ?? ($result->scenario()->targets()->targetPhp() === null ? 'composer' : 'php');
@@ -259,8 +298,13 @@ final class ComposerBlockerParser
         return null;
     }
 
-    private function relationType(string $operation, string $subject, ?string $requested, ?string $conflict): string
-    {
+    private function relationType(
+        string $operation,
+        string $subject,
+        ?string $requested,
+        ?string $conflict,
+        ?TargetPlatform $platform = null
+    ): string {
         if (in_array($operation, ['replaces', 'provides', 'conflicts with'], true)) {
             return 'replace-provide-conflict';
         }
@@ -268,7 +312,7 @@ final class ComposerBlockerParser
             return $this->phpConflictType($requested, $conflict);
         }
         if (strpos($subject, 'ext-') === 0) {
-            return 'extension-missing';
+            return $this->extensionType($subject, $platform);
         }
 
         return 'transitive-package-conflict';
@@ -340,6 +384,8 @@ final class ComposerBlockerParser
             'root-constraint-conflict' => 'A root Composer constraint conflicts with the requested target.',
             'transitive-package-conflict' => 'A transitive package constraint blocks the requested target.',
             'extension-missing' => 'A required PHP extension is unavailable.',
+            'extension-version-incompatible' => 'The modeled PHP extension version does not satisfy a package requirement.',
+            'extension-version-unknown' => 'The assumed extension is present, but its version compatibility is unknown.',
             'package-not-found' => 'Composer could not find the requested package or version.',
             'minimum-stability-conflict' => 'The requested package does not satisfy the project minimum stability.',
             'replace-provide-conflict' => 'Composer found conflicting replace, provide, or conflict rules.',
@@ -359,6 +405,8 @@ final class ComposerBlockerParser
             'root-constraint-conflict' => [sprintf('Update the root constraint for `%s`.', $subject), 'Choose a target compatible with the existing root constraint.'],
             'transitive-package-conflict' => [sprintf('Upgrade or replace `%s`.', $blocker), sprintf('Choose a `%s` version compatible with the transitive constraint.', $subject)],
             'extension-missing' => [sprintf('Install and enable `%s` for the target runtime.', $subject), sprintf('Choose package versions that do not require `%s`.', $subject)],
+            'extension-version-incompatible' => [sprintf('Use a target version of `%s` that satisfies the reported constraint.', $subject), sprintf('Choose package versions compatible with the modeled `%s` version.', $subject)],
+            'extension-version-unknown' => [sprintf('Repeat the analysis with an exact version for `%s`.', $subject), sprintf('Verify `%s` constraints on the target runtime.', $subject)],
             'package-not-found' => [sprintf('Verify the package name, constraint, and repositories for `%s`.', $subject), 'Choose an available package version.'],
             'minimum-stability-conflict' => ['Choose a release allowed by the project minimum stability.', 'Explicitly allow the required stability only after reviewing the package.'],
             'replace-provide-conflict' => [sprintf('Remove or replace `%s`.', $blocker), 'Choose versions whose replace/provide rules can coexist.'],
@@ -366,5 +414,21 @@ final class ComposerBlockerParser
         ];
 
         return $options[$type] ?? ['Inspect the linked Composer evidence.'];
+    }
+
+    private function extensionType(string $subject, ?TargetPlatform $platform): string
+    {
+        if ($platform === null) {
+            return 'extension-missing';
+        }
+
+        $assumption = $platform->extensionAssumption($subject);
+        if ($assumption === null || $assumption->state() === ExtensionAssumption::ABSENT) {
+            return 'extension-missing';
+        }
+
+        return $assumption->isPresentWithoutVersion()
+            ? 'extension-version-unknown'
+            : 'extension-version-incompatible';
     }
 }

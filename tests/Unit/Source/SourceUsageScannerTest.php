@@ -130,6 +130,10 @@ final class Example extends BaseClass implements Contract, \Vendor\Package\Other
         Client::STATUS;
         helper();
         \Vendor\Package\direct_helper();
+        \Vendor\Package\DIRECT_FLAG;
+        true;
+        false;
+        null;
 
         return new \Vendor\Package\CreatedClient();
     }
@@ -185,6 +189,10 @@ PHP);
             self::assertContains(['Vendor\\Package\\helper', 'function_import'], $usagePairs);
             self::assertContains(['Vendor\\Package\\helper', 'function_call'], $usagePairs);
             self::assertContains(['Vendor\\Package\\direct_helper', 'function_call'], $usagePairs);
+            self::assertContains(['Vendor\\Package\\DIRECT_FLAG', 'constant_access'], $usagePairs);
+            self::assertNotContains(['true', 'constant_access'], $usagePairs);
+            self::assertNotContains(['false', 'constant_access'], $usagePairs);
+            self::assertNotContains(['null', 'constant_access'], $usagePairs);
             self::assertSame([], $uncertainties);
             self::assertNotEmpty($evidence->all());
             self::assertContainsOnly('int', array_map(static fn ($usage): ?int => $usage->line(), $usages));
@@ -193,7 +201,7 @@ PHP);
         }
     }
 
-    public function testItAggregatesRepeatedUsagesPerFileAndTypeWhileRetainingEveryLocationEvidence(): void
+    public function testItPreservesRepeatedUsagesAtEveryExactLineWhileDeduplicatingExactObservations(): void
     {
         $projectPath = $this->createProject(<<<'PHP'
 <?php
@@ -212,17 +220,19 @@ PHP);
             $project = (new ProjectStateBuilder())->build($projectPath);
             $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
 
-            self::assertCount(3, $usages);
+            self::assertCount(4, $usages);
             self::assertSame('src/Example.php', $usages[0]->file());
             self::assertSame('Vendor\Package\Client', $usages[0]->symbol());
             self::assertSame('static_call', $usages[0]->usageType());
             self::assertSame(2, $usages[0]->line());
-            self::assertSame(['source-1', 'source-2'], $usages[0]->evidence());
-            self::assertSame('static_property_access', $usages[1]->usageType());
-            self::assertSame(['source-3'], $usages[1]->evidence());
-            self::assertSame('src/Other.php', $usages[2]->file());
-            self::assertSame('static_call', $usages[2]->usageType());
-            self::assertSame(['source-4'], $usages[2]->evidence());
+            self::assertSame(['source-1'], $usages[0]->evidence());
+            self::assertSame(3, $usages[1]->line());
+            self::assertSame(['source-2'], $usages[1]->evidence());
+            self::assertSame('static_property_access', $usages[2]->usageType());
+            self::assertSame(['source-3'], $usages[2]->evidence());
+            self::assertSame('src/Other.php', $usages[3]->file());
+            self::assertSame('static_call', $usages[3]->usageType());
+            self::assertSame(['source-4'], $usages[3]->evidence());
             self::assertSame(
                 [
                     ['src/Example.php', 2, 'static_call'],

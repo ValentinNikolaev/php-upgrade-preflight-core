@@ -18,9 +18,12 @@ use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
+use PhpUpgradePreflight\Core\Source\AutoloadOwnershipIndexBuilder;
+use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 
 final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
 {
@@ -34,6 +37,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     private FrameworkRuleEngine $frameworkRuleEngine;
     private RiskAndEffortEstimator $riskAndEffortEstimator;
     private ReportAssembler $reportAssembler;
+    private AutoloadOwnershipIndexBuilder $ownershipIndexBuilder;
+    private SourceImpactBuilder $sourceImpactBuilder;
 
     /** @param list<FrameworkIntegration> $frameworks */
     public function __construct(
@@ -47,7 +52,9 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         ?FrameworkRuleEngine $frameworkRuleEngine = null,
         ?RiskAndEffortEstimator $riskAndEffortEstimator = null,
         ?ReportAssembler $reportAssembler = null,
-        ?ScenarioSelector $scenarioSelector = null
+        ?ScenarioSelector $scenarioSelector = null,
+        ?AutoloadOwnershipIndexBuilder $ownershipIndexBuilder = null,
+        ?SourceImpactBuilder $sourceImpactBuilder = null
     ) {
         $this->projectStateBuilder = $projectStateBuilder ?? new ProjectStateBuilder();
         $this->scenarioRunner = $scenarioRunner ?? new ComposerScenarioRunner();
@@ -59,6 +66,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $this->frameworkRuleEngine = $frameworkRuleEngine ?? new FrameworkRuleEngine($frameworks);
         $this->riskAndEffortEstimator = $riskAndEffortEstimator ?? new RiskAndEffortEstimator();
         $this->reportAssembler = $reportAssembler ?? new ReportAssembler();
+        $this->ownershipIndexBuilder = $ownershipIndexBuilder ?? new AutoloadOwnershipIndexBuilder();
+        $this->sourceImpactBuilder = $sourceImpactBuilder ?? new SourceImpactBuilder();
     }
 
     public function analyzeUpgrade(UpgradeRequest $request): UpgradeReport
@@ -70,6 +79,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         }
 
         $project = $projectLoad->project();
+        $platform = TargetPlatform::fromRequest($request, $project);
         $targets = $this->targetNormalizer->normalize($request->targets()->packageTargets(), $request->targetPhp());
         $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
         $packageFamilyClassifiers = $this->frameworkRuleEngine->packageFamilyClassifiers($activeFrameworks);
@@ -85,7 +95,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $this->scenarioRunner->resetDiagnosticCache();
         $scenarioResults = [];
         foreach ($scenarios as $scenario) {
-            $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario);
+            $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario, $platform);
         }
 
         $bestResult = $this->bestSuccessfulResult($project->composerLock(), $scenarioResults);
@@ -102,25 +112,51 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $scenarioResults,
             $evidence,
             $bestLock ?? $project->composerLock(),
-            $requestedConstraints
+            $requestedConstraints,
+            $platform
         );
         $sourceUncertainties = $analysisUncertainties;
-        $sourceImpact = $this->sourceUsageScanner->scan(
+        $sourceInventory = $this->sourceUsageScanner->scan(
             $project,
             $sourcePaths,
             $evidence,
             $sourceUncertainties,
             $request->sourcePaths() !== []
         );
+        $frameworkGuidance = $this->frameworkRuleEngine->assessTransitions(
+            $activeFrameworks,
+            $project,
+            $request,
+            $evidence
+        );
         $frameworkFindings = $this->frameworkRuleEngine->evaluate(
             $activeFrameworks,
             $project,
             $request,
             $evidence,
-            $sourceImpact
+            $sourceInventory,
+            $frameworkGuidance,
+            $this->composerVersion($scenarioResults)
         );
-        $risk = $this->riskAndEffortEstimator->estimateRisk($blockers, $lockDiff->packageChanges(), $frameworkFindings);
-        $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges(), $sourceImpact, $frameworkFindings);
+        $ownershipIndex = $this->ownershipIndexBuilder->build(
+            $project,
+            $sourceUncertainties,
+            array_map(static fn ($usage): string => $usage->symbol(), $sourceInventory)
+        );
+        $actionableSourceImpact = $this->sourceImpactBuilder->build(
+            $sourceInventory,
+            $frameworkFindings,
+            $lockDiff->packageChanges(),
+            $ownershipIndex,
+            $evidence
+        );
+        $risk = $this->riskAndEffortEstimator->estimateRisk(
+            $blockers,
+            $lockDiff->packageChanges(),
+            $frameworkFindings,
+            $actionableSourceImpact
+        );
+        $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges(), $actionableSourceImpact, $frameworkFindings);
 
         return $this->reportAssembler->assemble(
             $request,
@@ -128,12 +164,15 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $scenarioResults,
             $lockDiff,
             $blockers,
-            $sourceImpact,
+            $sourceInventory,
             $frameworkFindings,
             $risk,
             $effort,
             $sourceUncertainties,
-            $evidence
+            $evidence,
+            $frameworkGuidance,
+            $platform,
+            $actionableSourceImpact
         );
     }
 
@@ -152,12 +191,17 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $outcome = ScenarioResult::OUTCOME_WORKSPACE_FAILURE;
         }
 
+        $safeFailureMessage = PathExposurePolicy::redactComposerText(
+            $failure->getMessage(),
+            $request->projectPath()
+        );
+
         $scenario = new Scenario('project-input', $request->targets(), false);
         $scenarioResult = new ScenarioResult(
             $scenario,
             1,
             '',
-            $failure->getMessage(),
+            $safeFailureMessage,
             null,
             null,
             ScenarioResult::FAILURE_OPERATIONAL,
@@ -184,7 +228,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
                 [],
                 ['Upgrade effort was not estimated because Composer project input could not be loaded.']
             ),
-            [sprintf('Composer project input could not be loaded: %s', $failure->getMessage())],
+            [sprintf('Composer project input could not be loaded: %s', $safeFailureMessage)],
             []
         );
     }
@@ -214,5 +258,17 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         });
 
         return $candidates[0][3];
+    }
+
+    /** @param list<ScenarioResult> $scenarioResults */
+    private function composerVersion(array $scenarioResults): ?string
+    {
+        foreach ($scenarioResults as $result) {
+            if ($result->composerVersion() !== null) {
+                return $result->composerVersion();
+            }
+        }
+
+        return null;
     }
 }

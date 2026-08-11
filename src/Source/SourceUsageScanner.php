@@ -49,7 +49,7 @@ final class SourceUsageScanner
         }
 
         foreach ($files as $file) {
-            $contents = file_get_contents($file);
+            $contents = @file_get_contents($file);
             if ($contents === false) {
                 $uncertainties[] = sprintf('Source file "%s" could not be read and was not scanned.', $this->relativePath($project->path(), $file));
                 continue;
@@ -78,7 +78,12 @@ final class SourceUsageScanner
                     'usage_type' => $detectedUsage['usage_type'],
                 ])->id();
 
-                $usageKey = serialize([$relative, $detectedUsage['symbol'], $detectedUsage['usage_type']]);
+                $usageKey = serialize([
+                    $relative,
+                    $detectedUsage['symbol'],
+                    $detectedUsage['usage_type'],
+                    $detectedUsage['line'],
+                ]);
                 if (isset($usageIndexes[$usageKey])) {
                     $index = $usageIndexes[$usageKey];
                     $usages[$index] = $usages[$index]->withAdditionalEvidence([$id]);

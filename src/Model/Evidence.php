@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Model;
 
+use PhpUpgradePreflight\Core\Support\SensitiveOutputRedactor;
+
 final class Evidence
 {
     public const E1_SOLVER = 'E1';
@@ -24,9 +26,13 @@ final class Evidence
     {
         $this->id = $id;
         $this->class = $class;
-        $this->summary = $summary;
+        $this->summary = SensitiveOutputRedactor::redact($summary);
         $this->confidence = $confidence;
-        $this->context = $context;
+        $sanitizedContext = SensitiveOutputRedactor::redactStructured($context);
+        if (!is_array($sanitizedContext)) {
+            throw new \LogicException('Evidence sanitization must preserve the context array.');
+        }
+        $this->context = $sanitizedContext;
     }
 
     public function id(): string

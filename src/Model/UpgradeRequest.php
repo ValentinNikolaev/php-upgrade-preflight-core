@@ -17,11 +17,13 @@ final class UpgradeRequest
     private string $format;
     private ?string $outputPath;
     private bool $debug;
+    private ExtensionAssumptionSet $extensionAssumptions;
 
     /**
      * @param list<UpgradeTarget> $targets
      * @param list<string> $sourcePaths
      * @param list<string> $frameworks
+     * @param list<ExtensionAssumption> $extensionAssumptions
      */
     public function __construct(
         string $projectPath,
@@ -32,12 +34,13 @@ final class UpgradeRequest
         array $frameworks = [],
         string $format = ReportFormat::JSON,
         ?string $outputPath = null,
-        bool $debug = false
+        bool $debug = false,
+        array $extensionAssumptions = []
     ) {
         $resolved = realpath($projectPath);
 
         if ($resolved === false || !is_dir($resolved)) {
-            throw new \InvalidArgumentException(sprintf('Project path "%s" does not exist.', $projectPath));
+            throw new \InvalidArgumentException('Project path does not exist.');
         }
 
         $this->projectPath = $resolved;
@@ -49,6 +52,7 @@ final class UpgradeRequest
         $this->format = ReportFormat::normalize($format);
         $this->outputPath = $outputPath;
         $this->debug = $debug;
+        $this->extensionAssumptions = new ExtensionAssumptionSet($extensionAssumptions);
     }
 
     public function projectPath(): string
@@ -96,6 +100,12 @@ final class UpgradeRequest
     public function debug(): bool
     {
         return $this->debug;
+    }
+
+    /** @return list<ExtensionAssumption> */
+    public function extensionAssumptions(): array
+    {
+        return $this->extensionAssumptions->all();
     }
 
     /** @return array{project_path: string, targets: list<array{package: string, constraint: string}>, from_php: ?string, target_php: ?string, source_paths: list<string>, frameworks: list<string>, format: string, output_path: ?string} */
@@ -171,11 +181,14 @@ final class UpgradeRequest
             $resolved = realpath($candidate);
 
             if ($resolved === false || (!is_file($resolved) && !is_dir($resolved))) {
-                throw new \InvalidArgumentException(sprintf('Source path "%s" does not exist.', $sourcePath));
+                throw new \InvalidArgumentException(sprintf('Source path at index %d does not exist.', $index));
             }
 
             if (!$this->isWithinProject($resolved)) {
-                throw new \InvalidArgumentException(sprintf('Source path "%s" must resolve inside the analyzed project.', $sourcePath));
+                throw new \InvalidArgumentException(sprintf(
+                    'Source path at index %d must resolve inside the analyzed project.',
+                    $index
+                ));
             }
 
             $relative = ltrim(str_replace('\\', '/', substr($resolved, strlen($this->projectPath))), '/');

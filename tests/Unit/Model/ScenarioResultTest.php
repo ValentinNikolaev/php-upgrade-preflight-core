@@ -9,6 +9,7 @@ use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PhpUpgradePreflight\Core\Model\UpgradeTargetSet;
+use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 use PHPUnit\Framework\TestCase;
 
 final class ScenarioResultTest extends TestCase
@@ -114,6 +115,83 @@ final class ScenarioResultTest extends TestCase
 
         self::assertSame(4000, strlen($serialized['diagnostics'][0]['stdout_excerpt']));
         self::assertSame(4000, strlen($serialized['diagnostics'][0]['stderr_excerpt']));
+    }
+
+    public function testWorkspacePathIsOnlyExposedByExplicitDebugSerialization(): void
+    {
+        $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-private-root';
+        $default = new ScenarioResult(
+            $this->scenario(),
+            1,
+            '',
+            'Cleanup failed.',
+            null,
+            $path,
+            ScenarioResult::FAILURE_OPERATIONAL,
+            null,
+            [],
+            0,
+            null,
+            [],
+            ScenarioResult::OUTCOME_CLEANUP_FAILURE
+        );
+        $debug = new ScenarioResult(
+            $this->scenario(),
+            1,
+            '',
+            'Debug failure.',
+            null,
+            $path,
+            ScenarioResult::FAILURE_OPERATIONAL,
+            null,
+            [],
+            0,
+            null,
+            [],
+            ScenarioResult::OUTCOME_PROCESS_FAILURE,
+            true
+        );
+
+        self::assertSame($path, $default->tempPath());
+        self::assertSame(PathExposurePolicy::ANALYZER_WORKSPACE, $default->toArray()['temp_path']);
+        self::assertSame($path, $debug->toArray()['temp_path']);
+    }
+
+    public function testWorkspacePathIsRemovedFromStoredOutputCommandsAndDiagnostics(): void
+    {
+        $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-private-root';
+        $diagnostic = new ComposerDiagnostic(
+            'fixture/dependency',
+            '^2.0',
+            ['composer', 'prohibits', $path . DIRECTORY_SEPARATOR . 'package'],
+            1,
+            'Diagnostic stdout in ' . $path,
+            'Diagnostic stderr in ' . $path
+        );
+        $result = new ScenarioResult(
+            $this->scenario(),
+            1,
+            'Scenario stdout in ' . $path,
+            'Scenario stderr in ' . $path,
+            null,
+            $path,
+            ScenarioResult::FAILURE_OPERATIONAL,
+            null,
+            ['composer', '--working-dir=' . $path],
+            0,
+            null,
+            [$diagnostic],
+            ScenarioResult::OUTCOME_PROCESS_FAILURE,
+            true
+        );
+
+        $serialized = json_encode($result->toArray(), JSON_THROW_ON_ERROR);
+
+        self::assertStringNotContainsString($path, $result->stdout());
+        self::assertStringNotContainsString($path, $result->stderr());
+        self::assertSame($path, $result->tempPath());
+        self::assertStringContainsString($path, $result->toArray()['temp_path']);
+        self::assertSame(6, substr_count($serialized, PathExposurePolicy::ANALYZER_WORKSPACE));
     }
 
     private function scenario(): Scenario

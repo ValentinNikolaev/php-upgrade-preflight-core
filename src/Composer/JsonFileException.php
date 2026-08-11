@@ -18,4 +18,9 @@ abstract class JsonFileException extends \RuntimeException
     {
         return $this->path;
     }
+
+    public function __toString(): string
+    {
+        return sprintf('%s: %s', static::class, $this->getMessage());
+    }
 }

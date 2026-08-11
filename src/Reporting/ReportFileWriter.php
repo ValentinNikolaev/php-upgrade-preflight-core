@@ -40,7 +40,7 @@ final class ReportFileWriter
         $resolvedProject = realpath($projectPath);
 
         if ($resolvedProject === false) {
-            throw new \InvalidArgumentException(sprintf('Project path "%s" does not exist.', $projectPath));
+            throw new \InvalidArgumentException('The analyzed project path does not exist.');
         }
 
         if ($this->isWithin($resolvedProject, $resolvedPath)) {
@@ -48,15 +48,15 @@ final class ReportFileWriter
         }
 
         if (is_dir($absolutePath)) {
-            throw new \InvalidArgumentException(sprintf('Report output path "%s" is a directory.', $outputPath));
+            throw new \InvalidArgumentException('The report output path is a directory.');
         }
 
         if (is_file($absolutePath) && !is_writable($absolutePath)) {
-            throw new \InvalidArgumentException(sprintf('Report output path "%s" is not writable.', $outputPath));
+            throw new \InvalidArgumentException('The report output path is not writable.');
         }
 
         if (!file_exists($absolutePath) && !is_writable(dirname($absolutePath))) {
-            throw new \InvalidArgumentException(sprintf('Report output directory "%s" is not writable.', dirname($absolutePath)));
+            throw new \InvalidArgumentException('The report output directory is not writable.');
         }
 
         return Path::canonicalize($absolutePath);
@@ -71,7 +71,7 @@ final class ReportFileWriter
 
         $parent = realpath(dirname($absolutePath));
         if ($parent === false || !is_dir($parent)) {
-            throw new \InvalidArgumentException(sprintf('Report output directory "%s" does not exist.', dirname($absolutePath)));
+            throw new \InvalidArgumentException('The report output directory does not exist.');
         }
 
         return Path::canonicalize($parent . DIRECTORY_SEPARATOR . basename($absolutePath));

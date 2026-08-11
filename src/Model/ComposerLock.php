@@ -71,12 +71,21 @@ final class ComposerLock
                     $this->packageReference($package, 'source'),
                     $this->packageReference($package, 'dist'),
                     ($package['abandoned'] ?? false) === true || $abandonedAlternative !== null,
-                    $abandonedAlternative
+                    $abandonedAlternative,
+                    $this->autoloadMetadata($package, 'autoload')
                 );
             }
         }
 
         return $indexed;
+    }
+
+    /** @param array<string, mixed> $package @return array<string, mixed> */
+    private function autoloadMetadata(array $package, string $key): array
+    {
+        $autoload = $package[$key] ?? null;
+
+        return is_array($autoload) ? $autoload : [];
     }
 
     /** @param array<string, mixed> $package */

@@ -27,9 +27,13 @@ final class CandidateLockEvidence
 
     public static function fromFile(string $path, ComposerLock $lock): self
     {
-        $sha256 = hash_file('sha256', $path);
+        if (!is_file($path)) {
+            throw new \RuntimeException('Unable to fingerprint the candidate Composer lockfile.');
+        }
+
+        $sha256 = @hash_file('sha256', $path);
         if ($sha256 === false) {
-            throw new \RuntimeException(sprintf('Unable to fingerprint candidate Composer lock "%s".', $path));
+            throw new \RuntimeException('Unable to fingerprint the candidate Composer lockfile.');
         }
 
         return self::fromLock($lock, $sha256);

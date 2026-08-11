@@ -60,6 +60,7 @@ final class ReportAssemblerTest extends TestCase
             'Composer scenario "exact-target" could not complete because of an analysis-environment failure.',
             'Dependency resolution does not prove application runtime compatibility; the project test suite must run on the target runtime.',
             'No Composer "test" script was found, so the project\'s canonical test command is unknown.',
+            'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.',
         ], $report->uncertainties());
         self::assertSame($evidenceId, $report->evidence()[0]->id());
         self::assertCount(1, $report->rootConstraintChanges());

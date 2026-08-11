@@ -73,6 +73,11 @@ final class SourceUsageVisitor extends NodeVisitorAbstract
             $this->addSpecificNameUsage($node->name, 'attribute');
         } elseif ($node instanceof Expr\FuncCall && $node->name instanceof Name) {
             $this->addSpecificNameUsage($node->name, 'function_call');
+        } elseif ($node instanceof Expr\ConstFetch) {
+            if (in_array(strtolower((string) $node->name), ['true', 'false', 'null'], true)) {
+                return $node;
+            }
+            $this->addSpecificNameUsage($node->name, 'constant_access');
         } elseif ($node instanceof Name
             && $node->getAttribute(ExplicitFullyQualifiedNameVisitor::ATTRIBUTE) === true
             && !isset($this->specificallyClassifiedNames[spl_object_id($node)])) {

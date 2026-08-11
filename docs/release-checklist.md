@@ -1,74 +1,78 @@
-# v0.1 release checklist
+# Release checklist
 
-Run this checklist from a clean release candidate commit. Record command output or CI links in the release notes.
+Run this checklist from a clean release-candidate commit. Set `VERSION` to an exact `MAJOR.MINOR.PATCH` value and derive `TAG=v$VERSION`, `SERIES=MAJOR.MINOR`, and `DEV_VERSION=$SERIES.x-dev`. Record command output and CI links in `docs/releases/v$VERSION.md` instead of writing release-specific values into this checklist.
+
+The active `0.2.x` release line is prepared from `main`. Historical `0.1.x` maintenance requires a separate, explicit release-policy change.
 
 ## Version and contract
 
-- [ ] Confirm `ReportMetadata::TOOL_VERSION` is `0.1.0` and the current schema stays `0.6`.
-- [ ] Confirm every package dependency on another project package uses `^0.1`.
-- [ ] Confirm all package manifests use `0.1.x-dev` as the `dev-main` branch alias.
-- [ ] Confirm the release verifier rejects every series except patch releases on `0.1.x`.
-- [ ] Move any remaining changelog entries under `0.1.0` and confirm the release date.
-- [ ] Validate links in README, package support metadata, schema docs, security policy, and changelog.
+- [ ] Confirm the requested release series is enabled by `ReleaseVerifier::ACTIVE_RELEASE_SERIES`.
+- [ ] Confirm the approved release branch exists on `origin`, is protected, and contains the release-candidate commit (`0.1.x` for `0.1.x`; `main` for later approved series).
+- [ ] Confirm `ReportMetadata::TOOL_VERSION` is the exact `VERSION` and the release notes describe `ReportMetadata::SCHEMA_VERSION`.
+- [ ] Confirm the active release schema matches `ReleaseVerifier::ACTIVE_SCHEMA_VERSION`.
+- [ ] Confirm every package dependency on another project package uses `^$SERIES`.
+- [ ] Confirm root path versions, root requirements, and every `dev-main` branch alias use `DEV_VERSION`.
+- [ ] Move releasable changelog entries under a dated `[VERSION]` heading.
+- [ ] Create `docs/releases/v$VERSION.md` with `# PHP Upgrade Preflight v$VERSION` as its first line.
+- [ ] Validate links in README, package support metadata, schema docs, security policy, changelog, and release notes.
 
-Run `composer release:verify -- 0.1.0` to enforce the version, branch-alias, internal-constraint, changelog, and release-notes checks above. Composer package versions come from tags; do not add `version` fields to package manifests.
+Run `composer release:verify -- VERSION` to enforce the release-series, tool-version, branch-alias, internal-constraint, changelog, and release-notes checks. Composer package versions come from tags; do not add `version` fields to package manifests.
 
 ## Deterministic quality gate
 
-- [ ] Run `composer check` on PHP 8.0 through PHP 8.5.
-- [ ] Confirm the Windows PHP 8.3 and Ubuntu jobs pass.
-- [ ] Run `composer test:fixtures` and review all six JSON and Markdown snapshot pairs.
+- [ ] Run `composer check` on every supported analyzer PHP version.
+- [ ] Confirm the required Windows and Ubuntu jobs pass.
+- [ ] Confirm the coverage, changed-code, selective-mutation, and representative-corpus budget gates pass.
+- [ ] Confirm the release dependency audit reports no vulnerable locked packages.
+- [ ] Export a machine-readable inventory of the locked release dependencies (CycloneDX/SPDX SBOM or `composer show --locked --format=json`) and retain it with the release evidence.
+- [ ] Run `composer test:fixtures` and review every JSON and Markdown snapshot pair.
 - [ ] Confirm fixture immutability assertions pass and `git status --short` shows no fixture changes.
+- [ ] Enforce the representative-corpus report-size, runtime, memory, redaction, and ordering budgets in [the v0.2 contract](v0.2-contract.md), when applicable to the release line.
 - [ ] Run normal and `--prefer-lowest` clean dependency installs for each package subtree on its declared PHP floor.
-- [ ] Install the Laravel adapter against supported Illuminate 8, 9, and 10 applications; also smoke-test the declared 11 and 12 constraints.
-- [ ] Confirm every Laravel host-line smoke boots the application and verifies provider discovery, analyzer binding, command registration, and the harmless no-target invocation.
-- [ ] Confirm the synthetic Composer credential fixture is absent from JSON, Markdown, captured diagnostics, and all generated ZIP entries.
+- [ ] Install the Laravel adapter against every advertised Illuminate host line and run the application-boot smoke.
+- [ ] Confirm every host-line smoke verifies provider discovery, analyzer binding, command registration, and a harmless invocation.
+- [ ] Confirm the test-only third-party adapter is discovered solely from Composer metadata and proves detection, default source paths, compatibility rules, and package-family classification without a CLI source registration.
+- [ ] Confirm adapter discovery tests cover deterministic ordering, malformed metadata, duplicate class and case-insensitive name collisions, unavailable classes/packages, and explicit `--framework` failures.
+- [ ] Confirm synthetic credentials are absent from JSON, Markdown, captured diagnostics, workflow logs, and generated ZIP entries.
 
-The historical Laravel host matrix uses Composer's `--no-security-blocking` option so published advisories do not prevent installability and application-boot checks. This flag is limited to ephemeral compatibility consumers; a passing compatibility job is not a security endorsement of an old Laravel release, and advisory review remains a separate maintainer decision.
+Historical host matrices may need Composer's `--no-security-blocking` option when a released old framework has advisories. Limit that flag to ephemeral compatibility consumers; installability is not a security endorsement.
 
 ## Fresh-clone audit
 
-- [ ] Clone the release candidate into a new directory with no existing `vendor` tree.
-- [ ] Run `composer install` and `composer check` in the documented Docker environment.
-- [ ] Install the CLI and Laravel adapter in a separate tools directory.
-- [ ] Analyze a copied documented fixture in JSON and Markdown modes.
-- [ ] Hash or snapshot the fixture before and after, then confirm byte-for-byte equality.
+- [ ] Clone the release candidate into a directory with no existing `vendor` tree.
+- [ ] Run `composer install` and `composer check` in the documented environment.
+- [ ] Install the CLI and framework adapters in a separate tools directory.
+- [ ] Analyze the copied PHP 7.4 fixture from that tools installation in JSON and Markdown modes without installing anything into the target.
+- [ ] Hash the fixture before and after and confirm byte-for-byte equality.
 - [ ] Test an output path containing spaces on Windows and Unix.
 
-The `Release` workflow performs the clean install, deterministic gate, JSON and Markdown analysis, fixture digest comparison, and spaced-output-path audit from a second clone on both Windows and Linux.
+The release workflow performs the clean install, deterministic gate, JSON and Markdown analysis, fixture digest comparison, and spaced-output-path audit from a second clone on both platforms.
 
 ## Package distribution
 
-This repository is a monorepo. Packagist reads a package manifest from the root of each distribution repository, so publish the `core`, `cli`, and `laravel` subtrees to their corresponding package repositories before submission.
+This repository is a monorepo. Packagist reads a package manifest from the root of each distribution repository, so publish `core`, `cli`, and `laravel` subtrees to their corresponding repositories before synchronization.
 
-- [ ] Split `packages/core`, `packages/cli`, and `packages/laravel` with history preserved.
-- [ ] Confirm each split root contains its `composer.json`, source, schema resources where applicable, license, readme, changelog, and security information.
-- [ ] Run `composer validate --strict` at the root of each split.
-- [ ] Create matching signed `v0.1.0` tags on all three package repositories from the approved monorepo commit.
-- [ ] Submit or update all three Packagist packages and enable GitHub synchronization.
-- [ ] Install `php-upgrade-preflight/cli:^0.1` and `php-upgrade-preflight/laravel:^0.1` from Packagist in an empty tools directory.
-- [ ] Confirm `vendor/bin/upgrade-intel --help` and Laravel package discovery work from distribution archives.
+For v0.2 these Composer packages are the only supported external distribution. The generated package ZIPs are Composer distribution artifacts, not a PHAR. Do not attach a PHAR or publish a project container image as a supported v0.2 runtime; the development Docker files are outside the release surface.
 
-Do not submit the monorepo root package to Packagist. Its path repositories support development and cannot resolve as dependency repositories for consumers.
+- [ ] Split every package subtree with history preserved.
+- [ ] Confirm each split contains its manifest, source, schema resources where applicable, license, shared readme, changelog, security policy, and documentation.
+- [ ] Record each split commit, source monorepo commit, archive filename, SHA-256 digest, and dependency-inventory digest as artifact provenance.
+- [ ] Run `composer validate --strict` at every split root.
+- [ ] Create matching signed `TAG` tags on the monorepo and all distribution repositories from the approved commit.
+- [ ] Update all Packagist packages and confirm GitHub synchronization.
+- [ ] Install the released package constraints from Packagist in an empty directory.
+- [ ] Confirm the generic CLI help, one analysis, framework package discovery, and target-project immutability from distribution artifacts.
 
-The release workflow stages each package with its license and shared README, changelog, security, and documentation files, then produces validated Composer archives and SHA-256 checksums. The distribution-repository split, signed tags, and Packagist synchronization remain explicit maintainer actions because they require access to separate repositories.
+Do not submit the monorepo root package to Packagist. Its path repositories exist only for development.
 
-Before upload or publication, the workflow stamps the release version only into each temporary archive manifest, verifies `SHA256SUMS`, scans archive contents for synthetic secret canaries, and installs `core`, `cli`, and `laravel` from the ZIPs in three clean consumers. The consumer gate runs `upgrade-intel --help`, one canonical JSON analysis with a before/after fixture digest, and the Laravel package-discovery boot harness.
+The workflow stamps the exact release version only into temporary archive manifests, verifies every checksum against the attached asset bytes, validates the dependency inventory and source-bound provenance, scans archives for seeded secrets, and installs every package ZIP in clean consumers. For a tag release it also downloads each matching signed distribution tag and compares the complete extracted payload with the expected split package, including shared documentation. The published quick-start check hashes a copied target before and after analysis so a successful command cannot hide target mutation. Distribution-repository updates and Packagist synchronization remain explicit maintainer actions.
 
 ## Publish
 
-- [ ] Create the GitHub release from the signed `v0.1.0` tag and attach release notes derived from the changelog.
-- [ ] Confirm Packagist shows the license, authors, keywords, homepage, support links, and `0.1.0` for each package.
+- [ ] Create the GitHub release from the signed `TAG` and attach release notes derived from the changelog.
+- [ ] Confirm Packagist shows the expected metadata and exact version for every package.
 - [ ] Run the README quick start using only published packages.
-- [ ] Announce any known limitations and link to the schema compatibility policy.
+- [ ] Announce supported transitions, schema migration requirements, and known limitations.
+- [ ] Record the workflow run, approved commit, signed tag verification, distribution split commits, archive checksums, dependency-inventory checksum, immutable-fixture checksum, release URL, and Packagist evidence in `docs/releases/v$VERSION.md`.
 
-A manual `Release` workflow run verifies and packages a version without publishing. Pushing a matching annotated tag publishes the GitHub release only after GitHub verifies its signature, its commit is confirmed on `main`, and the deterministic suite, dependency matrix, and fresh-clone audits pass.
-
-## Release evidence
-
-- [ ] Manual `Release` workflow URL: pending.
-- [ ] Approved release commit: pending.
-- [ ] `release-archives` artifact and independently verified `SHA256SUMS`: pending.
-- [ ] Archive-installed fixture SHA-256 before and after: pending.
-- [ ] Published GitHub release URL: pending.
-- [ ] Packagist `core`, `cli`, and `laravel` install evidence: pending.
+A manual `Release` run verifies and packages without publishing. A matching annotated tag publishes only after GitHub verifies its signature, confirms its commit is on `main` or (for `0.1.x`) the protected `0.1.x` maintenance line, and all release gates pass. Historical v0.1.0 evidence is retained in [`docs/releases/v0.1.0.md`](releases/v0.1.0.md).

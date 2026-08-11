@@ -15,6 +15,8 @@ final class PackageRef
     private ?string $distReference;
     private bool $abandoned;
     private ?string $abandonedAlternative;
+    /** @var array<string, mixed> */
+    private array $autoload;
 
     public function __construct(
         string $name,
@@ -23,7 +25,8 @@ final class PackageRef
         ?string $sourceReference = null,
         ?string $distReference = null,
         bool $abandoned = false,
-        ?string $abandonedAlternative = null
+        ?string $abandonedAlternative = null,
+        array $autoload = []
     ) {
         $this->name = strtolower($name);
         $this->version = $version;
@@ -33,6 +36,7 @@ final class PackageRef
         $abandonedAlternative = $abandonedAlternative === null ? null : trim($abandonedAlternative);
         $this->abandonedAlternative = $abandonedAlternative === '' ? null : $abandonedAlternative;
         $this->abandoned = $abandoned || $this->abandonedAlternative !== null;
+        $this->autoload = $autoload;
     }
 
     public function name(): string
@@ -91,6 +95,12 @@ final class PackageRef
         }
 
         return filter_var($this->abandonedAlternative, FILTER_VALIDATE_URL) === false ? 'other' : 'url';
+    }
+
+    /** @return array<string, mixed> */
+    public function autoload(): array
+    {
+        return $this->autoload;
     }
 
     /** @return array{name: string, version: string, direct: bool, source_reference: ?string, dist_reference: ?string, abandoned: bool, abandoned_alternative: ?string, abandoned_alternative_type: ?string} */

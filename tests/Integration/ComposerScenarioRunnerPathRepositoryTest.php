@@ -9,6 +9,7 @@ use PhpUpgradePreflight\Core\Analysis\DefaultUpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Composer\ComposerScenarioRunner;
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\ExtensionAssumption;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -89,6 +90,42 @@ final class ComposerScenarioRunnerPathRepositoryTest extends TestCase
         self::assertSame('fixture/dependency', $json['blockers'][0]['subject']);
         self::assertSame('^3.0', $json['blockers'][0]['requested_constraint']);
         self::assertSame(['solver-1', 'solver-2', 'solver-3'], $json['blockers'][0]['evidence']);
+        $snapshot->assertUnchanged($this);
+    }
+
+    public function testPresenceOnlyExtensionConstraintProducesAnUnknownAdvisoryInsteadOfABlocker(): void
+    {
+        if (!$this->composerIsAvailable()) {
+            self::markTestSkipped('Composer is required for the path-repository integration test.');
+        }
+
+        $projectPath = dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'path-repository' . DIRECTORY_SEPARATOR . 'project';
+        $snapshot = FixtureSnapshot::capture(dirname($projectPath));
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget('fixture/dependency', '^2.0')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [ExtensionAssumption::fromPresenceInput('ext-json')]
+        );
+
+        $report = (new DefaultUpgradeAnalyzer())->analyzeUpgrade($request);
+
+        self::assertSame('unknown', $report->resolutionStatus());
+        self::assertTrue($report->scenarios()[0]->succeeded(), $report->scenarios()[0]->stderr());
+        self::assertCount(1, $report->blockers());
+        self::assertSame('extension-version-unknown', $report->blockers()[0]->type());
+        self::assertSame('ext-json', $report->blockers()[0]->subject());
+        self::assertFalse($report->blockers()[0]->blocksResolution());
+        self::assertStringContainsString(
+            'related solver failures are advisory rather than reproducible blockers',
+            implode(' ', $report->uncertainties())
+        );
         $snapshot->assertUnchanged($this);
     }
 

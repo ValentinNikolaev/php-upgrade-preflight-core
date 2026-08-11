@@ -195,6 +195,15 @@ final class ContextualSourceUsageVisitor extends NodeVisitorAbstract
 
         $method = strtolower((string) $call->name);
 
+        if ($method === 'dispatchnow'
+            && $call instanceof Expr\StaticCall
+            && $call->class instanceof Name) {
+            $class = strtolower(ltrim((string) $call->class, '\\'));
+            if ($class === 'bus' || str_ends_with($class, '\\facades\\bus')) {
+                $this->addUsage((string) $call->class . '::dispatchNow', 'deprecated_queue_dispatch', $call->getStartLine());
+            }
+        }
+
         if ($this->isConfigCall($call, $method) && isset($call->args[0])) {
             $this->addConfigReferences($call->args[0]->value, $method !== 'set');
         }

@@ -10,6 +10,7 @@ use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\TargetPlatform;
 
 final class BlockerGrouper
 {
@@ -33,7 +34,8 @@ final class BlockerGrouper
         array $scenarioResults,
         EvidenceLedger $evidence,
         ?ComposerLock $metadataLock = null,
-        array $requestedConstraints = []
+        array $requestedConstraints = [],
+        ?TargetPlatform $platform = null
     ): array {
         $metadataLock = $metadataLock ?? $this->successfulLock($scenarioResults);
         $blockers = $metadataLock === null
@@ -68,7 +70,7 @@ final class BlockerGrouper
                 'diagnostics' => array_map(static fn (ComposerDiagnostic $diagnostic): array => $diagnostic->toArray(), $result->diagnostics()),
             ])->id();
 
-            foreach ($this->parser->parse($result, $evidenceId) as $blocker) {
+            foreach ($this->parser->parse($result, $evidenceId, $platform) as $blocker) {
                 if ($blocker->type() === 'abandoned-package' && isset($abandonedPackageIndexes[$blocker->subject()])) {
                     $index = $abandonedPackageIndexes[$blocker->subject()];
                     $blockers[$index] = $blockers[$index]->withAdditionalEvidence($blocker->evidence());
