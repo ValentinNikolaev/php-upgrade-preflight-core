@@ -20,7 +20,7 @@ The signed v0.1.0 release and its schema `0.6` artifacts remain immutable histor
 
 ## v0.2 release and development identity
 
-The v0.2.0 release identifies reports as tool `0.2.0` with schema `0.7`. Root path repositories and package branch aliases use `0.2.x-dev`, while internal package constraints use `^0.2`. Composer derives exact package releases from matching Git tags; package manifests do not declare a `version` field.
+The current v0.2.1 release identifies reports as tool `0.2.1` with schema `0.7`; v0.2.0 reports use the same schema. Root path repositories and package branch aliases use `0.2.x-dev`, while internal package constraints use `^0.2`. Composer derives exact package releases from matching Git tags; package manifests do not declare a `version` field.
 
 The branch aliases describe Composer's `dev-main` line, not the version embedded in release reports. Future v0.2 patch releases update the exact tool version, dated changelog entry, and release notes together while retaining `0.2.x-dev` aliases and `^0.2` internal constraints. Exact release tags never use a `-dev` suffix.
 

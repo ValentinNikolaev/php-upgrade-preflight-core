@@ -8,7 +8,7 @@ JSON reports use a versioned consumer contract. Tool releases and schema release
     "schema_version": "0.7",
     "tool": {
       "name": "php-upgrade-preflight",
-      "version": "0.2.0"
+      "version": "0.2.1"
     }
   }
 }
@@ -18,7 +18,7 @@ Select a parser or validator through `metadata.schema_version`. Do not infer the
 
 ## Current contract
 
-PHP Upgrade Preflight v0.2.0 writes the strict Draft 2020-12 [`upgrade-report-v0.7.schema.json`](../packages/core/resources/schema/upgrade-report-v0.7.schema.json). It rejects unknown properties and defines scenario outcomes, structured blockers, platform provenance, package changes, framework-transition guidance, source inventory, actionable source impact, risk, effort, and uncertainties.
+PHP Upgrade Preflight v0.2.1 writes the strict Draft 2020-12 [`upgrade-report-v0.7.schema.json`](../packages/core/resources/schema/upgrade-report-v0.7.schema.json). It rejects unknown properties and defines scenario outcomes, structured blockers, platform provenance, package changes, framework-transition guidance, source inventory, actionable source impact, risk, effort, and uncertainties.
 
 Historical schemas remain in the same directory for consumers that store older reports:
 

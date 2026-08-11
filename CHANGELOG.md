@@ -4,6 +4,23 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-11
+
+### Fixed
+
+- Canonicalized coverage source paths on Windows so the deterministic coverage ratchet accepts equivalent long and short filesystem paths without weakening stale-coverage detection.
+- Generated Composer artifact-repository JSON with escaped, slash-normalized paths and provisioned `ext-fileinfo` for the Windows release-archive Laravel consumer.
+- Removed seeded release-verifier canaries from package test sources while retaining independent provider-token redaction specimens.
+
+### Changed
+
+- Published-package verification now requires Core, CLI, and Laravel to resolve to the exact source and distribution commits behind their verified signed tags, preventing a version-only Packagist check from accepting an immutable stale reference.
+- Reports identify the patch release as `0.2.1`; schema `0.7`, `0.2.x-dev` branch aliases, and `^0.2` internal constraints are unchanged.
+
+### Security
+
+- Added a package-source canary boundary test and exact installed-reference verification for the Packagist quick start.
+
 ## [0.2.0] - 2026-08-11
 
 ### Added
@@ -56,6 +73,7 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 - Checksum-verified release-archive consumers that install all three ZIPs, run the CLI, analyze an immutable fixture, and boot Laravel package discovery before publication.
 - Composer-installed CLI entry-point discovery for both generated proxy and standard `vendor/` package layouts.
 
-[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.1.0
