@@ -8,7 +8,7 @@ final class ReportMetadata
 {
     public const SCHEMA_VERSION = '0.7';
     public const TOOL_NAME = 'php-upgrade-preflight';
-    public const TOOL_VERSION = '0.2.0-dev';
+    public const TOOL_VERSION = '0.2.0';
 
     public function schemaVersion(): string
     {
