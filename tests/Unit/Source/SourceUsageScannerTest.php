@@ -4,9 +4,21 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Tests\Unit\Source;
 
+use PhpParser\Node;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Name;
+use PhpParser\Node\Stmt;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitorAbstract;
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
+use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
+use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Framework\SourceUsageVisitorProvider;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\SourceUsage;
+use PhpUpgradePreflight\Core\Source\SourceUsageCollector;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -286,20 +298,22 @@ PHP);
         }
     }
 
-    public function testContextualInspectionClassifiesUpgradeSensitiveSourceUsages(): void
+    /**
+     * Core owns no framework vocabulary. Without an active integration that contributes
+     * a collector, a Laravel-shaped project must yield only framework-neutral usage
+     * types; the Laravel vocabulary now belongs to the Laravel adapter.
+     *
+     * @see \PhpUpgradePreflight\Laravel\Tests\Unit\Source\LaravelSourceUsageVisitorTest
+     */
+    public function testScanWithoutIntegrationsEmitsNoFrameworkVocabulary(): void
     {
         $projectPath = $this->createProject(<<<'PHP'
 <?php
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Config;
-
 config('services.mailgun.domain');
-config(['services.mailgun.secret' => 'secret']);
 config()->get('cache.default');
-Config::get('app.timezone');
-config($dynamicKey);
 PHP);
 
         $sources = [
@@ -312,7 +326,6 @@ return [
     ],
     'aliases' => [
         'Package' => Vendor\Package\Facades\Package::class,
-        'Legacy' => 'Vendor\\Package\\Facades\\Legacy',
     ],
 ];
 PHP,
@@ -320,15 +333,6 @@ PHP,
 <?php
 
 return [App\Providers\BootstrapServiceProvider::class];
-PHP,
-            'app/Providers/AppServiceProvider.php' => <<<'PHP'
-<?php
-
-namespace App\Providers;
-
-use Illuminate\Support\ServiceProvider;
-
-final class AppServiceProvider extends ServiceProvider {}
 PHP,
             'app/Http/Kernel.php' => <<<'PHP'
 <?php
@@ -338,52 +342,8 @@ namespace App\Http;
 final class Kernel
 {
     protected $middleware = [\App\Http\Middleware\TrustHosts::class];
-    protected $middlewareGroups = ['web' => [\App\Http\Middleware\EncryptCookies::class]];
-
-    public function configure($route): void
-    {
-        $route->middleware([\App\Http\Middleware\Authenticate::class]);
-    }
-}
-PHP,
-            'app/Console/Kernel.php' => <<<'PHP'
-<?php
-
-namespace App\Console;
-
-final class Kernel
-{
     protected $commands = [\App\Console\Commands\RebuildIndex::class];
-
-    public function register($app): void
-    {
-        $app->register(\Vendor\Package\RuntimeServiceProvider::class);
-        $this->commands([\App\Console\Commands\WarmCache::class]);
-    }
 }
-PHP,
-            'app/Console/Commands/RebuildIndex.php' => <<<'PHP'
-<?php
-
-namespace App\Console\Commands;
-
-use Illuminate\Console\Command;
-
-final class RebuildIndex extends Command {}
-PHP,
-            'tests/ExampleTest.php' => <<<'PHP'
-<?php
-
-namespace Tests;
-
-use App\Contracts\Gateway;
-use App\Services\Mailer;
-use Mockery;
-
-$this->createMock(Gateway::class);
-$this->mock(Mailer::class);
-Mockery::mock('overload:App\Services\LegacyClient');
-Mailer::shouldReceive('send');
 PHP,
         ];
 
@@ -400,174 +360,33 @@ PHP,
             $project = (new ProjectStateBuilder())->build($projectPath);
             $usages = (new SourceUsageScanner())->scan(
                 $project,
-                ['src', 'app', 'bootstrap', 'config', 'tests'],
+                ['src', 'app', 'bootstrap', 'config'],
                 $evidence,
                 $uncertainties,
                 true
             );
-            $usageTriples = array_map(
-                static fn ($usage): array => [$usage->file(), $usage->symbol(), $usage->usageType()],
+            $usageTypes = array_values(array_unique(array_map(
+                static fn ($usage): string => $usage->usageType(),
                 $usages
-            );
+            )));
 
-            self::assertContains(['src/Example.php', 'services.mailgun.domain', 'config_reference'], $usageTriples);
-            self::assertContains(['src/Example.php', 'services.mailgun.secret', 'config_reference'], $usageTriples);
-            self::assertContains(['src/Example.php', 'cache.default', 'config_reference'], $usageTriples);
-            self::assertContains(['src/Example.php', 'app.timezone', 'config_reference'], $usageTriples);
-            self::assertNotContains(['src/Example.php', 'dynamicKey', 'config_reference'], $usageTriples);
-            self::assertContains(['config/app.php', 'Vendor\Package\PackageServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['config/app.php', 'Vendor\Package\Facades\Package', 'facade_alias'], $usageTriples);
-            self::assertContains(['config/app.php', 'Vendor\Package\Facades\Legacy', 'facade_alias'], $usageTriples);
-            self::assertContains(['bootstrap/providers.php', 'App\Providers\BootstrapServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['app/Providers/AppServiceProvider.php', 'App\Providers\AppServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['app/Console/Kernel.php', 'Vendor\Package\RuntimeServiceProvider', 'service_provider'], $usageTriples);
-            self::assertContains(['app/Http/Kernel.php', 'App\Http\Middleware\TrustHosts', 'middleware_reference'], $usageTriples);
-            self::assertContains(['app/Http/Kernel.php', 'App\Http\Middleware\EncryptCookies', 'middleware_reference'], $usageTriples);
-            self::assertContains(['app/Http/Kernel.php', 'App\Http\Middleware\Authenticate', 'middleware_reference'], $usageTriples);
-            self::assertContains(['app/Console/Kernel.php', 'App\Console\Commands\RebuildIndex', 'console_command'], $usageTriples);
-            self::assertContains(['app/Console/Kernel.php', 'App\Console\Commands\WarmCache', 'console_command'], $usageTriples);
-            self::assertContains(['app/Console/Commands/RebuildIndex.php', 'App\Console\Commands\RebuildIndex', 'console_command'], $usageTriples);
-            self::assertContains(['tests/ExampleTest.php', 'App\Contracts\Gateway', 'test_double'], $usageTriples);
-            self::assertContains(['tests/ExampleTest.php', 'App\Services\Mailer', 'test_double'], $usageTriples);
-            self::assertContains(['tests/ExampleTest.php', 'App\Services\LegacyClient', 'test_double'], $usageTriples);
-            self::assertSame([], $uncertainties);
-
-            $evidenceById = [];
-            foreach ($evidence->all() as $item) {
-                $evidenceById[$item->id()] = $item;
+            foreach ([
+                'config_reference',
+                'console_command',
+                'deprecated_queue_dispatch',
+                'facade_alias',
+                'middleware_reference',
+                'service_provider',
+                'test_double',
+            ] as $frameworkUsageType) {
+                self::assertNotContains(
+                    $frameworkUsageType,
+                    $usageTypes,
+                    sprintf('Core must not emit the adapter usage type "%s".', $frameworkUsageType)
+                );
             }
 
-            foreach ($usages as $usage) {
-                if (in_array($usage->usageType(), ['config_reference', 'service_provider', 'facade_alias', 'middleware_reference', 'console_command', 'test_double'], true)) {
-                    self::assertNotNull($usage->line());
-                    self::assertNotEmpty($usage->evidence());
-
-                    foreach ($usage->evidence() as $evidenceId) {
-                        self::assertArrayHasKey($evidenceId, $evidenceById);
-                        self::assertSame($usage->file(), $evidenceById[$evidenceId]->context()['file']);
-                        self::assertSame($usage->usageType(), $evidenceById[$evidenceId]->context()['usage_type']);
-                        self::assertIsInt($evidenceById[$evidenceId]->context()['line']);
-                    }
-                }
-            }
-        } finally {
-            (new Filesystem())->remove($projectPath);
-        }
-    }
-
-    public function testConfigArrayReadsAndWritesPreserveLiteralKeys(): void
-    {
-        $projectPath = $this->createProject(<<<'PHP'
-<?php
-
-namespace App;
-
-use Illuminate\Support\Facades\Config;
-
-Config::get(['app.name', 'app.env']);
-Config::getMany(['cache.default', 'queue.default']);
-Config::get(['mail.default' => 'smtp']);
-Config::set(['app.debug' => false]);
-PHP);
-        $evidence = new EvidenceLedger();
-        $uncertainties = [];
-
-        try {
-            $project = (new ProjectStateBuilder())->build($projectPath);
-            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
-            $configReferences = array_values(array_filter(
-                $usages,
-                static fn ($usage): bool => $usage->usageType() === 'config_reference'
-            ));
-
-            self::assertSame(
-                ['app.name', 'app.env', 'cache.default', 'queue.default', 'mail.default', 'app.debug'],
-                array_map(static fn ($usage): string => $usage->symbol(), $configReferences)
-            );
-            self::assertSame([], $uncertainties);
-        } finally {
-            (new Filesystem())->remove($projectPath);
-        }
-    }
-
-    public function testPhpUnitAndFacadeTestDoubleApisAreClassified(): void
-    {
-        $projectPath = $this->createProject(<<<'PHP'
-<?php
-
-namespace Tests;
-
-use App\Contracts\AbstractGateway;
-use App\Services\PartialMailer;
-use App\Support\ReusableBehavior;
-use Illuminate\Support\Facades\Event;
-
-$this->createPartialMock(PartialMailer::class, ['send']);
-$this->getMockForAbstractClass(AbstractGateway::class);
-$this->getMockForTrait(ReusableBehavior::class);
-Event::fake();
-PHP);
-        $evidence = new EvidenceLedger();
-        $uncertainties = [];
-
-        try {
-            $project = (new ProjectStateBuilder())->build($projectPath);
-            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
-            $testDoubles = array_values(array_filter(
-                $usages,
-                static fn ($usage): bool => $usage->usageType() === 'test_double'
-            ));
-
-            self::assertSame(
-                [
-                    'App\Services\PartialMailer',
-                    'App\Contracts\AbstractGateway',
-                    'App\Support\ReusableBehavior',
-                    'Illuminate\Support\Facades\Event',
-                ],
-                array_map(static fn ($usage): string => $usage->symbol(), $testDoubles)
-            );
-            self::assertSame([], $uncertainties);
-        } finally {
-            (new Filesystem())->remove($projectPath);
-        }
-    }
-
-    public function testRegisterRequiresApplicationContextOrAServiceProviderTarget(): void
-    {
-        $projectPath = $this->createProject(<<<'PHP'
-<?php
-
-namespace App;
-
-$serializer->register(\App\Serialization\JsonNormalizer::class);
-$container->register(\Vendor\Package\PackageServiceProvider::class);
-$app->register(\App\Providers\CustomProvider::class);
-$this->application->register(\App\Providers\OtherProvider::class);
-Application::register(\App\Providers\StaticProvider::class);
-PHP);
-        $evidence = new EvidenceLedger();
-        $uncertainties = [];
-
-        try {
-            $project = (new ProjectStateBuilder())->build($projectPath);
-            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true);
-            $serviceProviders = array_values(array_filter(
-                $usages,
-                static fn ($usage): bool => $usage->usageType() === 'service_provider'
-            ));
-            $symbols = array_map(static fn ($usage): string => $usage->symbol(), $serviceProviders);
-
-            self::assertNotContains('App\Serialization\JsonNormalizer', $symbols);
-            self::assertSame(
-                [
-                    'Vendor\Package\PackageServiceProvider',
-                    'App\Providers\CustomProvider',
-                    'App\Providers\OtherProvider',
-                    'App\Providers\StaticProvider',
-                ],
-                $symbols
-            );
+            self::assertContains('class_constant_access', $usageTypes);
             self::assertSame([], $uncertainties);
         } finally {
             (new Filesystem())->remove($projectPath);
@@ -699,6 +518,205 @@ PHP);
         }
     }
 
+    /**
+     * A contributed collector is third-party code running inside core's traversal. Every
+     * documented way it can misbehave degrades the contributed dimension with evidence; none
+     * of them may end an analysis whose Composer work already succeeded.
+     *
+     * @dataProvider adapterFailureProvider
+     */
+    public function testContributedCollectorFailuresAreContainedWithEvidence(string $mode, string $expectedReason): void
+    {
+        $projectPath = $this->createProject(<<<'PHP'
+<?php
+
+namespace App;
+
+final class Example
+{
+    public function run(): void
+    {
+        \Vendor\Package\Client::send();
+    }
+}
+PHP);
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true, [
+                new FixtureSourceUsageProvider('broken-adapter', $mode),
+            ]);
+
+            self::assertSame(
+                [['Vendor\\Package\\Client', 'static_call']],
+                array_map(static fn ($usage): array => [$usage->symbol(), $usage->usageType()], $usages)
+            );
+
+            $failures = $this->collectorFailureEvidence($evidence);
+            self::assertCount(1, $failures);
+            self::assertSame('source-collector-1', $failures[0]->id());
+            self::assertSame(Evidence::E2_PACKAGE_METADATA, $failures[0]->evidenceClass());
+            self::assertSame('high', $failures[0]->confidence());
+            self::assertSame('broken-adapter', $failures[0]->context()['provider']);
+            self::assertSame($expectedReason, $failures[0]->context()['reason']);
+            self::assertSame('src/Example.php', $failures[0]->context()['file']);
+            self::assertCount(1, $uncertainties);
+            self::assertStringContainsString('broken-adapter', $uncertainties[0]);
+            self::assertStringContainsString('source-collector-1', $uncertainties[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    /** @return array<string, array{string, string}> */
+    public function adapterFailureProvider(): array
+    {
+        return [
+            'the provider throws' => [FixtureSourceUsageProvider::MODE_PROVIDER_THROWS, 'provider_failure'],
+            'the provider yields a visitor that is not a collector' => [
+                FixtureSourceUsageProvider::MODE_INVALID_COLLECTOR,
+                'invalid_collector',
+            ],
+            'a contributed collector throws while traversing' => [
+                FixtureSourceUsageProvider::MODE_COLLECTOR_THROWS,
+                'collector_failure',
+            ],
+        ];
+    }
+
+    public function testAFailingAdapterIsReportedOnceWhileOtherAdaptersKeepContributing(): void
+    {
+        $projectPath = $this->createProject("<?php\nVendor\\Package\\Client::send();\n");
+        file_put_contents(
+            $projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Other.php',
+            "<?php\nVendor\\Package\\Other::send();\n"
+        );
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true, [
+                new FixtureSourceUsageProvider('broken-adapter', FixtureSourceUsageProvider::MODE_PROVIDER_THROWS),
+                new FixtureSourceUsageProvider('healthy-adapter', FixtureSourceUsageProvider::MODE_HEALTHY),
+            ]);
+
+            self::assertSame(
+                [
+                    ['src/Example.php', 'Vendor\\Package\\Client', 'static_call'],
+                    ['src/Example.php', 'Vendor\\Package\\Client', 'fixture_static_call'],
+                    ['src/Other.php', 'Vendor\\Package\\Other', 'static_call'],
+                    ['src/Other.php', 'Vendor\\Package\\Other', 'fixture_static_call'],
+                ],
+                array_map(
+                    static fn ($usage): array => [$usage->file(), $usage->symbol(), $usage->usageType()],
+                    $usages
+                )
+            );
+            self::assertCount(1, $this->collectorFailureEvidence($evidence));
+            self::assertCount(1, $uncertainties);
+            self::assertStringContainsString('src/Example.php', $uncertainties[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    /**
+     * One traverser applies a single traversal-control decision to its whole visitor list, so
+     * a contributed collector that prunes its own traversal must not silently delete core's
+     * usages from inside the pruned subtree. The framework-neutral inventory has to be
+     * identical with and without the adapter installed.
+     */
+    public function testAContributedCollectorCannotTruncateTheFrameworkNeutralInventory(): void
+    {
+        $projectPath = $this->createProject(<<<'PHP'
+<?php
+
+namespace App;
+
+final class Example
+{
+    public function run(): void
+    {
+        \Vendor\Package\Client::send();
+        \Vendor\Package\helper();
+
+        new \Vendor\Package\CreatedClient();
+    }
+}
+PHP);
+        $baselineEvidence = new EvidenceLedger();
+        $baselineUncertainties = [];
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $baseline = (new SourceUsageScanner())->scan(
+                $project,
+                ['src'],
+                $baselineEvidence,
+                $baselineUncertainties,
+                true
+            );
+            $usages = (new SourceUsageScanner())->scan($project, ['src'], $evidence, $uncertainties, true, [
+                new FixtureSourceUsageProvider('pruning-adapter', FixtureSourceUsageProvider::MODE_PRUNING_COLLECTOR),
+            ]);
+            $contributed = array_values(array_filter(
+                $usages,
+                static fn (SourceUsage $usage): bool => str_starts_with($usage->usageType(), 'fixture_')
+            ));
+            $frameworkNeutral = array_values(array_filter(
+                $usages,
+                static fn (SourceUsage $usage): bool => !str_starts_with($usage->usageType(), 'fixture_')
+            ));
+
+            self::assertSame(
+                ['static_call', 'function_call', 'instantiated_class'],
+                array_map(static fn ($usage): string => $usage->usageType(), $baseline),
+                'The fixture must keep every framework-neutral usage inside the pruned class body.'
+            );
+            self::assertSame($this->usageProjection($baseline), $this->usageProjection($frameworkNeutral));
+            self::assertSame(
+                [['src/Example.php', 'Example', 'fixture_class', 5]],
+                $this->usageProjection($contributed),
+                'The contributed collector must still control its own traversal.'
+            );
+            self::assertSame([], $uncertainties);
+            self::assertSame([], $this->collectorFailureEvidence($evidence));
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    /** @return list<Evidence> */
+    private function collectorFailureEvidence(EvidenceLedger $evidence): array
+    {
+        return array_values(array_filter(
+            $evidence->all(),
+            static fn (Evidence $item): bool => str_starts_with($item->id(), 'source-collector-')
+        ));
+    }
+
+    /**
+     * @param list<SourceUsage> $usages
+     * @return list<array{string, string, string, int|null}>
+     */
+    private function usageProjection(array $usages): array
+    {
+        return array_map(
+            static fn (SourceUsage $usage): array => [
+                $usage->file(),
+                $usage->symbol(),
+                $usage->usageType(),
+                $usage->line(),
+            ],
+            $usages
+        );
+    }
+
     private function createProject(string $source): string
     {
         $projectPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'source-usage-project-' . bin2hex(random_bytes(8));
@@ -708,5 +726,160 @@ PHP);
         file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Example.php', $source);
 
         return $projectPath;
+    }
+}
+
+/**
+ * Stands in for a third-party integration that contributes source-usage collectors. Each
+ * mode reproduces one way an adapter can misbehave inside core's traversal.
+ */
+final class FixtureSourceUsageProvider implements FrameworkIntegration, SourceUsageVisitorProvider
+{
+    public const MODE_HEALTHY = 'healthy';
+    public const MODE_PROVIDER_THROWS = 'provider_throws';
+    public const MODE_INVALID_COLLECTOR = 'invalid_collector';
+    public const MODE_COLLECTOR_THROWS = 'collector_throws';
+    public const MODE_PRUNING_COLLECTOR = 'pruning_collector';
+
+    private string $name;
+    private string $mode;
+
+    public function __construct(string $name, string $mode)
+    {
+        $this->name = $name;
+        $this->mode = $mode;
+    }
+
+    public function name(): string
+    {
+        return $this->name;
+    }
+
+    public function detect(ProjectState $project): FrameworkDetection
+    {
+        return new FrameworkDetection($this->name, true);
+    }
+
+    public function rules(): iterable
+    {
+        return [];
+    }
+
+    public function defaultSourcePaths(ProjectState $project): array
+    {
+        return ['src'];
+    }
+
+    public function sourceUsageVisitors(string $relativeFile): iterable
+    {
+        if ($this->mode === self::MODE_PROVIDER_THROWS) {
+            throw new \RuntimeException('The adapter failed while building its collectors.');
+        }
+
+        if ($this->mode === self::MODE_INVALID_COLLECTOR) {
+            yield new FixtureNonCollectorVisitor(); // @phpstan-ignore generator.valueType
+
+            return;
+        }
+
+        if ($this->mode === self::MODE_COLLECTOR_THROWS) {
+            yield new FixtureThrowingCollector();
+
+            return;
+        }
+
+        if ($this->mode === self::MODE_PRUNING_COLLECTOR) {
+            yield new FixturePruningCollector();
+
+            return;
+        }
+
+        yield new FixtureRecordingCollector();
+    }
+}
+
+/** A parser visitor that never satisfies the SourceUsageCollector contract. */
+final class FixtureNonCollectorVisitor extends NodeVisitorAbstract
+{
+}
+
+/** A contributed collector that fails while core traverses a file with it. */
+final class FixtureThrowingCollector extends NodeVisitorAbstract implements SourceUsageCollector
+{
+    public function enterNode(Node $node)
+    {
+        throw new \RuntimeException('The contributed collector failed while traversing.');
+    }
+
+    /** @return list<array{symbol: string, usage_type: string, line: int}> */
+    public function usages(): array
+    {
+        return [];
+    }
+}
+
+/**
+ * A contributed collector that stops descending once it has seen a class, which is an
+ * ordinary optimization for a visitor that believes it owns the traversal.
+ */
+final class FixturePruningCollector extends NodeVisitorAbstract implements SourceUsageCollector
+{
+    /** @var list<array{symbol: string, usage_type: string, line: int}> */
+    private array $usages = [];
+
+    /** @return Node|int */
+    public function enterNode(Node $node)
+    {
+        if ($node instanceof Stmt\Class_) {
+            $this->usages[] = [
+                'symbol' => $node->name === null ? 'anonymous' : (string) $node->name,
+                'usage_type' => 'fixture_class',
+                'line' => $node->getStartLine(),
+            ];
+
+            return NodeTraverser::DONT_TRAVERSE_CHILDREN;
+        }
+
+        if ($node instanceof Expr\StaticCall && $node->class instanceof Name) {
+            $this->usages[] = [
+                'symbol' => ltrim((string) $node->class, '\\'),
+                'usage_type' => 'fixture_static_call',
+                'line' => $node->getStartLine(),
+            ];
+        }
+
+        return $node;
+    }
+
+    /** @return list<array{symbol: string, usage_type: string, line: int}> */
+    public function usages(): array
+    {
+        return $this->usages;
+    }
+}
+
+/** A well-behaved contributed collector with its own adapter-owned vocabulary. */
+final class FixtureRecordingCollector extends NodeVisitorAbstract implements SourceUsageCollector
+{
+    /** @var list<array{symbol: string, usage_type: string, line: int}> */
+    private array $usages = [];
+
+    public function enterNode(Node $node): Node
+    {
+        if ($node instanceof Expr\StaticCall && $node->class instanceof Name) {
+            $this->usages[] = [
+                'symbol' => ltrim((string) $node->class, '\\'),
+                'usage_type' => 'fixture_static_call',
+                'line' => $node->getStartLine(),
+            ];
+        }
+
+        return $node;
+    }
+
+    /** @return list<array{symbol: string, usage_type: string, line: int}> */
+    public function usages(): array
+    {
+        return $this->usages;
     }
 }

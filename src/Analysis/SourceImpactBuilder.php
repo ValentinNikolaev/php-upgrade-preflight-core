@@ -12,8 +12,22 @@ use PhpUpgradePreflight\Core\Model\SourceImpactFinding;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Source\SymbolOwnershipIndex;
 
+/**
+ * Correlates scanned source usages with package changes and framework compatibility rules.
+ *
+ * Merging is delegated to {@see SourceImpactAccumulator} and justification prose to
+ * {@see SourceImpactReasonWriter}, leaving this class responsible only for deciding which
+ * usages matter and what their severity, ownership, and relevance are.
+ */
 final class SourceImpactBuilder
 {
+    private SourceImpactReasonWriter $reasonWriter;
+
+    public function __construct(?SourceImpactReasonWriter $reasonWriter = null)
+    {
+        $this->reasonWriter = $reasonWriter ?? new SourceImpactReasonWriter();
+    }
+
     /**
      * @param list<SourceUsage> $inventory
      * @param list<CompatibilityFinding> $frameworkFindings
@@ -27,25 +41,12 @@ final class SourceImpactBuilder
         ?SymbolOwnershipIndex $ownershipIndex = null,
         ?EvidenceLedger $evidence = null
     ): array {
-        $impact = [];
-        $impactIndexes = [];
+        $impact = new SourceImpactAccumulator();
         $relevantChanges = $this->relevantPackageChanges($packageChanges);
 
         foreach ($inventory as $usage) {
-            $matchingFindings = array_values(array_filter(
-                $frameworkFindings,
-                static fn (CompatibilityFinding $finding): bool => array_intersect(
-                    $usage->evidence(),
-                    $finding->evidence()
-                ) !== []
-            ));
-            $ownership = $ownershipIndex === null || !$this->isSymbolUsage($usage)
-                ? ['owners' => [], 'mapping_types' => [], 'matched_prefix' => null]
-                : $ownershipIndex->lookup(
-                    $usage->symbol(),
-                    $this->supportsPrefixOwnership($usage),
-                    $this->symbolType($usage)
-                );
+            $matchingFindings = $this->matchingFindings($usage, $frameworkFindings);
+            $ownership = $this->ownership($usage, $ownershipIndex);
 
             $changedOwners = [];
             foreach ($ownership['owners'] as $owner) {
@@ -60,7 +61,7 @@ final class SourceImpactBuilder
 
             if ($changedOwners !== []) {
                 foreach ($changedOwners as $owner => $change) {
-                    $impact = $this->appendFinding($impact, $impactIndexes, $this->finding(
+                    $impact->add($this->finding(
                         $usage,
                         $matchingFindings,
                         $change,
@@ -73,7 +74,7 @@ final class SourceImpactBuilder
                 continue;
             }
 
-            $impact = $this->appendFinding($impact, $impactIndexes, $this->finding(
+            $impact->add($this->finding(
                 $usage,
                 $matchingFindings,
                 null,
@@ -84,70 +85,36 @@ final class SourceImpactBuilder
             ));
         }
 
-        return $impact;
+        return $impact->findings();
     }
 
     /**
-     * @param list<SourceImpactFinding> $impact
-     * @param array<string, int> $indexes
-     * @return non-empty-list<SourceImpactFinding>
+     * @param list<CompatibilityFinding> $frameworkFindings
+     * @return list<CompatibilityFinding>
      */
-    private function appendFinding(array $impact, array &$indexes, SourceImpactFinding $finding): array
+    private function matchingFindings(SourceUsage $usage, array $frameworkFindings): array
     {
-        $first = $finding->occurrences()[0];
-        $key = serialize([
-            $finding->affectedPackage(),
-            $finding->ownership(),
-            $finding->relevance(),
-            $finding->reason(),
-            $finding->severity(),
-            $first->symbol(),
-            $first->usageType(),
-        ]);
-
-        if (!isset($indexes[$key])) {
-            $indexes[$key] = count($impact);
-            $impact[] = $finding;
-
-            return $impact;
-        }
-
-        $index = $indexes[$key];
-        $existing = $impact[$index];
-        $occurrences = $existing->occurrences();
-        $occurrenceIndexes = [];
-        foreach ($occurrences as $occurrenceIndex => $occurrence) {
-            $occurrenceIndexes[$this->occurrenceKey($occurrence)] = $occurrenceIndex;
-        }
-        foreach ($finding->occurrences() as $occurrence) {
-            $occurrenceKey = $this->occurrenceKey($occurrence);
-            if (isset($occurrenceIndexes[$occurrenceKey])) {
-                $occurrenceIndex = $occurrenceIndexes[$occurrenceKey];
-                $occurrences[$occurrenceIndex] = $occurrences[$occurrenceIndex]
-                    ->withAdditionalEvidence($occurrence->evidence());
-                continue;
-            }
-
-            $occurrenceIndexes[$occurrenceKey] = count($occurrences);
-            $occurrences[] = $occurrence;
-        }
-
-        $impact[$index] = new SourceImpactFinding(
-            $existing->affectedPackage(),
-            $existing->ownership(),
-            $existing->relevance(),
-            $existing->reason(),
-            $existing->severity(),
-            $occurrences,
-            array_merge($existing->evidence(), $finding->evidence())
-        );
-
-        return array_values($impact);
+        return array_values(array_filter(
+            $frameworkFindings,
+            static fn (CompatibilityFinding $finding): bool => array_intersect(
+                $usage->evidence(),
+                $finding->evidence()
+            ) !== []
+        ));
     }
 
-    private function occurrenceKey(SourceUsage $usage): string
+    /** @return array{owners: list<string>, mapping_types: list<string>, matched_prefix: ?string} */
+    private function ownership(SourceUsage $usage, ?SymbolOwnershipIndex $ownershipIndex): array
     {
-        return serialize([$usage->file(), $usage->symbol(), $usage->usageType(), $usage->line()]);
+        if ($ownershipIndex === null || !$this->isSymbolUsage($usage)) {
+            return ['owners' => [], 'mapping_types' => [], 'matched_prefix' => null];
+        }
+
+        return $ownershipIndex->lookup(
+            $usage->symbol(),
+            $this->supportsPrefixOwnership($usage),
+            $this->symbolType($usage)
+        );
     }
 
     /**
@@ -187,7 +154,7 @@ final class SourceImpactBuilder
             : 'framework_rule';
 
         if ($evidence !== null && $ownership['owners'] !== []) {
-            $references[] = $evidence->add(
+            $references[] = $evidence->addOnce(
                 'ownership',
                 Evidence::E2_PACKAGE_METADATA,
                 sprintf('Correlated %s with Composer autoload metadata.', $usage->symbol()),
@@ -210,57 +177,11 @@ final class SourceImpactBuilder
             $affectedPackage,
             $ownershipConfidence,
             $relevance,
-            $this->reason($frameworks, $packageChange, $owner, $ownership, $ownershipIndex),
+            $this->reasonWriter->write($frameworks, $packageChange, $owner, $ownership, $ownershipIndex),
             $severity,
             [$usage],
             $references
         );
-    }
-
-    /**
-     * @param list<string> $frameworks
-     * @param array{owners: list<string>, mapping_types: list<string>, matched_prefix: ?string} $ownership
-     */
-    private function reason(
-        array $frameworks,
-        ?PackageChange $change,
-        ?string $owner,
-        array $ownership,
-        ?SymbolOwnershipIndex $index
-    ): string {
-        if ($change === null && $frameworks !== [] && $ownership['owners'] === []) {
-            return sprintf(
-                'Referenced by active %s compatibility guidance; package ownership has not been established.',
-                implode(', ', $frameworks)
-            );
-        }
-
-        $parts = [];
-        if ($change !== null) {
-            $parts[] = sprintf(
-                'The symbol is owned by %s, which is %s%s.',
-                $change->name(),
-                $change->changeType(),
-                $change->isMajorChange() ? ' across a major version' : ''
-            );
-        }
-        if ($frameworks !== []) {
-            $parts[] = sprintf('The usage is referenced by active %s compatibility guidance.', implode(', ', $frameworks));
-        }
-
-        if ($ownership['owners'] === []) {
-            $parts[] = 'Package ownership could not be established from supported Composer autoload metadata.';
-        } elseif (count($ownership['owners']) > 1) {
-            $candidates = array_map(
-                static fn (string $candidate): string => $index === null ? $candidate : $index->describeOwner($candidate),
-                $ownership['owners']
-            );
-            $parts[] = sprintf('Ownership is ambiguous between %s.', implode(', ', $candidates));
-        } elseif ($change === null && $owner !== null && $index !== null) {
-            $parts[] = sprintf('Composer autoload metadata assigns the symbol to %s.', $index->describeOwner($owner));
-        }
-
-        return implode(' ', $parts);
     }
 
     /** @param list<PackageChange> $changes @return array<string, PackageChange> */
@@ -286,6 +207,17 @@ final class SourceImpactBuilder
         return 'medium';
     }
 
+    /**
+     * Autoload ownership only means something for PHP symbols. A `config_reference`
+     * symbol is an opaque dotted configuration key, so looking it up would prefix-match
+     * it against PSR-4 roots and invent an owner.
+     *
+     * Known seam: `config_reference` is adapter vocabulary (the Laravel visitor emits it),
+     * so core naming it here is a residual coupling. The durable fix is for a usage to
+     * declare whether its symbol is a PHP symbol or an opaque key, rather than for core
+     * to keep a list of adapter usage types. That is a SourceUsage model change and a
+     * separate decision; this guard stays because it is load-bearing, not dead.
+     */
     private function isSymbolUsage(SourceUsage $usage): bool
     {
         return $usage->usageType() !== 'config_reference';

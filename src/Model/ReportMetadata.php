@@ -6,9 +6,9 @@ namespace PhpUpgradePreflight\Core\Model;
 
 final class ReportMetadata
 {
-    public const SCHEMA_VERSION = '0.7';
+    public const SCHEMA_VERSION = '0.8';
     public const TOOL_NAME = 'php-upgrade-preflight';
-    public const TOOL_VERSION = '0.2.1';
+    public const TOOL_VERSION = '0.3.0';
 
     public function schemaVersion(): string
     {

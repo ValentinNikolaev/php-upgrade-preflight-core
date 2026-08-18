@@ -17,6 +17,7 @@ final class ScenarioResult
     public const OUTCOME_SOLVER_FAILURE = 'solver_failure';
     public const OUTCOME_VALIDATION_FAILURE = 'validation_failure';
     public const OUTCOME_COMPOSER_MISSING = 'composer_missing';
+    public const OUTCOME_REPOSITORY_METADATA_UNAVAILABLE = 'repository_metadata_unavailable';
     public const OUTCOME_TIMEOUT = 'timeout';
     public const OUTCOME_INVALID_JSON = 'invalid_json';
     public const OUTCOME_LOCKFILE_MISSING = 'lockfile_missing';
@@ -40,6 +41,7 @@ final class ScenarioResult
     /** @var list<ComposerDiagnostic> */
     private array $diagnostics;
     private bool $exposeTempPath;
+    private ?ProjectState $candidateProjectState;
 
     public function __construct(
         Scenario $scenario,
@@ -55,7 +57,8 @@ final class ScenarioResult
         ?CandidateLockEvidence $candidateLockEvidence = null,
         array $diagnostics = [],
         ?string $outcome = null,
-        bool $exposeTempPath = false
+        bool $exposeTempPath = false,
+        ?ProjectState $candidateProjectState = null
     ) {
         if ($failureType !== null && !in_array($failureType, [self::FAILURE_SOLVER, self::FAILURE_OPERATIONAL, self::FAILURE_VALIDATION], true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported scenario failure type "%s".', $failureType));
@@ -98,6 +101,9 @@ final class ScenarioResult
         if ($outcome !== self::OUTCOME_SUCCESS && $lock !== null) {
             throw new \InvalidArgumentException('A failed scenario outcome cannot contain a candidate lock.');
         }
+        if ($outcome !== self::OUTCOME_SUCCESS && $candidateProjectState !== null) {
+            throw new \InvalidArgumentException('A failed scenario outcome cannot contain a candidate project state.');
+        }
 
         $this->scenario = $scenario;
         $this->exitCode = $exitCode;
@@ -113,6 +119,7 @@ final class ScenarioResult
         $this->candidateLockEvidence = $candidateLockEvidence ?? ($lock === null ? null : CandidateLockEvidence::fromLock($lock));
         $this->diagnostics = array_values($diagnostics);
         $this->exposeTempPath = $exposeTempPath;
+        $this->candidateProjectState = $candidateProjectState;
     }
 
     public function scenario(): Scenario
@@ -176,6 +183,11 @@ final class ScenarioResult
         return $this->candidateLockEvidence;
     }
 
+    public function candidateProjectState(): ?ProjectState
+    {
+        return $this->candidateProjectState;
+    }
+
     /** @return list<ComposerDiagnostic> */
     public function diagnostics(): array
     {
@@ -202,7 +214,7 @@ final class ScenarioResult
         return !$this->succeeded() && $this->failureType === self::FAILURE_VALIDATION;
     }
 
-    /** @return array{name: string, composer_version: ?string, command: list<string>, duration_ms: int, exit_code: int, succeeded: bool, outcome: string, failure_type: ?string, stdout_excerpt: string, stderr_excerpt: string, candidate_lock: ?array{sha256: string, content_hash: ?string, package_count: int}, diagnostics: list<array{package: string, constraint: string, command: list<string>, exit_code: int, stdout_excerpt: string, stderr_excerpt: string}>, temp_path: ?string} */
+    /** @return array{name: string, composer_version: ?string, command: list<string>, duration_ms: int, exit_code: int, succeeded: bool, outcome: string, failure_type: ?string, stdout_excerpt: string, stderr_excerpt: string, candidate_lock: ?array{sha256: string, content_hash: ?string, package_count: int}, diagnostics: list<array{package: string, constraint: string, command: list<string>, exit_code: int, outcome: string, stdout_excerpt: string, stderr_excerpt: string}>, temp_path: ?string} */
     public function toArray(): array
     {
         $command = array_map(
@@ -254,6 +266,7 @@ final class ScenarioResult
             self::OUTCOME_SOLVER_FAILURE,
             self::OUTCOME_VALIDATION_FAILURE,
             self::OUTCOME_COMPOSER_MISSING,
+            self::OUTCOME_REPOSITORY_METADATA_UNAVAILABLE,
             self::OUTCOME_TIMEOUT,
             self::OUTCOME_INVALID_JSON,
             self::OUTCOME_LOCKFILE_MISSING,

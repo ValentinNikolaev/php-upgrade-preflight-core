@@ -187,5 +187,12 @@ final class SourceImpactBuilderTest extends TestCase
             )
         );
         self::assertSame(['source-1', 'source-2', 'source-3', 'source-4'], $impact[0]->evidence());
+        self::assertMatchesRegularExpression('/^source-impact-[a-f0-9]{20}$/', $impact[0]->id());
+
+        $merged = $impact[0]->withStageIds(['fixture-1-to-2'])->merge(
+            $impact[0]->withStageIds(['fixture-2-to-3'])
+        );
+        self::assertSame(['fixture-1-to-2', 'fixture-2-to-3'], $merged->stageIds());
+        self::assertCount(3, $merged->occurrences());
     }
 }

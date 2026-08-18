@@ -32,8 +32,8 @@ final class JsonFileReader
             );
         }
 
-        $decoded = json_decode($contents, true);
-        if (!is_array($decoded) || json_last_error() !== JSON_ERROR_NONE) {
+        $structured = json_decode($contents);
+        if (json_last_error() !== JSON_ERROR_NONE) {
             throw new InvalidJsonException(
                 $path,
                 sprintf(
@@ -44,6 +44,49 @@ final class JsonFileReader
             );
         }
 
+        if (!$structured instanceof \stdClass) {
+            throw new InvalidJsonException(
+                $path,
+                sprintf('Composer file "%s" must contain a JSON object.', SensitiveOutputRedactor::redact(basename($path)))
+            );
+        }
+
+        $this->assertManifestObjectSections($structured, $path);
+
+        $decoded = json_decode($contents, true);
+        if (!is_array($decoded)) {
+            throw new \LogicException('A JSON object must decode to an associative array.');
+        }
+
         return $decoded;
+    }
+
+    private function assertManifestObjectSections(\stdClass $document, string $path): void
+    {
+        if (strtolower(basename($path)) !== 'composer.json') {
+            return;
+        }
+
+        $manifest = get_object_vars($document);
+        if (!array_key_exists('config', $manifest)) {
+            return;
+        }
+
+        if (!$manifest['config'] instanceof \stdClass) {
+            throw $this->invalidManifestSection($path, 'its "config" section is not an object');
+        }
+
+        $config = get_object_vars($manifest['config']);
+        if (array_key_exists('platform', $config) && !$config['platform'] instanceof \stdClass) {
+            throw $this->invalidManifestSection($path, 'its "config.platform" section is not an object');
+        }
+    }
+
+    private function invalidManifestSection(string $path, string $reason): InvalidJsonException
+    {
+        return new InvalidJsonException(
+            $path,
+            sprintf('Composer file "composer.json" cannot be analyzed because %s.', $reason)
+        );
     }
 }

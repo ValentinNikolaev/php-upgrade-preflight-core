@@ -59,6 +59,7 @@ final class UpgradeReportEvidenceTest extends TestCase
         ], ['Source could not be parsed (source-1).']);
 
         self::assertSame('source-1', $report->evidence()[0]->id());
+        self::assertSame('skipped', $report->stagedResolution()->executionState());
     }
 
     public function testRootConstraintChangesAndPlanStagesParticipateInEvidenceValidation(): void

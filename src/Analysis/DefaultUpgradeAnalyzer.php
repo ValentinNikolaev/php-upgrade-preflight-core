@@ -12,10 +12,8 @@ use PhpUpgradePreflight\Core\Composer\ProjectStateLoadResult;
 use PhpUpgradePreflight\Core\Contracts\UpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
-use PhpUpgradePreflight\Core\Model\EffortEstimate;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\LockDiff;
-use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\TargetPlatform;
@@ -39,6 +37,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     private ReportAssembler $reportAssembler;
     private AutoloadOwnershipIndexBuilder $ownershipIndexBuilder;
     private SourceImpactBuilder $sourceImpactBuilder;
+    private StagedUpgradeOrchestrator $stagedUpgradeOrchestrator;
+    private StageAssessmentBuilder $stageAssessmentBuilder;
 
     /** @param list<FrameworkIntegration> $frameworks */
     public function __construct(
@@ -54,7 +54,9 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         ?ReportAssembler $reportAssembler = null,
         ?ScenarioSelector $scenarioSelector = null,
         ?AutoloadOwnershipIndexBuilder $ownershipIndexBuilder = null,
-        ?SourceImpactBuilder $sourceImpactBuilder = null
+        ?SourceImpactBuilder $sourceImpactBuilder = null,
+        ?StagedUpgradeOrchestrator $stagedUpgradeOrchestrator = null,
+        ?StageAssessmentBuilder $stageAssessmentBuilder = null
     ) {
         $this->projectStateBuilder = $projectStateBuilder ?? new ProjectStateBuilder();
         $this->scenarioRunner = $scenarioRunner ?? new ComposerScenarioRunner();
@@ -68,6 +70,10 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $this->reportAssembler = $reportAssembler ?? new ReportAssembler();
         $this->ownershipIndexBuilder = $ownershipIndexBuilder ?? new AutoloadOwnershipIndexBuilder();
         $this->sourceImpactBuilder = $sourceImpactBuilder ?? new SourceImpactBuilder();
+        $this->stagedUpgradeOrchestrator = $stagedUpgradeOrchestrator
+            ?? new StagedUpgradeOrchestrator($this->scenarioRunner, $this->blockerGrouper, $this->lockDiffBuilder);
+        $this->stageAssessmentBuilder = $stageAssessmentBuilder
+            ?? new StageAssessmentBuilder($this->sourceImpactBuilder, $this->riskAndEffortEstimator);
     }
 
     public function analyzeUpgrade(UpgradeRequest $request): UpgradeReport
@@ -92,7 +98,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $analysisUncertainties
         );
 
-        $this->scenarioRunner->resetDiagnosticCache();
+        $this->scenarioRunner->resetAnalysisCaches();
         $scenarioResults = [];
         foreach ($scenarios as $scenario) {
             $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario, $platform);
@@ -115,13 +121,32 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $requestedConstraints,
             $platform
         );
-        $sourceUncertainties = $analysisUncertainties;
+        $stagedResolution = $this->stagedUpgradeOrchestrator->analyze(
+            $activeFrameworks,
+            $project,
+            $request,
+            $platform,
+            $evidence
+        );
+        // A metadata-probe workspace the analyzer could not remove leaves state on disk and makes
+        // every Composer version or platform answer derived from that probe suspect, so it has to
+        // reach the report rather than staying an in-process accessor nobody reads. Candidate locks
+        // are collected after the staged chain for the same reason: a scenario or stage lock entry
+        // the analyzer could not index is gone once the workspace is removed, and the candidate
+        // package count and package changes silently exclude it.
+        $sourceUncertainties = array_merge(
+            $analysisUncertainties,
+            $this->scenarioRunner->probeCleanupUncertainties(),
+            $project->composerLock()->unusablePackageUncertainties(),
+            $this->scenarioRunner->candidateLockUncertainties()
+        );
         $sourceInventory = $this->sourceUsageScanner->scan(
             $project,
-            $sourcePaths,
+            array_values($sourcePaths),
             $evidence,
             $sourceUncertainties,
-            $request->sourcePaths() !== []
+            $request->sourcePaths() !== [],
+            $activeFrameworks
         );
         $frameworkGuidance = $this->frameworkRuleEngine->assessTransitions(
             $activeFrameworks,
@@ -136,7 +161,12 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $evidence,
             $sourceInventory,
             $frameworkGuidance,
-            $this->composerVersion($scenarioResults)
+            $this->composerVersion($scenarioResults),
+            // A rule that throws is skipped rather than ending the run, but the evidence
+            // recorded for that skip is only reachable through the uncertainty that cites
+            // it. Dropping the appended entries here would orphan that evidence and turn
+            // a contained adapter defect back into a failed report.
+            $sourceUncertainties
         );
         $ownershipIndex = $this->ownershipIndexBuilder->build(
             $project,
@@ -150,13 +180,29 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $ownershipIndex,
             $evidence
         );
-        $risk = $this->riskAndEffortEstimator->estimateRisk(
+        $stagedResolution = $this->stageAssessmentBuilder->build(
+            $stagedResolution,
+            $sourceInventory,
+            $frameworkFindings,
+            $ownershipIndex,
+            $evidence,
+            $project,
+            $request
+        );
+        $risk = $this->riskAndEffortEstimator->estimateAggregateRisk(
             $blockers,
             $lockDiff->packageChanges(),
             $frameworkFindings,
-            $actionableSourceImpact
+            $actionableSourceImpact,
+            $stagedResolution
         );
-        $effort = $this->riskAndEffortEstimator->estimateEffort($blockers, $lockDiff->packageChanges(), $actionableSourceImpact, $frameworkFindings);
+        $effort = $this->riskAndEffortEstimator->estimateAggregateEffort(
+            $blockers,
+            $lockDiff->packageChanges(),
+            $actionableSourceImpact,
+            $frameworkFindings,
+            $stagedResolution
+        );
 
         return $this->reportAssembler->assemble(
             $request,
@@ -165,6 +211,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $lockDiff,
             $blockers,
             $sourceInventory,
+            $actionableSourceImpact,
             $frameworkFindings,
             $risk,
             $effort,
@@ -172,7 +219,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $evidence,
             $frameworkGuidance,
             $platform,
-            $actionableSourceImpact
+            $stagedResolution
         );
     }
 
@@ -213,23 +260,11 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $outcome
         );
 
-        return new UpgradeReport(
+        return ReportAssembler::inputFailure(
             $request,
             $projectLoad->project(),
-            [$scenarioResult],
-            new LockDiff([]),
-            [],
-            [],
-            [],
-            new RiskSummary('high', ['Upgrade risk could not be assessed because Composer project input is incomplete.']),
-            new EffortEstimate(
-                [0, 0],
-                'low',
-                [],
-                ['Upgrade effort was not estimated because Composer project input could not be loaded.']
-            ),
-            [sprintf('Composer project input could not be loaded: %s', $safeFailureMessage)],
-            []
+            $scenarioResult,
+            $safeFailureMessage
         );
     }
 

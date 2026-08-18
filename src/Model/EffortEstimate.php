@@ -21,9 +21,32 @@ final class EffortEstimate
      */
     public function __construct(array $rangeHours, string $confidence, array $components, array $assumptions)
     {
-        $this->rangeHours = $rangeHours;
+        Confidence::assert($confidence, 'effort confidence');
+
+        $normalizedComponents = [];
+        foreach ($components as $name => $componentRange) {
+            if (!is_string($name) || $name === '') {
+                throw new \InvalidArgumentException('Effort component names must be non-empty strings.');
+            }
+            if (!is_array($componentRange)) {
+                throw new \InvalidArgumentException(sprintf('Effort component "%s" must be an hour range.', $name));
+            }
+
+            $normalizedComponents[$name] = self::normalizedRange(
+                $componentRange,
+                sprintf('Effort component "%s"', $name)
+            );
+        }
+
+        foreach ($assumptions as $assumption) {
+            if (!is_string($assumption)) {
+                throw new \InvalidArgumentException('Effort assumptions must be strings.');
+            }
+        }
+
+        $this->rangeHours = self::normalizedRange($rangeHours, 'Effort range');
         $this->confidence = $confidence;
-        $this->components = $components;
+        $this->components = $normalizedComponents;
         $this->assumptions = array_values($assumptions);
     }
 
@@ -59,5 +82,31 @@ final class EffortEstimate
             'components' => $this->components === [] ? new \stdClass() : $this->components,
             'assumptions' => $this->assumptions,
         ];
+    }
+
+    /**
+     * @param array<mixed> $range
+     * @return array{0:int,1:int}
+     */
+    private static function normalizedRange(array $range, string $subject): array
+    {
+        if (count($range) !== 2 || !array_key_exists(0, $range) || !array_key_exists(1, $range)) {
+            throw new \InvalidArgumentException(sprintf('%s must contain exactly a minimum and a maximum.', $subject));
+        }
+
+        $minimum = $range[0];
+        $maximum = $range[1];
+
+        if (!is_int($minimum) || !is_int($maximum)) {
+            throw new \InvalidArgumentException(sprintf('%s bounds must be integer hours.', $subject));
+        }
+        if ($minimum < 0 || $maximum < 0) {
+            throw new \InvalidArgumentException(sprintf('%s bounds cannot be negative.', $subject));
+        }
+        if ($minimum > $maximum) {
+            throw new \InvalidArgumentException(sprintf('%s minimum cannot exceed its maximum.', $subject));
+        }
+
+        return [$minimum, $maximum];
     }
 }

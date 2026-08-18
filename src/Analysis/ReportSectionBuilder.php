@@ -16,11 +16,24 @@ use PhpUpgradePreflight\Core\Model\ReportSections;
 use PhpUpgradePreflight\Core\Model\RootConstraintChange;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\SourceImpactFinding;
+use PhpUpgradePreflight\Core\Model\StageAnalysis;
+use PhpUpgradePreflight\Core\Model\StagedResolution;
 use PhpUpgradePreflight\Core\Model\TestGuidance;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 
 final class ReportSectionBuilder
 {
+    private const DEPENDENCY_BLOCKED = 'blocked';
+    private const DEPENDENCY_BLOCKED_WITH_DEGRADED_ANALYSIS = 'blocked_with_degraded_analysis';
+    private const DEPENDENCY_ADVISORY_ON_CHANGED_STATE = 'advisory_on_changed_state';
+    private const DEPENDENCY_ADVISORY_ON_UNCHANGED_STATE = 'advisory_on_unchanged_state';
+    private const DEPENDENCY_ADVISORY_WITH_DEGRADED_ANALYSIS = 'advisory_with_degraded_analysis';
+    private const DEPENDENCY_ADVISORY_WITHOUT_EVIDENCE = 'advisory_without_evidence';
+    private const DEPENDENCY_TRANSITION_AVAILABLE = 'transition_available';
+    private const DEPENDENCY_NO_CHANGE_VERIFIED = 'no_change_verified';
+    private const DEPENDENCY_ANALYSIS_DEGRADED = 'analysis_degraded';
+    private const DEPENDENCY_WITHOUT_EVIDENCE = 'without_evidence';
+
     /**
      * @param list<ScenarioResult> $scenarioResults
      * @param list<Blocker> $blockers
@@ -37,7 +50,8 @@ final class ReportSectionBuilder
         array $sourceImpact,
         array $frameworkFindings,
         array $sourceUncertainties,
-        EvidenceLedger $evidence
+        EvidenceLedger $evidence,
+        ?StagedResolution $stagedResolution = null
     ): ReportSections {
         $rootConstraintChanges = $this->rootConstraintChanges($request, $project, $evidence);
         $planStages = $this->planStages(
@@ -49,14 +63,15 @@ final class ReportSectionBuilder
             $blockers,
             $sourceImpact,
             $frameworkFindings,
-            $evidence
+            $evidence,
+            $stagedResolution
         );
 
         return new ReportSections(
             $rootConstraintChanges,
             $planStages,
             $this->testGuidance($request, $project, $sourceImpact, $frameworkFindings),
-            $this->uncertainties($request, $project, $scenarioResults, $sourceUncertainties)
+            array_values($this->uncertainties($request, $project, $scenarioResults, $sourceUncertainties))
         );
     }
 
@@ -124,8 +139,18 @@ final class ReportSectionBuilder
         array $blockers,
         array $sourceImpact,
         array $frameworkFindings,
-        EvidenceLedger $evidence
+        EvidenceLedger $evidence,
+        ?StagedResolution $stagedResolution = null
     ): array {
+        if ($stagedResolution !== null && $stagedResolution->stages() !== []) {
+            return $this->executedStagePlan($stagedResolution, $evidence);
+        }
+        if ($stagedResolution !== null
+            && $stagedResolution->executionState() === StagedResolution::SKIPPED
+            && $stagedResolution->stopReason() !== 'stage_target_provider_unavailable') {
+            return $this->skippedStagePlan($stagedResolution, $evidence);
+        }
+
         $guidanceEvidence = $evidence->add(
             'plan',
             Evidence::E5_HEURISTIC,
@@ -140,105 +165,220 @@ final class ReportSectionBuilder
             ]
         )->id();
 
-        $constraintActions = [];
-        $constraintEvidence = [$guidanceEvidence];
+        $stages = [
+            $this->constraintStage($request, $project, $rootConstraintChanges, $guidanceEvidence),
+            $this->dependencyStage(
+                $this->dependencyPosture($scenarioResults, $lockDiff, $blockers),
+                $blockers,
+                $guidanceEvidence
+            ),
+        ];
+
+        $applicationStage = $this->applicationStage($sourceImpact, $frameworkFindings, $guidanceEvidence);
+        if ($applicationStage !== null) {
+            $stages[] = $applicationStage;
+        }
+
+        $stages[] = $this->validationStage($guidanceEvidence);
+
+        return $stages;
+    }
+
+    /** @param list<RootConstraintChange> $rootConstraintChanges */
+    private function constraintStage(
+        UpgradeRequest $request,
+        ProjectState $project,
+        array $rootConstraintChanges,
+        string $guidanceEvidence
+    ): PlanStage {
+        $actions = [];
+        $references = [$guidanceEvidence];
         foreach ($rootConstraintChanges as $change) {
-            $constraintActions[] = sprintf(
+            $actions[] = sprintf(
                 '%s the `%s` root constraint%s `%s`.',
                 $change->changeType() === 'added' ? 'Add' : 'Update',
                 $change->package(),
                 $change->fromConstraint() === null ? ' at' : ' to',
                 $change->toConstraint() ?? '-'
             );
-            $constraintEvidence = array_merge($constraintEvidence, $change->evidence());
+            $references = array_merge($references, $change->evidence());
         }
         if ($this->phpConstraintNeedsReview($request, $project)) {
-            $constraintActions[] = sprintf(
+            $actions[] = sprintf(
                 'Select a root PHP constraint that includes target platform PHP %s without pinning an exact patch version.',
                 $request->targetPhp()
             );
         }
-        if ($constraintActions === []) {
-            $constraintActions[] = 'Confirm the requested targets still match the root requirements before regenerating the lock file.';
+        if ($actions === []) {
+            $actions[] = 'Confirm the requested targets still match the root requirements before regenerating the lock file.';
         }
 
-        $dependencyActions = [];
-        $dependencyEvidence = [$guidanceEvidence];
-        foreach ($blockers as $blocker) {
-            $dependencyActions[] = $blocker->blocksResolution()
-                ? sprintf('Resolve the `%s` blocker affecting `%s`.', $blocker->type(), $blocker->subject())
-                : sprintf('Address the `%s` advisory affecting `%s`.', $blocker->type(), $blocker->subject());
-            $dependencyEvidence = array_merge($dependencyEvidence, $blocker->evidence());
-        }
+        return new PlanStage(
+            'constraints',
+            'Prepare the requested root constraint changes before dependency resolution.',
+            $actions,
+            $references
+        );
+    }
+
+    /**
+     * Decides the dependency-stage posture from resolution evidence alone.
+     *
+     * Kept separate from {@see dependencyStage()} so that rewording never requires
+     * re-reasoning about Composer resolution semantics, and vice versa.
+     *
+     * @param list<ScenarioResult> $scenarioResults
+     * @param list<Blocker> $blockers
+     */
+    private function dependencyPosture(array $scenarioResults, LockDiff $lockDiff, array $blockers): string
+    {
         $hasSuccessfulScenario = $this->hasSuccessfulScenario($scenarioResults);
         $hasOperationalFailure = $this->hasOperationalFailure($scenarioResults);
+        $hasPackageChanges = $lockDiff->packageChanges() !== [];
+
         if ($this->hasResolutionBlocker($blockers)) {
-            if ($hasOperationalFailure) {
-                $dependencyActions[] = 'Restore the Composer analysis environment so every scenario can complete.';
-            }
-            $dependencyActions[] = 'Rerun the isolated Composer scenarios after resolving the reported blockers.';
-            $dependencySummary = 'Resolve dependency blockers and review the resulting lockfile transition.';
-        } elseif ($blockers !== [] && $hasSuccessfulScenario) {
-            $dependencyActions[] = $lockDiff->packageChanges() === []
-                ? 'Use the verified dependency state as the baseline for addressing maintenance advisories.'
-                : 'Apply and review the smallest successful dependency transition before addressing maintenance advisories.';
-            $dependencySummary = 'Address dependency maintenance advisories in the feasible dependency state.';
-        } elseif ($blockers !== [] && $hasOperationalFailure) {
-            $dependencyActions[] = 'Restore the Composer analysis environment and rerun the isolated scenarios before changing the lockfile.';
-            $dependencySummary = 'Address dependency maintenance advisories and re-establish analysis confidence.';
-        } elseif ($blockers !== []) {
-            $dependencyActions[] = 'Run the isolated Composer scenarios before changing the lockfile.';
-            $dependencySummary = 'Address dependency maintenance advisories and establish dependency-resolution evidence.';
-        } elseif ($hasSuccessfulScenario && $lockDiff->packageChanges() !== []) {
-            $dependencyActions[] = 'Regenerate `composer.lock` with the smallest successful dependency transition.';
-            $dependencySummary = 'Apply and review the successful dependency transition.';
-        } elseif ($hasSuccessfulScenario) {
-            $dependencyActions[] = 'Keep the existing lockfile after Composer confirms that no package changes are required.';
-            $dependencySummary = 'Preserve the verified no-change dependency state.';
-        } elseif ($hasOperationalFailure) {
-            $dependencyActions[] = 'Restore the Composer analysis environment and rerun the isolated scenarios before changing the lockfile.';
-            $dependencySummary = 'Re-establish dependency-analysis confidence before making changes.';
-        } else {
-            $dependencyActions[] = 'Run the isolated Composer scenarios before changing the lockfile.';
-            $dependencySummary = 'Establish dependency-resolution evidence before making changes.';
+            return $hasOperationalFailure
+                ? self::DEPENDENCY_BLOCKED_WITH_DEGRADED_ANALYSIS
+                : self::DEPENDENCY_BLOCKED;
+        }
+        if ($blockers !== [] && $hasSuccessfulScenario) {
+            return $hasPackageChanges
+                ? self::DEPENDENCY_ADVISORY_ON_CHANGED_STATE
+                : self::DEPENDENCY_ADVISORY_ON_UNCHANGED_STATE;
+        }
+        if ($blockers !== []) {
+            return $hasOperationalFailure
+                ? self::DEPENDENCY_ADVISORY_WITH_DEGRADED_ANALYSIS
+                : self::DEPENDENCY_ADVISORY_WITHOUT_EVIDENCE;
+        }
+        if ($hasSuccessfulScenario) {
+            return $hasPackageChanges
+                ? self::DEPENDENCY_TRANSITION_AVAILABLE
+                : self::DEPENDENCY_NO_CHANGE_VERIFIED;
         }
 
-        $stages = [
-            new PlanStage(
-                'constraints',
-                'Prepare the requested root constraint changes before dependency resolution.',
-                $constraintActions,
-                $constraintEvidence
-            ),
-            new PlanStage(
-                'dependencies',
-                $dependencySummary,
-                $dependencyActions,
-                $dependencyEvidence
-            ),
-        ];
+        return $hasOperationalFailure
+            ? self::DEPENDENCY_ANALYSIS_DEGRADED
+            : self::DEPENDENCY_WITHOUT_EVIDENCE;
+    }
 
-        if ($sourceImpact !== [] || $frameworkFindings !== []) {
-            $applicationActions = [];
-            $applicationEvidence = [$guidanceEvidence];
-            if ($sourceImpact !== []) {
-                $applicationActions[] = 'Review the reported source locations and adapt affected application code.';
-                $applicationEvidence = array_merge($applicationEvidence, $this->sourceEvidence($sourceImpact));
-            }
-            if ($frameworkFindings !== []) {
-                $applicationActions[] = 'Address framework compatibility findings before runtime validation.';
-                $applicationEvidence = array_merge($applicationEvidence, $this->frameworkEvidence($frameworkFindings));
-            }
-
-            $stages[] = new PlanStage(
-                'application',
-                'Apply source and framework migration work after dependency resolution is stable.',
-                $applicationActions,
-                $applicationEvidence
-            );
+    /** @param list<Blocker> $blockers */
+    private function dependencyStage(string $posture, array $blockers, string $guidanceEvidence): PlanStage
+    {
+        $actions = [];
+        $references = [$guidanceEvidence];
+        foreach ($blockers as $blocker) {
+            $actions[] = $blocker->blocksResolution()
+                ? sprintf('Resolve the `%s` blocker affecting `%s`.', $blocker->type(), $blocker->subject())
+                : sprintf('Address the `%s` advisory affecting `%s`.', $blocker->type(), $blocker->subject());
+            $references = array_merge($references, $blocker->evidence());
         }
 
-        $stages[] = new PlanStage(
+        $guidance = $this->dependencyGuidance($posture);
+
+        return new PlanStage(
+            'dependencies',
+            $guidance['summary'],
+            array_merge($actions, $guidance['actions']),
+            $references
+        );
+    }
+
+    /**
+     * The wording for each dependency posture, and nothing else.
+     *
+     * @return array{summary: string, actions: list<string>}
+     */
+    private function dependencyGuidance(string $posture): array
+    {
+        return match ($posture) {
+            self::DEPENDENCY_BLOCKED => [
+                'summary' => 'Resolve dependency blockers and review the resulting lockfile transition.',
+                'actions' => ['Rerun the isolated Composer scenarios after resolving the reported blockers.'],
+            ],
+            self::DEPENDENCY_BLOCKED_WITH_DEGRADED_ANALYSIS => [
+                'summary' => 'Resolve dependency blockers and review the resulting lockfile transition.',
+                'actions' => [
+                    'Restore the Composer analysis environment so every scenario can complete.',
+                    'Rerun the isolated Composer scenarios after resolving the reported blockers.',
+                ],
+            ],
+            self::DEPENDENCY_ADVISORY_ON_CHANGED_STATE => [
+                'summary' => 'Address dependency maintenance advisories in the feasible dependency state.',
+                'actions' => [
+                    'Apply and review the smallest successful dependency transition before addressing maintenance advisories.',
+                ],
+            ],
+            self::DEPENDENCY_ADVISORY_ON_UNCHANGED_STATE => [
+                'summary' => 'Address dependency maintenance advisories in the feasible dependency state.',
+                'actions' => ['Use the verified dependency state as the baseline for addressing maintenance advisories.'],
+            ],
+            self::DEPENDENCY_ADVISORY_WITH_DEGRADED_ANALYSIS => [
+                'summary' => 'Address dependency maintenance advisories and re-establish analysis confidence.',
+                'actions' => [
+                    'Restore the Composer analysis environment and rerun the isolated scenarios before changing the lockfile.',
+                ],
+            ],
+            self::DEPENDENCY_ADVISORY_WITHOUT_EVIDENCE => [
+                'summary' => 'Address dependency maintenance advisories and establish dependency-resolution evidence.',
+                'actions' => ['Run the isolated Composer scenarios before changing the lockfile.'],
+            ],
+            self::DEPENDENCY_TRANSITION_AVAILABLE => [
+                'summary' => 'Apply and review the successful dependency transition.',
+                'actions' => ['Regenerate `composer.lock` with the smallest successful dependency transition.'],
+            ],
+            self::DEPENDENCY_NO_CHANGE_VERIFIED => [
+                'summary' => 'Preserve the verified no-change dependency state.',
+                'actions' => ['Keep the existing lockfile after Composer confirms that no package changes are required.'],
+            ],
+            self::DEPENDENCY_ANALYSIS_DEGRADED => [
+                'summary' => 'Re-establish dependency-analysis confidence before making changes.',
+                'actions' => [
+                    'Restore the Composer analysis environment and rerun the isolated scenarios before changing the lockfile.',
+                ],
+            ],
+            default => [
+                'summary' => 'Establish dependency-resolution evidence before making changes.',
+                'actions' => ['Run the isolated Composer scenarios before changing the lockfile.'],
+            ],
+        };
+    }
+
+    /**
+     * @param list<SourceImpactFinding> $sourceImpact
+     * @param list<CompatibilityFinding> $frameworkFindings
+     */
+    private function applicationStage(
+        array $sourceImpact,
+        array $frameworkFindings,
+        string $guidanceEvidence
+    ): ?PlanStage {
+        if ($sourceImpact === [] && $frameworkFindings === []) {
+            return null;
+        }
+
+        $actions = [];
+        $references = [$guidanceEvidence];
+        if ($sourceImpact !== []) {
+            $actions[] = 'Review the reported source locations and adapt affected application code.';
+            $references = array_merge($references, $this->sourceEvidence($sourceImpact));
+        }
+        if ($frameworkFindings !== []) {
+            $actions[] = 'Address framework compatibility findings before runtime validation.';
+            $references = array_merge($references, $this->frameworkEvidence($frameworkFindings));
+        }
+
+        return new PlanStage(
+            'application',
+            'Apply source and framework migration work after dependency resolution is stable.',
+            $actions,
+            $references
+        );
+    }
+
+    private function validationStage(string $guidanceEvidence): PlanStage
+    {
+        return new PlanStage(
             'validation',
             'Validate the upgraded project on the target runtime before release.',
             [
@@ -247,8 +387,86 @@ final class ReportSectionBuilder
             ],
             [$guidanceEvidence]
         );
+    }
 
-        return $stages;
+    /** @return list<PlanStage> */
+    private function executedStagePlan(StagedResolution $resolution, EvidenceLedger $evidence): array
+    {
+        $plan = [];
+        foreach ($resolution->stages() as $stage) {
+            $stageId = $stage->target()->id();
+            $status = $stage->resolutionStatus();
+            $isProved = $stage->executionState() === StageAnalysis::EXECUTED
+                && in_array($status, [StagedResolution::FEASIBLE, StagedResolution::FEASIBLE_WITH_CHANGES], true)
+                && $stage->outputState() !== null;
+            $evidenceId = $evidence->add(
+                'stage-plan',
+                Evidence::E5_HEURISTIC,
+                sprintf('Generated recommendations from the executed outcome of stage %s.', $stageId),
+                $isProved ? 'medium' : 'low',
+                [
+                    'stage_id' => $stageId,
+                    'execution_state' => $stage->executionState(),
+                    'resolution_status' => $status,
+                    'transition_recommended' => $isProved,
+                ]
+            )->id();
+
+            $actions = $stage->recommendedActions();
+            if ($actions === []) {
+                $actions[] = sprintf('[%s] No transition is recommended without an executed selectable candidate.', $stageId);
+            }
+            if ($isProved) {
+                foreach ($stage->tests() as $test) {
+                    $testData = $test->toArray();
+                    $actions[] = sprintf('[%s] %s: %s', $stageId, $testData['name'], $testData['purpose']);
+                }
+            }
+            $summary = $isProved
+                ? sprintf('Apply only the selected %s candidate, then validate before advancing.', $stageId)
+                : sprintf('Stop at %s; its transition is not proved and must be rerun.', $stageId);
+            $plan[] = new PlanStage(
+                $stageId,
+                $summary,
+                array_values(array_unique($actions)),
+                array_values(array_unique(array_merge([$evidenceId], $stage->evidenceReferences()))),
+                $stageId
+            );
+
+            if (!$isProved) {
+                break;
+            }
+        }
+
+        return $plan;
+    }
+
+    /** @return list<PlanStage> */
+    private function skippedStagePlan(StagedResolution $resolution, EvidenceLedger $evidence): array
+    {
+        $reason = $resolution->stopReason() ?? 'staged_resolution_unavailable';
+        $evidenceId = $evidence->add(
+            'stage-plan',
+            Evidence::E5_HEURISTIC,
+            'Stopped the recommended plan because staged Composer resolution did not produce a stage.',
+            'low',
+            [
+                'execution_state' => $resolution->executionState(),
+                'resolution_status' => $resolution->status(),
+                'stop_reason' => $reason,
+                'transition_recommended' => false,
+            ]
+        )->id();
+
+        return [new PlanStage(
+            'staged-resolution',
+            sprintf('Stop before the missing staged transition; staged Composer resolution ended with %s.', $reason),
+            [sprintf(
+                'Resolve the staged analysis stop condition `%s` and rerun analysis before applying a framework transition.',
+                $reason
+            )],
+            array_values(array_unique(array_merge([$evidenceId], $resolution->evidenceReferences())))
+        )];
     }
 
     /**
@@ -262,42 +480,40 @@ final class ReportSectionBuilder
         array $sourceImpact,
         array $frameworkFindings
     ): array {
-        $hasTestScript = $this->hasComposerScript($project, 'test');
-        $tests = [
-            new TestGuidance(
-                'composer-validation',
-                'Validate the edited Composer manifest before dependency installation.',
-                'composer validate --strict',
-                'required'
-            ),
-            new TestGuidance(
-                'project-test-suite',
-                $hasTestScript
-                    ? 'Run the project test suite after applying the dependency and source changes.'
-                    : 'Identify and run the project test suite; no Composer test script was detected.',
-                $hasTestScript ? 'composer test' : null,
-                'required'
-            ),
-            new TestGuidance(
-                'platform-requirements',
-                $request->targetPhp() === null
-                    ? 'Confirm the installed dependencies satisfy the deployment platform.'
-                    : sprintf('Confirm the installed dependencies satisfy PHP %s and the deployment extensions.', $request->targetPhp()),
-                'composer check-platform-reqs',
-                'required'
-            ),
-        ];
+        $hasTestScript = TestGuidanceCatalog::hasComposerScript($project, 'test');
+        $applicable = TestGuidanceCatalog::applicable(
+            $hasTestScript,
+            $sourceImpact !== [] || $frameworkFindings !== []
+        );
 
-        if ($sourceImpact !== [] || $frameworkFindings !== []) {
+        $tests = [];
+        foreach ($applicable as $spec) {
             $tests[] = new TestGuidance(
-                'focused-regressions',
-                'Add or run focused regression coverage for the reported source and framework findings.',
-                null,
-                'recommended'
+                $spec['id'],
+                $this->testPurpose($spec['id'], $request, $hasTestScript),
+                $spec['command'],
+                $spec['grade']
             );
         }
 
         return $tests;
+    }
+
+    private function testPurpose(string $id, UpgradeRequest $request, bool $hasTestScript): string
+    {
+        return match ($id) {
+            TestGuidanceCatalog::COMPOSER_VALIDATION => 'Validate the edited Composer manifest before dependency installation.',
+            TestGuidanceCatalog::PROJECT_TEST_SUITE => $hasTestScript
+                ? 'Run the project test suite after applying the dependency and source changes.'
+                : 'Identify and run the project test suite; no Composer test script was detected.',
+            TestGuidanceCatalog::PLATFORM_REQUIREMENTS => $request->targetPhp() === null
+                ? 'Confirm the installed dependencies satisfy the deployment platform.'
+                : sprintf(
+                    'Confirm the installed dependencies satisfy PHP %s and the deployment extensions.',
+                    $request->targetPhp()
+                ),
+            default => 'Add or run focused regression coverage for the reported source and framework findings.',
+        };
     }
 
     /** @param list<ScenarioResult> $scenarioResults @param list<string> $sourceUncertainties @return list<string> */
@@ -329,7 +545,7 @@ final class ReportSectionBuilder
             $uncertainties[] = $phpConstraintUncertainty;
         }
 
-        if (!$this->hasComposerScript($project, 'test')) {
+        if (!TestGuidanceCatalog::hasComposerScript($project, 'test')) {
             $uncertainties[] = 'No Composer "test" script was found, so the project\'s canonical test command is unknown.';
         }
 
@@ -411,13 +627,6 @@ final class ReportSectionBuilder
         );
     }
 
-    private function hasComposerScript(ProjectState $project, string $name): bool
-    {
-        $scripts = $project->composerJson()->data()['scripts'] ?? null;
-
-        return is_array($scripts) && array_key_exists($name, $scripts);
-    }
-
     /** @param list<SourceImpactFinding> $sourceImpact @return list<string> */
     private function sourceEvidence(array $sourceImpact): array
     {
@@ -426,7 +635,7 @@ final class ReportSectionBuilder
             $references = array_merge($references, $usage->evidence());
         }
 
-        return $references;
+        return array_values($references);
     }
 
     /** @param list<CompatibilityFinding> $frameworkFindings @return list<string> */
@@ -437,6 +646,6 @@ final class ReportSectionBuilder
             $references = array_merge($references, $finding->evidence());
         }
 
-        return $references;
+        return array_values($references);
     }
 }

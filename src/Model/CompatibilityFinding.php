@@ -22,6 +22,8 @@ final class CompatibilityFinding
         array $evidence,
         array $appliesToHops = []
     ) {
+        Severity::assert($severity, 'framework finding severity');
+
         $normalizedHops = [];
         foreach ($appliesToHops as $hop) {
             if (!is_array($hop)

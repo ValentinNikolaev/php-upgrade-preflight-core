@@ -43,12 +43,18 @@ final class PlatformProvenance
      *   analyzer: array{php_version: string, provenance: string},
      *   current_php: array{version: ?string, provenance: string},
      *   target_php: array{version: ?string, provenance: string},
-     *   extensions: array{provenance: string, explicitly_modeled: bool, completeness: string, unmodeled_provenance: ?string, assumptions: list<array{name: string, state: string, version: ?string, provenance: string}>}
+     *   extensions: array{provenance: string, explicitly_modeled: bool, completeness: string, unmodeled_provenance: ?string, assumptions: list<array{name: string, state: string, version: ?string, provenance: string}>},
+     *   profile: ?array<string, mixed>
      * }
      */
     public function toArray(): array
     {
         $assumptions = $this->platform->extensionAssumptions();
+        $profile = $this->platform->profile();
+        $completeness = $profile === null
+            ? ($assumptions !== [] ? 'partial' : 'none')
+            : $profile->completeness();
+        $extensionProvenance = $this->extensionProvenance($assumptions, $profile);
 
         return [
             'analyzer' => [
@@ -64,15 +70,16 @@ final class PlatformProvenance
                 'provenance' => $this->platform->targetPhpProvenance(),
             ],
             'extensions' => [
-                'provenance' => $assumptions !== [] ? 'mixed' : 'analyzer_runtime',
-                'explicitly_modeled' => $assumptions !== [],
-                'completeness' => $assumptions !== [] ? 'partial' : 'none',
-                'unmodeled_provenance' => 'analyzer_runtime',
+                'provenance' => $extensionProvenance,
+                'explicitly_modeled' => $profile !== null || $assumptions !== [],
+                'completeness' => $completeness,
+                'unmodeled_provenance' => $completeness === 'complete' ? null : 'analyzer_runtime',
                 'assumptions' => array_map(
                     static fn (ExtensionAssumption $assumption): array => $assumption->toArray(),
                     $assumptions
                 ),
             ],
+            'profile' => $this->platform->profileReport(),
         ];
     }
 
@@ -80,7 +87,14 @@ final class PlatformProvenance
     public function uncertainties(): array
     {
         $uncertainties = [];
-        if ($this->platform->extensionAssumptions() === []) {
+        $profile = $this->platform->profile();
+        if ($profile !== null && $profile->isComplete()) {
+            $uncertainties[] =
+                'Target-platform completeness covers Composer platform package decisions only; the Composer executable, repositories, network access, and repository metadata remain separate inputs that can affect resolution.';
+        } elseif ($profile !== null) {
+            $uncertainties[] =
+                'The target-platform profile is partial; unlisted supported platform packages still came from the analyzer runtime.';
+        } elseif ($this->platform->extensionAssumptions() === []) {
             $uncertainties[] =
                 'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.';
         } else {
@@ -95,6 +109,34 @@ final class PlatformProvenance
             );
         }
 
+        if ($this->platform->toolchainBoundPackages() !== []) {
+            $uncertainties[] =
+                'Composer, composer-plugin-api, and composer-runtime-api are toolchain-bound: declared values are accepted only when they exactly match the executing Composer inventory and are never simulated by changing the executable.';
+        }
+
         return $uncertainties;
+    }
+
+    /**
+     * @param list<ExtensionAssumption> $assumptions
+     */
+    private function extensionProvenance(array $assumptions, ?TargetPlatformProfile $profile): string
+    {
+        if ($profile === null) {
+            return $assumptions !== [] ? 'mixed' : 'analyzer_runtime';
+        }
+        if ($assumptions === []) {
+            return $profile->isComplete() ? 'profile' : 'mixed';
+        }
+
+        $sources = [];
+        foreach ($assumptions as $assumption) {
+            $source = $assumption->provenance() === ExtensionAssumption::CLOSED_WORLD
+                ? ExtensionAssumption::PROFILE
+                : $assumption->provenance();
+            $sources[$source] = true;
+        }
+
+        return count($sources) === 1 ? (string) array_key_first($sources) : 'mixed';
     }
 }

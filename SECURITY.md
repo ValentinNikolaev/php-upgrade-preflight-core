@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The project accepts security fixes for the latest `0.2.x` release line. The signed v0.1.x artifacts remain available for historical compatibility verification but are no longer the actively supported line. Development branches may change without a compatibility guarantee.
+The project accepts security fixes for the latest published `0.2.x` release line. The signed v0.1.x artifacts remain available for historical compatibility verification but are no longer actively supported. v0.3.0 remains a release candidate until its signed tags and Packagist packages are published and verified; development and release-candidate branches may change without a compatibility guarantee.
 
 ## Report a vulnerability
 
@@ -14,7 +14,7 @@ Do not open a public issue before maintainers have assessed the report. The main
 
 ## Security model
 
-PHP Upgrade Preflight runs Composer in temporary directories with scripts and plugins disabled. It still parses target-controlled Composer metadata and source code, and Composer may access declared repositories with credentials from the host environment.
+PHP Upgrade Preflight runs Composer in temporary directories with scripts and plugins disabled. It still parses target-controlled Composer metadata and source code. Compatible mode may access declared repositories with credentials from the host environment. Restricted mode uses analyzer-owned Composer configuration, scrubs the controlled credential and proxy environment, and requests best-effort offline behavior, but it is not an OS process or network sandbox.
 
 Captured Composer output and CLI or Artisan failure diagnostics are redacted before storage or rendering. The redactor removes whole repository URLs, authorization payloads, named credential values, and common provider-token forms. Synthetic canaries gate JSON, Markdown, captured CI output, and release ZIP contents. This is a defense-in-depth boundary, not permission to use broad or long-lived credentials.
 

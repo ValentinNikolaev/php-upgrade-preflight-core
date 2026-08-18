@@ -2,7 +2,9 @@
 
 External installation separates the analyzer's runtime dependencies from the target application. Use it when the application runs PHP 7.4, when its Composer constraints reject the tool, or when an audit must leave the repository untouched.
 
-For v0.2, the supported external path is a Composer installation in a separate tools directory. There is no supported PHAR or published versioned container image. A user-supplied container may still isolate untrusted input, but it is an execution environment for the Composer-installed packages rather than a project release format.
+For the published v0.2 line and the planned v0.3 line, the supported external path is a Composer installation in a separate tools directory. There is no supported PHAR or published versioned container image. A user-supplied container may still isolate untrusted input, but it is an execution environment for the Composer-installed packages rather than a project release format.
+
+v0.2.1 is currently the latest Packagist release, so the installation command below uses `^0.2`. The v0.3.0 behavior documented later on this page belongs to the release candidate on `main`; evaluate it from a source checkout until signed v0.3.0 tags and packages are published and verified.
 
 ## Directory layout
 
@@ -54,11 +56,13 @@ Quote an entire option when a path contains spaces, for example `"--path=C:\work
 
 The executable uses the PHP interpreter and `composer` command available in the tool process environment. Scenario workspaces receive only the target's `composer.json` and `composer.lock`. The analyzer converts relative Composer path-repository URLs to absolute paths before running Composer in a workspace.
 
-Composer scripts and plugins stay disabled in every scenario and diagnostic. Composer still uses its normal global configuration, credentials, network access, platform extensions, and repository access. Run the tool in a container or restricted account when the target manifest is untrusted.
+Composer scripts and plugins stay disabled in every scenario and diagnostic. The default compatible mode may use normal global configuration, credentials, proxy settings, caches, network access, platform extensions, and repository access. Restricted mode instead uses fresh analyzer-owned Composer state, scrubs controlled credential and proxy inputs, and requests best-effort offline operation; it is not an OS process or network sandbox. Run the tool in a container or restricted account when the target manifest is untrusted, and see [Composer execution policy](composer-execution.md) before choosing a mode.
 
 `--from-php` records the known current runtime and enables staged probes. `--target-php` changes Composer's simulated platform in the temporary manifest. Neither option changes the PHP interpreter that runs the analyzer.
 
-Schema `0.7` records those distinctions in `platform`: analyzer PHP always has `runtime` provenance; current PHP comes from `--from-php`, the target's original `config.platform.php`, or remains `unknown`; target PHP comes from the request or remains `unknown`. Extension assumptions come from the target's original `config.platform` and the request, with request values taking precedence. Listed assumptions are deterministic, but every unlisted extension still comes from the analyzer host. Because the CLI cannot describe a complete extension inventory, `--with-extension` and `--without-extension` produce `completeness: partial`, not a claim of full host independence.
+For reproducible target-platform decisions, pass a schema `1.0` JSON profile with `--target-platform-profile=/work/profiles/production.json`. A `complete` profile is closed-world for supported safely simulated PHP, extension, library, and PHP-subtype packages: unlisted packages in those classes are modeled absent. Composer 2.2 or newer is required; an older executable yields operational uncertainty rather than weakening the request. A `partial` profile and legacy named assumptions leave unlisted packages dependent on the analyzer host.
+
+Schema `0.8` records analyzer, current, and target provenance plus the normalized profile under `platform.profile`. Canonical output includes the profile's SHA-256 digest and safe `file` provenance, never its local path. It also identifies Composer platform values bound to the actual executable as `toolchain_bound`. Profile completeness does not freeze repository metadata, downloads, credentials, network behavior, or the Composer executable, so isolate or pin those inputs separately when they matter.
 
 ## Redaction boundary
 

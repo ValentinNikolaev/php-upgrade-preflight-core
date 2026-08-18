@@ -54,6 +54,20 @@ final class UpgradeTargetSetTest extends TestCase
         self::assertFalse((new \ReflectionProperty($input, 'constraint'))->isPublic());
     }
 
+    public function testItReusesImmutableTargetInstancesAcrossAccessors(): void
+    {
+        $input = new UpgradeTarget('vendor/package', '^1.0');
+        $targets = new UpgradeTargetSet([$input], '8.1');
+
+        self::assertSame($input, $targets->packageTargets()[0]);
+        self::assertSame($targets->all(), $targets->all());
+        self::assertSame($targets->all(), iterator_to_array($targets));
+        self::assertSame(
+            ['php', 'vendor/package'],
+            array_map(static fn (UpgradeTarget $target): string => $target->package(), $targets->all())
+        );
+    }
+
     public function testItRejectsConflictingPackageDuplicates(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -85,15 +99,17 @@ final class UpgradeTargetSetTest extends TestCase
         new UpgradeTargetSet($targets, $targetPhp);
     }
 
-    /** @return list<array{list<mixed>, ?string, string}> */
+    /**
+     * Package and constraint validation belongs to UpgradeTarget itself, so unresolvable targets
+     * can never reach this collection. Only collection-level rejections are covered here.
+     *
+     * @return list<array{list<mixed>, ?string, string}>
+     */
     public function invalidTargetProvider(): array
     {
         return [
             [[], null, 'At least one upgrade target is required.'],
             [['not-a-target'], null, 'must be an UpgradeTarget'],
-            [[new UpgradeTarget('invalid', '^1.0')], null, 'Invalid Composer target package'],
-            [[new UpgradeTarget('vendor/package', '')], null, 'non-empty constraint'],
-            [[new UpgradeTarget('vendor/package', 'not a constraint')], null, 'Invalid constraint'],
             [[], '^8.1', 'must be an exact'],
         ];
     }

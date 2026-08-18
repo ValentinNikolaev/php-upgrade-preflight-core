@@ -2,12 +2,12 @@
 
 Run this checklist from a clean release-candidate commit. Set `VERSION` to an exact `MAJOR.MINOR.PATCH` value and derive `TAG=v$VERSION`, `SERIES=MAJOR.MINOR`, and `DEV_VERSION=$SERIES.x-dev`. Record command output and CI links in `docs/releases/v$VERSION.md` instead of writing release-specific values into this checklist.
 
-The active `0.2.x` release line is prepared from `main`. Historical `0.1.x` maintenance requires a separate, explicit release-policy change.
+The active `0.3.x` release line is prepared from `main`. Maintenance releases use their protected line: `0.2.x` for v0.2 and `0.1.x` for v0.1.
 
 ## Version and contract
 
 - [ ] Confirm the requested release series is enabled by `ReleaseVerifier::ACTIVE_RELEASE_SERIES`.
-- [ ] Confirm the approved release branch exists on `origin`, is protected, and contains the release-candidate commit (`0.1.x` for `0.1.x`; `main` for later approved series).
+- [ ] Confirm the approved release branch exists on `origin`, is protected, and contains the release-candidate commit (`0.1.x` for v0.1, `0.2.x` for v0.2, and `main` for the active v0.3 series).
 - [ ] Confirm `ReportMetadata::TOOL_VERSION` is the exact `VERSION` and the release notes describe `ReportMetadata::SCHEMA_VERSION`.
 - [ ] Confirm the active release schema matches `ReleaseVerifier::ACTIVE_SCHEMA_VERSION`.
 - [ ] Confirm every package dependency on another project package uses `^$SERIES`.
@@ -27,7 +27,7 @@ Run `composer release:verify -- VERSION` to enforce the release-series, tool-ver
 - [ ] Export a machine-readable inventory of the locked release dependencies (CycloneDX/SPDX SBOM or `composer show --locked --format=json`) and retain it with the release evidence.
 - [ ] Run `composer test:fixtures` and review every JSON and Markdown snapshot pair.
 - [ ] Confirm fixture immutability assertions pass and `git status --short` shows no fixture changes.
-- [ ] Enforce the representative-corpus report-size, runtime, memory, redaction, and ordering budgets in [the v0.2 contract](v0.2-contract.md), when applicable to the release line.
+- [ ] Enforce the applicable representative-corpus and staged-analysis budgets in the [v0.2 contract](v0.2-contract.md) or [v0.3 contract](v0.3-contract.md).
 - [ ] Run normal and `--prefer-lowest` clean dependency installs for each package subtree on its declared PHP floor.
 - [ ] Install the Laravel adapter against every advertised Illuminate host line and run the application-boot smoke.
 - [ ] Confirm every host-line smoke verifies provider discovery, analyzer binding, command registration, and a harmless invocation.
@@ -52,7 +52,9 @@ The release workflow performs the clean install, deterministic gate, JSON and Ma
 
 This repository is a monorepo. Packagist reads a package manifest from the root of each distribution repository, so publish `core`, `cli`, and `laravel` subtrees to their corresponding repositories before synchronization.
 
-For v0.2 these Composer packages are the only supported external distribution. The generated package ZIPs are Composer distribution artifacts, not a PHAR. Do not attach a PHAR or publish a project container image as a supported v0.2 runtime; the development Docker files are outside the release surface.
+`tools/prepare-distribution.sh` rebuilds the three distribution working trees from the current checkout, and `tools/release-distribution.sh` commits, signs, and pushes them. Both are described in [the tools guide](../tools/README.md).
+
+For v0.3 these Composer packages remain the only supported external distribution. The generated package ZIPs are Composer distribution artifacts, not a PHAR. Do not attach a PHAR or publish a project container image as a supported runtime; the development Docker files are outside the release surface.
 
 - [ ] Split every package subtree with history preserved.
 - [ ] Confirm each split contains its manifest, source, schema resources where applicable, license, shared readme, changelog, security policy, and documentation.
@@ -75,4 +77,4 @@ The workflow stamps the exact release version only into temporary archive manife
 - [ ] Announce supported transitions, schema migration requirements, and known limitations.
 - [ ] Record the workflow run, approved commit, signed tag verification, distribution split commits, archive checksums, dependency-inventory checksum, immutable-fixture checksum, release URL, and Packagist evidence in `docs/releases/v$VERSION.md`.
 
-A manual `Release` run verifies and packages without publishing. A matching annotated tag publishes only after GitHub verifies its signature, confirms its commit is on `main` or (for `0.1.x`) the protected `0.1.x` maintenance line, and all release gates pass. Historical v0.1.0 evidence is retained in [`docs/releases/v0.1.0.md`](releases/v0.1.0.md).
+A manual `Release` run verifies and packages without publishing. A matching annotated tag publishes only after GitHub verifies its signature, confirms its commit is on `main`, `0.2.x`, or `0.1.x` according to the tag series, and all release gates pass. Historical v0.1.0 and v0.2.1 evidence remains retained.

@@ -10,6 +10,7 @@ final class UpgradeRequest
     private UpgradeTargetSet $targets;
     private ?string $fromPhp;
     private ?string $targetPhp;
+    private string $targetPhpProvenance;
     /** @var list<string> */
     private array $sourcePaths;
     /** @var list<string> */
@@ -18,6 +19,8 @@ final class UpgradeRequest
     private ?string $outputPath;
     private bool $debug;
     private ExtensionAssumptionSet $extensionAssumptions;
+    private ?TargetPlatformProfile $targetPlatformProfile;
+    private ComposerExecutionConfiguration $composerExecution;
 
     /**
      * @param list<UpgradeTarget> $targets
@@ -35,7 +38,9 @@ final class UpgradeRequest
         string $format = ReportFormat::JSON,
         ?string $outputPath = null,
         bool $debug = false,
-        array $extensionAssumptions = []
+        array $extensionAssumptions = [],
+        ?TargetPlatformProfile $targetPlatformProfile = null,
+        ?ComposerExecutionConfiguration $composerExecution = null
     ) {
         $resolved = realpath($projectPath);
 
@@ -44,15 +49,29 @@ final class UpgradeRequest
         }
 
         $this->projectPath = $resolved;
-        $this->targets = new UpgradeTargetSet($targets, $targetPhp);
+        $profilePhp = $targetPlatformProfile === null ? null : $targetPlatformProfile->package('php');
+        $profilePhpVersion = $profilePhp === null ? null : $profilePhp->version();
+        $requestContainsPhp = $targetPhp !== null;
+        foreach ($targets as $target) {
+            if ($target instanceof UpgradeTarget && strtolower(trim($target->package())) === 'php') {
+                $requestContainsPhp = true;
+            }
+        }
+        $this->targets = new UpgradeTargetSet($targets, $this->mergeTargetPhp($targetPhp, $profilePhpVersion));
         $this->fromPhp = $this->validateCurrentPhp($fromPhp);
         $this->targetPhp = $this->targets->targetPhp();
+        $this->targetPhpProvenance = $this->targetPhp === null
+            ? 'unknown'
+            : ($requestContainsPhp ? 'request' : 'profile');
         $this->sourcePaths = $this->normalizeSourcePaths($sourcePaths);
         $this->frameworks = $this->normalizeFrameworks($frameworks);
         $this->format = ReportFormat::normalize($format);
         $this->outputPath = $outputPath;
         $this->debug = $debug;
         $this->extensionAssumptions = new ExtensionAssumptionSet($extensionAssumptions);
+        $this->targetPlatformProfile = $targetPlatformProfile;
+        $this->composerExecution = $composerExecution ?? ComposerExecutionConfiguration::compatible();
+        $this->assertTargetPlatformProfileCompatibility();
     }
 
     public function projectPath(): string
@@ -73,6 +92,11 @@ final class UpgradeRequest
     public function targetPhp(): ?string
     {
         return $this->targetPhp;
+    }
+
+    public function targetPhpProvenance(): string
+    {
+        return $this->targetPhpProvenance;
     }
 
     /** @return list<string> */
@@ -108,7 +132,25 @@ final class UpgradeRequest
         return $this->extensionAssumptions->all();
     }
 
-    /** @return array{project_path: string, targets: list<array{package: string, constraint: string}>, from_php: ?string, target_php: ?string, source_paths: list<string>, frameworks: list<string>, format: string, output_path: ?string} */
+    public function targetPlatformProfile(): ?TargetPlatformProfile
+    {
+        return $this->targetPlatformProfile;
+    }
+
+    public function composerExecution(): ComposerExecutionConfiguration
+    {
+        return $this->composerExecution;
+    }
+
+    public function withComposerExecution(ComposerExecutionConfiguration $composerExecution): self
+    {
+        $request = clone $this;
+        $request->composerExecution = $composerExecution;
+
+        return $request;
+    }
+
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [
@@ -120,10 +162,74 @@ final class UpgradeRequest
             'frameworks' => $this->frameworks,
             'format' => $this->format,
             'output_path' => $this->outputPath,
+            'target_platform_profile' => $this->targetPlatformProfile === null
+                ? null
+                : $this->targetPlatformProfile->summary(),
+            'composer_execution' => $this->composerExecution->fingerprintData(),
         ];
     }
 
-    /** @param list<string> $frameworks @return list<string> */
+    private function mergeTargetPhp(?string $requested, ?string $profile): ?string
+    {
+        if ($profile === null) {
+            return $requested;
+        }
+        if ($requested === null) {
+            return $profile;
+        }
+
+        $requestedTarget = new UpgradeTargetSet([], $requested);
+        if ($requestedTarget->targetPhp() !== $profile) {
+            throw new \InvalidArgumentException('Target PHP contradicts the target platform profile.');
+        }
+
+        return $profile;
+    }
+
+    private function assertTargetPlatformProfileCompatibility(): void
+    {
+        if ($this->targetPlatformProfile === null) {
+            return;
+        }
+
+        foreach ($this->extensionAssumptions->all() as $assumption) {
+            $profileDecision = $this->targetPlatformProfile->package($assumption->name());
+            if ($assumption->isPresentWithoutVersion()) {
+                if ($this->targetPlatformProfile->isComplete()) {
+                    throw new \InvalidArgumentException(
+                        'A complete target platform profile cannot be combined with a presence-only extension assumption.'
+                    );
+                }
+                if ($profileDecision !== null && $profileDecision->isAbsent()) {
+                    throw new \InvalidArgumentException(sprintf(
+                        'Presence-only request platform package %s contradicts its absence in the target platform profile.',
+                        $assumption->name()
+                    ));
+                }
+
+                continue;
+            }
+
+            if ($profileDecision === null) {
+                continue;
+            }
+
+            $requestValue = $assumption->state() === ExtensionAssumption::ABSENT
+                ? false
+                : $assumption->version();
+            if ($profileDecision->composerValue() !== $requestValue) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Request platform package %s contradicts the target platform profile.',
+                    $assumption->name()
+                ));
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $frameworks
+     * @return list<string>
+     */
     private function normalizeFrameworks(array $frameworks): array
     {
         $normalized = [];
@@ -164,7 +270,10 @@ final class UpgradeRequest
         return $version;
     }
 
-    /** @param list<string> $sourcePaths @return list<string> */
+    /**
+     * @param list<string> $sourcePaths
+     * @return list<string>
+     */
     private function normalizeSourcePaths(array $sourcePaths): array
     {
         $normalized = [];

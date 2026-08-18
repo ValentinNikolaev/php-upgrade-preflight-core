@@ -49,7 +49,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
             self::assertTrue($report->scenarios()[0]->isOperationalFailure());
             self::assertStringContainsString('Invalid JSON', $report->scenarios()[0]->stderr());
             self::assertSame([], $report->planStages());
-            self::assertSame('0.7', $report->metadata()->schemaVersion());
+            self::assertSame('0.8', $report->metadata()->schemaVersion());
         } finally {
             (new Filesystem())->remove($projectPath);
         }
@@ -311,7 +311,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
         /** @var array<string, mixed> $json */
         $json = json_decode((new JsonReportWriter())->render($report), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('0.7', $json['metadata']['schema_version']);
+        self::assertSame('0.8', $json['metadata']['schema_version']);
         self::assertTrue($json['transition']['package_changes'][0]['direct']);
         self::assertSame('source-2.0.0', $json['transition']['package_changes'][0]['to_source_reference']);
         self::assertSame('dist-2.0.0', $json['transition']['package_changes'][0]['to_dist_reference']);
@@ -466,7 +466,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertSame([], $report->blockers());
         self::assertSame('low', $report->risk()->level());
-        self::assertCount(7, $report->uncertainties());
+        self::assertCount(8, $report->uncertainties());
         self::assertContains(
             'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.',
             $report->uncertainties()
@@ -590,7 +590,7 @@ final class DefaultUpgradeAnalyzerTest extends TestCase
 
         self::assertSame('unknown', $report->resolutionStatus());
         self::assertCount(1, $report->blockers());
-        self::assertCount(6, $report->uncertainties());
+        self::assertCount(7, $report->uncertainties());
         self::assertContains(
             'Composer extension checks used the analyzer runtime because no complete explicit extension platform was supplied.',
             $report->uncertainties()

@@ -26,6 +26,8 @@ use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Model\TestGuidance;
+use PhpUpgradePreflight\Core\Model\TargetPlatformPackage;
+use PhpUpgradePreflight\Core\Model\TargetPlatformProfile;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -69,6 +71,8 @@ final class ImmutableDtoTest extends TestCase
             [ScenarioResult::class],
             [SourceUsage::class],
             [TestGuidance::class],
+            [TargetPlatformPackage::class],
+            [TargetPlatformProfile::class],
             [UpgradeReport::class],
             [UpgradeRequest::class],
             [UpgradeTarget::class],

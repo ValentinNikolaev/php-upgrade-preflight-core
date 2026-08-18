@@ -13,6 +13,14 @@ final class RiskSummary
     /** @param list<string> $drivers */
     public function __construct(string $level, array $drivers)
     {
+        Severity::assert($level, 'risk level');
+
+        foreach ($drivers as $driver) {
+            if (!is_string($driver)) {
+                throw new \InvalidArgumentException('Risk drivers must be strings.');
+            }
+        }
+
         $this->level = $level;
         $this->drivers = array_values($drivers);
     }

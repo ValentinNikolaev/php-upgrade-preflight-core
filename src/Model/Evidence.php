@@ -22,8 +22,10 @@ final class Evidence
     private array $context;
 
     /** @param array<string, mixed> $context */
-    public function __construct(string $id, string $class, string $summary, string $confidence = 'high', array $context = [])
+    public function __construct(string $id, string $class, string $summary, string $confidence = Confidence::HIGH, array $context = [])
     {
+        Confidence::assert($confidence, 'evidence confidence');
+
         $this->id = $id;
         $this->class = $class;
         $this->summary = SensitiveOutputRedactor::redact($summary);

@@ -10,6 +10,8 @@ final class ExtensionAssumption
     public const ABSENT = 'absent';
     public const REQUEST = 'request';
     public const COMPOSER_CONFIG = 'composer_config';
+    public const PROFILE = 'profile';
+    public const CLOSED_WORLD = 'closed_world';
 
     private string $name;
     private string $state;
@@ -19,7 +21,7 @@ final class ExtensionAssumption
     private function __construct(string $name, string $state, ?string $version, string $provenance)
     {
         $name = strtolower(trim($name));
-        if (preg_match('/^ext-[a-z0-9_.-]+$/', $name) !== 1) {
+        if (!str_starts_with($name, 'ext-') || !TargetPlatformPackage::isSupportedName($name)) {
             throw new \InvalidArgumentException(sprintf(
                 'Extension name "%s" must use Composer ext-name syntax.',
                 $name
@@ -30,7 +32,7 @@ final class ExtensionAssumption
             throw new \InvalidArgumentException(sprintf('Unsupported extension state "%s".', $state));
         }
 
-        if (!in_array($provenance, [self::REQUEST, self::COMPOSER_CONFIG], true)) {
+        if (!in_array($provenance, [self::REQUEST, self::COMPOSER_CONFIG, self::PROFILE, self::CLOSED_WORLD], true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported extension provenance "%s".', $provenance));
         }
 
@@ -80,6 +82,20 @@ final class ExtensionAssumption
             $value === false ? self::ABSENT : self::PRESENT,
             is_string($value) ? $value : null,
             self::COMPOSER_CONFIG
+        );
+    }
+
+    public static function fromPlatformPackage(TargetPlatformPackage $package): self
+    {
+        if ($package->packageClass() !== TargetPlatformPackage::CLASS_EXTENSION) {
+            throw new \InvalidArgumentException('Only extension platform packages can become extension assumptions.');
+        }
+
+        return new self(
+            $package->name(),
+            $package->isAbsent() ? self::ABSENT : self::PRESENT,
+            $package->version(),
+            $package->provenance()
         );
     }
 

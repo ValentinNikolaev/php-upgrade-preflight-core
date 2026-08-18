@@ -13,28 +13,34 @@ use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
+use PhpUpgradePreflight\Core\Model\SourceImpactFinding;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
+use PhpUpgradePreflight\Core\Model\StagedResolution;
 use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 
+/**
+ * Single construction point for every {@see UpgradeReport}.
+ *
+ * Correlated source impact is supplied by the caller rather than rebuilt here: the
+ * analyzer owns the ownership index and the evidence ledger, and a second, weaker
+ * construction path would emit findings without package ownership or E2 evidence.
+ */
 final class ReportAssembler
 {
     private ReportSectionBuilder $sectionBuilder;
-    private SourceImpactBuilder $sourceImpactBuilder;
 
-    public function __construct(
-        ?ReportSectionBuilder $sectionBuilder = null,
-        ?SourceImpactBuilder $sourceImpactBuilder = null
-    ) {
+    public function __construct(?ReportSectionBuilder $sectionBuilder = null)
+    {
         $this->sectionBuilder = $sectionBuilder ?? new ReportSectionBuilder();
-        $this->sourceImpactBuilder = $sourceImpactBuilder ?? new SourceImpactBuilder();
     }
 
     /**
      * @param list<ScenarioResult> $scenarioResults
      * @param list<Blocker> $blockers
      * @param list<SourceUsage> $sourceImpact
+     * @param list<SourceImpactFinding> $actionableSourceImpact
      * @param list<CompatibilityFinding> $frameworkFindings
      * @param list<string> $sourceUncertainties
      * @param list<FrameworkGuidance> $frameworkGuidance
@@ -46,6 +52,7 @@ final class ReportAssembler
         LockDiff $lockDiff,
         array $blockers,
         array $sourceImpact,
+        array $actionableSourceImpact,
         array $frameworkFindings,
         RiskSummary $risk,
         EffortEstimate $effort,
@@ -53,9 +60,9 @@ final class ReportAssembler
         EvidenceLedger $evidence,
         array $frameworkGuidance = [],
         ?TargetPlatform $platform = null,
-        ?array $actionableSourceImpact = null
+        ?StagedResolution $stagedResolution = null
     ): UpgradeReport {
-        $actionableSourceImpact = $actionableSourceImpact ?? $this->sourceImpactBuilder->build($sourceImpact, $frameworkFindings);
+        $actionableSourceImpact = array_values($actionableSourceImpact);
         $sections = $this->sectionBuilder->build(
             $request,
             $project,
@@ -65,27 +72,64 @@ final class ReportAssembler
             $actionableSourceImpact,
             $frameworkFindings,
             $sourceUncertainties,
-            $evidence
+            $evidence,
+            $stagedResolution
         );
 
         return new UpgradeReport(
-            $request,
-            $project,
-            $scenarioResults,
-            $lockDiff,
-            $blockers,
-            $sourceImpact,
-            $frameworkFindings,
-            $risk,
-            $effort,
-            $sections->uncertainties(),
-            $evidence->all(),
-            $sections->rootConstraintChanges(),
-            $sections->planStages(),
-            $sections->tests(),
-            $actionableSourceImpact,
-            $frameworkGuidance,
-            $platform
+            request: $request,
+            projectState: $project,
+            scenarios: $scenarioResults,
+            lockDiff: $lockDiff,
+            blockers: $blockers,
+            sourceImpact: $sourceImpact,
+            frameworkFindings: $frameworkFindings,
+            risk: $risk,
+            effort: $effort,
+            uncertainties: $sections->uncertainties(),
+            evidence: $evidence->all(),
+            rootConstraintChanges: $sections->rootConstraintChanges(),
+            planStages: $sections->planStages(),
+            tests: $sections->tests(),
+            actionableSourceImpact: $actionableSourceImpact,
+            frameworkGuidance: $frameworkGuidance,
+            targetPlatform: $platform,
+            stagedResolution: $stagedResolution
+        );
+    }
+
+    /**
+     * Builds the terminal report for a project whose Composer input could not be read.
+     *
+     * No scenario, section, or evidence analysis is possible in that state, so the report
+     * carries only the failing scenario and the uncertainty that explains it.
+     */
+    public static function inputFailure(
+        UpgradeRequest $request,
+        ProjectState $project,
+        ScenarioResult $result,
+        string $message
+    ): UpgradeReport {
+        return new UpgradeReport(
+            request: $request,
+            projectState: $project,
+            scenarios: [$result],
+            lockDiff: new LockDiff([]),
+            blockers: [],
+            sourceImpact: [],
+            frameworkFindings: [],
+            risk: new RiskSummary('high', [
+                'Upgrade risk could not be assessed because Composer project input is incomplete.',
+            ]),
+            effort: new EffortEstimate(
+                [0, 0],
+                'low',
+                [],
+                ['Upgrade effort was not estimated because Composer project input could not be loaded.']
+            ),
+            uncertainties: [sprintf('Composer project input could not be loaded: %s', $message)],
+            evidence: [],
+            stagedResolution: StagedResolution::skipped('project_input_failure')
         );
     }
 }

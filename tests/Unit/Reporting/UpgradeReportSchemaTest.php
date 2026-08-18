@@ -8,6 +8,7 @@ use Opis\JsonSchema\Errors\ErrorFormatter;
 use Opis\JsonSchema\Validator;
 use PhpUpgradePreflight\Core\Analysis\DefaultUpgradeAnalyzer;
 use PhpUpgradePreflight\Core\Analysis\ReportAssembler;
+use PhpUpgradePreflight\Core\Analysis\SourceImpactBuilder;
 use PhpUpgradePreflight\Core\Model\Blocker;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
@@ -21,11 +22,13 @@ use PhpUpgradePreflight\Core\Model\FrameworkHop;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\ProjectState;
+use PhpUpgradePreflight\Core\Model\ReportFormat;
 use PhpUpgradePreflight\Core\Model\ReportMetadata;
 use PhpUpgradePreflight\Core\Model\RiskSummary;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
+use PhpUpgradePreflight\Core\Model\TargetPlatformProfile;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -36,14 +39,14 @@ use Symfony\Component\Filesystem\Filesystem;
 
 final class UpgradeReportSchemaTest extends TestCase
 {
-    public function testCanonicalV07ReportMatchesTheCommittedSnapshot(): void
+    public function testCanonicalV08ReportMatchesTheCommittedSnapshot(): void
     {
         $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         $actual = JsonSnapshotNormalizer::normalize(
             (new JsonReportWriter())->render($this->report($projectPath)),
             $projectPath
         );
-        $snapshotPath = dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.7.json';
+        $snapshotPath = dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.8.json';
         if (getenv('PHP_UPGRADE_PREFLIGHT_UPDATE_SNAPSHOTS') === '1') {
             file_put_contents($snapshotPath, $actual);
         }
@@ -53,7 +56,7 @@ final class UpgradeReportSchemaTest extends TestCase
         self::assertSame($snapshot, $actual);
     }
 
-    public function testCanonicalV07ReportConformsToThePublishedSchema(): void
+    public function testCanonicalV08ReportConformsToThePublishedSchema(): void
     {
         $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         $json = (new JsonReportWriter())->render($this->report($projectPath));
@@ -88,6 +91,123 @@ final class UpgradeReportSchemaTest extends TestCase
         $this->assertConformsToSchema((new JsonReportWriter())->render($report));
     }
 
+    public function testCompleteAndPartialTargetPlatformProfileProjectionsConformToSchema(): void
+    {
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
+        $canonical = $this->report($projectPath)->toArray();
+        $profile = [
+            'schema_version' => '1.0',
+            'completeness' => 'complete',
+            'sha256' => str_repeat('a', 64),
+            'provenance' => 'file',
+            'supported_classes' => ['php', 'extension', 'library', 'php_subtype', 'composer_platform'],
+            'closed_world' => true,
+            'toolchain_bound' => ['composer', 'composer-plugin-api', 'composer-runtime-api'],
+            'effective' => [
+                [
+                    'name' => 'composer',
+                    'class' => 'composer_platform',
+                    'state' => 'present',
+                    'version' => '2.8.12',
+                    'provenance' => 'profile',
+                    'simulation' => 'toolchain_bound',
+                ],
+                [
+                    'name' => 'composer-plugin-api',
+                    'class' => 'composer_platform',
+                    'state' => 'present',
+                    'version' => '2.6.0',
+                    'provenance' => 'profile',
+                    'simulation' => 'toolchain_bound',
+                ],
+                [
+                    'name' => 'composer-runtime-api',
+                    'class' => 'composer_platform',
+                    'state' => 'present',
+                    'version' => '2.2.2',
+                    'provenance' => 'profile',
+                    'simulation' => 'toolchain_bound',
+                ],
+                [
+                    'name' => 'ext-curl',
+                    'class' => 'extension',
+                    'state' => 'absent',
+                    'version' => null,
+                    'provenance' => 'closed_world',
+                    'simulation' => 'composer_config',
+                ],
+                [
+                    'name' => 'php',
+                    'class' => 'php',
+                    'state' => 'present',
+                    'version' => '8.3.0',
+                    'provenance' => 'profile',
+                    'simulation' => 'composer_config',
+                ],
+            ],
+        ];
+        $canonical['request_summary']['target_platform_profile'] = array_intersect_key(
+            $profile,
+            array_flip(['schema_version', 'completeness', 'sha256', 'provenance'])
+        );
+        $canonical['platform']['profile'] = $profile;
+        $completeJson = json_encode($canonical, JSON_THROW_ON_ERROR);
+
+        $this->assertConformsToSchema($completeJson);
+
+        $canonical['request_summary']['target_platform_profile']['completeness'] = 'partial';
+        $canonical['platform']['profile']['completeness'] = 'partial';
+        $canonical['platform']['profile']['closed_world'] = false;
+        $this->assertConformsToSchema(json_encode($canonical, JSON_THROW_ON_ERROR));
+
+        $presenceOnly = [
+            'name' => 'ext-intl',
+            'class' => 'extension',
+            'state' => 'present',
+            'version' => null,
+            'provenance' => 'request',
+            'simulation' => 'composer_config',
+        ];
+        array_splice($canonical['platform']['profile']['effective'], 4, 0, [$presenceOnly]);
+        $this->assertConformsToSchema(json_encode($canonical, JSON_THROW_ON_ERROR));
+        array_splice($canonical['platform']['profile']['effective'], 4, 1);
+
+        $canonical['request_summary']['target_platform_profile']['completeness'] = 'complete';
+        $canonical['platform']['profile']['completeness'] = 'complete';
+        $schemaContents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.8.schema.json');
+        self::assertIsString($schemaContents);
+        $result = (new Validator(null, 20, false))->validate(
+            json_decode(json_encode($canonical, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR),
+            json_decode($schemaContents, false, 512, JSON_THROW_ON_ERROR)
+        );
+        self::assertFalse($result->isValid(), 'A complete profile must be closed-world.');
+
+        $canonical['platform']['profile']['closed_world'] = true;
+        array_splice($canonical['platform']['profile']['effective'], 4, 0, [$presenceOnly]);
+        $result = (new Validator(null, 20, false))->validate(
+            json_decode(json_encode($canonical, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR),
+            json_decode($schemaContents, false, 512, JSON_THROW_ON_ERROR)
+        );
+        self::assertFalse($result->isValid(), 'A complete profile cannot contain a presence-only decision.');
+    }
+
+    public function testRuntimeCompleteProfileProjectionConformsToSchema(): void
+    {
+        $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
+        $profile = TargetPlatformProfile::fromArray([
+            'schema_version' => '1.0',
+            'completeness' => 'complete',
+            'packages' => ['php' => '8.1'],
+        ]);
+        $canonical = $this->report($projectPath, ['laravel'], false, $profile)->toArray();
+
+        self::assertSame(
+            ['composer', 'composer-plugin-api', 'composer-runtime-api'],
+            $canonical['platform']['profile']['toolchain_bound']
+        );
+        $this->assertConformsToSchema(json_encode($canonical, JSON_THROW_ON_ERROR));
+    }
+
     public function testStructuredProjectInputFailureConformsToThePublishedSchema(): void
     {
         $projectPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php-upgrade-preflight-schema-input-' . bin2hex(random_bytes(8));
@@ -110,14 +230,14 @@ final class UpgradeReportSchemaTest extends TestCase
 
     public function testPublishedSchemaAndRuntimeMetadataDescribeTheSameContractVersion(): void
     {
-        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.7.schema.json');
+        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.8.schema.json');
 
         self::assertIsString($contents);
         /** @var array<string, mixed> $schema */
         $schema = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('https://json-schema.org/draft/2020-12/schema', $schema['$schema']);
-        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.7', $schema['$id']);
+        self::assertSame('urn:php-upgrade-preflight:schema:upgrade-report:0.8', $schema['$id']);
         self::assertSame(
             ReportMetadata::SCHEMA_VERSION,
             $schema['$defs']['metadata']['properties']['schema_version']['const']
@@ -136,7 +256,17 @@ final class UpgradeReportSchemaTest extends TestCase
         );
         self::assertSame(
             ScenarioResult::supportedOutcomes(),
-            $schema['$defs']['scenario']['properties']['outcome']['enum']
+            $schema['$defs']['scenarioOutcome']['enum']
+        );
+        // Scenario results and Composer diagnostics must share one outcome vocabulary, so a new
+        // outcome cannot be accepted in one place and rejected in the other.
+        self::assertSame(
+            '#/$defs/scenarioOutcome',
+            $schema['$defs']['scenario']['properties']['outcome']['$ref']
+        );
+        self::assertSame(
+            '#/$defs/scenarioOutcome',
+            $schema['$defs']['composerDiagnostic']['properties']['outcome']['$ref']
         );
         $projectPath = dirname(__DIR__, 5) . '/tests/fixtures/laravel-app';
         self::assertSame(array_keys($this->report($projectPath)->toArray()), $schema['required']);
@@ -161,7 +291,34 @@ final class UpgradeReportSchemaTest extends TestCase
             array_keys($this->report($projectPath)->toArray()['platform']['extensions']),
             $schema['$defs']['platformProvenance']['properties']['extensions']['required']
         );
+        self::assertSame(
+            array_keys($this->report($projectPath)->toArray()['platform']),
+            $schema['$defs']['platformProvenance']['required']
+        );
+        self::assertSame(
+            array_keys($this->report($projectPath)->toArray()['request_summary']),
+            $schema['$defs']['requestSummary']['required']
+        );
         self::assertNotSame([], $this->report($projectPath)->toArray()['transition']['framework_guidance']);
+    }
+
+    public function testV08SchemaUsesComposerCompatiblePlatformPackageNameGrammar(): void
+    {
+        $contents = file_get_contents(dirname(__DIR__, 3) . '/resources/schema/upgrade-report-v0.8.schema.json');
+
+        self::assertIsString($contents);
+        /** @var array<string, mixed> $schema */
+        $schema = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+        $platformConditions = $schema['$defs']['effectivePlatformDecision']['allOf'];
+        $extensionPattern = $platformConditions[3]['then']['properties']['name']['pattern'];
+        $libraryPattern = $platformConditions[4]['then']['properties']['name']['pattern'];
+        $assumptionPattern = $schema['$defs']['extensionAssumption']['properties']['name']['pattern'];
+
+        self::assertSame($extensionPattern, $assumptionPattern);
+        self::assertSame(1, preg_match('/' . $extensionPattern . '/D', 'ext-pdo_sqlite'));
+        self::assertSame(0, preg_match('/' . $extensionPattern . '/D', 'ext-a..b'));
+        self::assertSame(1, preg_match('/' . $libraryPattern . '/D', 'lib-curl-openssl'));
+        self::assertSame(0, preg_match('/' . $libraryPattern . '/D', 'lib-a--b'));
     }
 
     public function testCanonicalV06SnapshotStillConformsToThePreservedSchema(): void
@@ -170,6 +327,14 @@ final class UpgradeReportSchemaTest extends TestCase
 
         self::assertIsString($snapshot);
         $this->assertConformsToSchema($snapshot, '0.6');
+    }
+
+    public function testCanonicalV07SnapshotStillConformsToThePreservedSchema(): void
+    {
+        $snapshot = file_get_contents(dirname(__DIR__, 2) . '/Snapshots/upgrade-report-v0.7.json');
+
+        self::assertIsString($snapshot);
+        $this->assertConformsToSchema($snapshot, '0.7');
     }
 
     public function testPublishedV05BlockerContractRemainsUnchanged(): void
@@ -286,8 +451,12 @@ final class UpgradeReportSchemaTest extends TestCase
     }
 
     /** @param list<string> $frameworks */
-    private function report(string $projectPath, array $frameworks = ['laravel'], bool $partialExtensions = false): UpgradeReport
-    {
+    private function report(
+        string $projectPath,
+        array $frameworks = ['laravel'],
+        bool $partialExtensions = false,
+        ?TargetPlatformProfile $profile = null
+    ): UpgradeReport {
         $request = new UpgradeRequest(
             $projectPath,
             [
@@ -297,7 +466,12 @@ final class UpgradeReportSchemaTest extends TestCase
             '7.4',
             null,
             ['app'],
-            $frameworks
+            $frameworks,
+            ReportFormat::JSON,
+            null,
+            false,
+            [],
+            $profile
         );
         $platform = ['php' => '7.4.33'];
         if ($partialExtensions) {
@@ -372,6 +546,19 @@ final class UpgradeReportSchemaTest extends TestCase
             ]),
         ];
 
+        $sourceInventory = [
+            new SourceUsage('app/Example.php', 'Legacy\\Facade', 'static_call', ['source-1'], 17),
+        ];
+        $frameworkFindings = [
+            new CompatibilityFinding(
+                'laravel',
+                'medium',
+                'Legacy package requires review.',
+                ['package-1', 'source-1'],
+                [['from_major' => 7, 'to_major' => 9]]
+            ),
+        ];
+
         return (new ReportAssembler())->assemble(
             $request,
             $project,
@@ -406,18 +593,9 @@ final class UpgradeReportSchemaTest extends TestCase
                     ['Upgrade or replace `legacy/package`.', 'Choose a compatible Laravel target.']
                 ),
             ],
-            [
-                new SourceUsage('app/Example.php', 'Legacy\\Facade', 'static_call', ['source-1'], 17),
-            ],
-            [
-                new CompatibilityFinding(
-                    'laravel',
-                    'medium',
-                    'Legacy package requires review.',
-                    ['package-1', 'source-1'],
-                    [['from_major' => 7, 'to_major' => 9]]
-                ),
-            ],
+            $sourceInventory,
+            (new SourceImpactBuilder())->build($sourceInventory, $frameworkFindings),
+            $frameworkFindings,
             new RiskSummary('high', [
                 'A root dependency constraint conflicts with the requested target.',
                 'A framework compatibility finding requires review.',
@@ -446,7 +624,7 @@ final class UpgradeReportSchemaTest extends TestCase
         );
     }
 
-    private function assertConformsToSchema(string $json, string $schemaVersion = '0.7'): void
+    private function assertConformsToSchema(string $json, string $schemaVersion = '0.8'): void
     {
         $schemaContents = file_get_contents(sprintf(
             '%s/resources/schema/upgrade-report-v%s.schema.json',

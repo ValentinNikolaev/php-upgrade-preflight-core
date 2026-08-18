@@ -6,7 +6,7 @@ namespace PhpUpgradePreflight\Core\Reporting;
 
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 
-final class JsonReportWriter
+final class JsonReportWriter implements ReportWriter
 {
     public function render(UpgradeReport $report): string
     {

@@ -17,17 +17,25 @@ Composer-metadata discovery generalizes adapter registration for the standalone 
 | `--path=PATH` | Project directory. Defaults to the current Laravel application. |
 | `--target=PACKAGE:CONSTRAINT` | Requested package constraint. Repeat as needed. |
 | `--target-php=VERSION` | Exact target PHP platform version. |
+| `--target-platform-profile=PATH` | JSON target-platform profile. May be supplied once. |
 | `--from-php=VERSION` | Known current PHP version. |
 | `--with-extension=EXT[:VERSION]` | Assume `ext-name` is present, optionally at an exact version. Repeat as needed. |
 | `--without-extension=EXT` | Assume `ext-name` is absent. Repeat as needed. |
 | `--source=PATH` | File or directory inside the project. Repeat as needed. |
 | `--format=json\|markdown` | Report format. Defaults to `json`. |
 | `--output=PATH` | Report file outside the analyzed project. |
+| `--composer-mode=compatible\|restricted` | Composer execution policy. Defaults to `compatible`. |
+| `--composer-executable=PATH` | Composer command or executable path. Defaults to `composer`. |
+| `--composer-version=CONSTRAINT` | Expected Composer constraint. Defaults to `>=2.0.0 <3.0.0`. |
+| `--composer-timeout=SECONDS` | Scenario timeout, 1–3600 seconds. Defaults to 300. |
+| `--composer-diagnostic-timeout=SECONDS` | Diagnostic timeout, 1–900 seconds. Defaults to 60. |
 | `--debug` | Preserve temporary workspaces and expose exact `temp_path` values; output is non-shareable. |
 
-Extension options have the same validation and provenance semantics as the standalone CLI. A name may be supplied only once across both options. Exact versions and absences affect only temporary Composer workspaces. Absence simulation requires Composer 2.2 or newer and stops affected scenarios before workspace creation on an older detected version. Presence without a version remains visible as uncertainty; related constraint failures are non-blocking `extension-version-unknown` advisories. Every unlisted host extension also remains explicit uncertainty in the canonical report.
+Extension options have the same validation and provenance semantics as the standalone CLI. Matching duplicates collapse deterministically; contradictory versions or presence/absence are rejected. Exact versions and absences affect only temporary Composer workspaces. Absence simulation requires Composer 2.2 or newer and stops affected scenarios before workspace creation on an older detected version. Presence without a version remains visible as uncertainty; related constraint failures are non-blocking `extension-version-unknown` advisories. Every unlisted host extension also remains explicit uncertainty in the canonical report.
 
-Request assumptions override same-name entries from the application's original `config.platform`. In v0.2 they still form only a partial extension model: `platform.extensions` records `completeness: partial` and identifies the analyzer runtime as the source for every unlisted extension. No Artisan option claims a complete, host-independent extension inventory.
+`--target-platform-profile` has the same schema `1.0`, supported package classes, validation, precedence, and reporting contract as the standalone CLI. A `partial` profile leaves unlisted platform packages host-dependent. A `complete` profile is closed-world for its supported classes, models safely simulated unlisted packages absent, and requires Composer 2.2 or newer. Older Composer produces an operationally unknown result rather than silently weakening the profile. The report records only safe `file` provenance and a canonical digest; it does not expose the profile path. See the [CLI profile example and guarantee boundary](cli.md).
+
+Composer execution options have the same policy as the standalone CLI. Compatible mode can inherit private-repository state. Restricted mode uses analyzer-owned Composer state, scrubs the controlled credential and proxy sources, and requests best-effort offline behavior without claiming OS isolation. See [Composer execution policy](composer-execution.md).
 
 By default, canonical JSON and Markdown replace absolute local roots with `[PROJECT_ROOT]`, `[REPORT_OUTPUT]`, `[LOCAL_REPOSITORY]`, and `[ANALYZER_WORKSPACE]`. The analyzer still uses exact project and source paths internally, while reported source files remain project-relative. A cleanup failure reports only `[ANALYZER_WORKSPACE]` unless `--debug` was supplied. Explicit debug mode preserves workspaces and exposes exact `temp_path` values, so debug reports and retained workspaces are non-shareable. Credential redaction remains active in every mode.
 
@@ -44,10 +52,10 @@ php artisan upgrade:analyze \
   --output=/work/reports/laravel-11.md
 ```
 
-Artisan must boot before it can run the command. The v0.2 adapter is host-installable with Laravel 8–13; use the external CLI for Laravel 7, when the current PHP interpreter cannot boot the application, when service providers are broken, or when installing the adapter would disturb the dependency graph.
+Artisan must boot before it can run the command. The v0.3 release-candidate adapter is tested as host-installable with Laravel 8–13 but is not yet published; use the released v0.2 adapter or evaluate v0.3 from a source checkout until publication. Use the external CLI for Laravel 7, when the current PHP interpreter cannot boot the application, when service providers are broken, or when installing the adapter would disturb the dependency graph.
 
 Laravel guidance covers 7→8, the retained direct 7→9 path, and adjacent 8→9 through 12→13 packs. Gapless adjacent packs compose multi-major guidance. Same-major requests, downgrades, ambiguous or unknown majors, catalog boundaries, and requests whose first required hop is missing are unsupported. A covered prefix before a later gap is `partially_supported`, and guidance stops there.
 
-Schema `0.7` records raw AST observations in `source_inventory`; `source_impact` contains only observations correlated with a selected package change, an applicable Laravel rule, or both. Read `resolution.status` separately from `transition.framework_guidance[].status`: Composer feasibility and rule-pack coverage do not imply one another.
+Schema `0.8` preserves raw `source_inventory` and actionable direct `source_impact`, then adds the same staged result as the generic CLI. Read direct `resolution.status`, `transition.framework_guidance[].status`, and `staged_resolution.status` separately; Composer feasibility and rule-pack coverage do not imply one another.
 
 The command returns `0` after writing any valid report, including a blocked result. It returns `2` for invalid invocation and `1` when it cannot produce a report.

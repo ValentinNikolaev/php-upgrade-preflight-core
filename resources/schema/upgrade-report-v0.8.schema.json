@@ -1,0 +1,2093 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:php-upgrade-preflight:schema:upgrade-report:0.8",
+    "title": "PHP Upgrade Preflight v0.8 Report",
+    "description": "Canonical machine-readable staged report produced by PHP Upgrade Preflight 0.3.x.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "metadata",
+        "request_summary",
+        "project_state",
+        "platform",
+        "composer_execution",
+        "resolution",
+        "staged_resolution",
+        "transition",
+        "blockers",
+        "source_inventory",
+        "source_impact",
+        "framework_findings",
+        "plan",
+        "risk",
+        "effort",
+        "tests",
+        "uncertainties",
+        "evidence"
+    ],
+    "properties": {
+        "metadata": {
+            "$ref": "#/$defs/metadata"
+        },
+        "request_summary": {
+            "$ref": "#/$defs/requestSummary"
+        },
+        "project_state": {
+            "$ref": "#/$defs/projectState"
+        },
+        "platform": {
+            "$ref": "#/$defs/platformProvenance"
+        },
+        "composer_execution": {
+            "$ref": "#/$defs/composerExecutionProvenance"
+        },
+        "resolution": {
+            "$ref": "#/$defs/resolution"
+        },
+        "staged_resolution": {
+            "$ref": "#/$defs/stagedResolution"
+        },
+        "transition": {
+            "$ref": "#/$defs/transition"
+        },
+        "blockers": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/blocker"
+            }
+        },
+        "source_inventory": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/sourceUsage"
+            }
+        },
+        "source_impact": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/sourceImpactFinding"
+            }
+        },
+        "framework_findings": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/frameworkFinding"
+            }
+        },
+        "plan": {
+            "$ref": "#/$defs/plan"
+        },
+        "risk": {
+            "$ref": "#/$defs/risk"
+        },
+        "effort": {
+            "$ref": "#/$defs/effort"
+        },
+        "tests": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/testGuidance"
+            }
+        },
+        "uncertainties": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "minLength": 1
+            },
+            "uniqueItems": true
+        },
+        "evidence": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/evidence"
+            }
+        }
+    },
+    "$defs": {
+        "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schema_version",
+                "tool"
+            ],
+            "properties": {
+                "schema_version": {
+                    "const": "0.8"
+                },
+                "tool": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "name",
+                        "version"
+                    ],
+                    "properties": {
+                        "name": {
+                            "const": "php-upgrade-preflight"
+                        },
+                        "version": {
+                            "type": "string",
+                            "pattern": "^0\\.3\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+                        }
+                    },
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "completeness": {
+                                        "const": "none"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "provenance": {
+                                        "const": "analyzer_runtime"
+                                    },
+                                    "explicitly_modeled": {
+                                        "const": false
+                                    },
+                                    "unmodeled_provenance": {
+                                        "const": "analyzer_runtime"
+                                    },
+                                    "assumptions": {
+                                        "maxItems": 0
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "if": {
+                                "properties": {
+                                    "completeness": {
+                                        "const": "partial"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "provenance": {
+                                        "const": "mixed"
+                                    },
+                                    "explicitly_modeled": {
+                                        "const": true
+                                    },
+                                    "unmodeled_provenance": {
+                                        "const": "analyzer_runtime"
+                                    },
+                                    "assumptions": {
+                                        "minItems": 1
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "if": {
+                                "properties": {
+                                    "completeness": {
+                                        "const": "complete"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "explicitly_modeled": {
+                                        "const": true
+                                    },
+                                    "unmodeled_provenance": {
+                                        "type": "null"
+                                    },
+                                    "assumptions": {
+                                        "minItems": 1
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "requestSummary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "project_path",
+                "targets",
+                "from_php",
+                "target_php",
+                "source_paths",
+                "frameworks",
+                "format",
+                "output_path",
+                "target_platform_profile",
+                "composer_execution"
+            ],
+            "properties": {
+                "project_path": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "targets": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/$defs/target"
+                    }
+                },
+                "from_php": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "target_php": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "source_paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "frameworks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "uniqueItems": true
+                },
+                "format": {
+                    "enum": [
+                        "json",
+                        "markdown"
+                    ]
+                },
+                "output_path": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "target_platform_profile": {
+                    "$ref": "#/$defs/targetPlatformProfileSummary"
+                },
+                "composer_execution": {
+                    "$ref": "#/$defs/composerExecutionConfiguration"
+                }
+            }
+        },
+        "composerExecutionConfiguration": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "mode",
+                "executable_selection",
+                "expected_version",
+                "scenario_timeout_seconds",
+                "diagnostic_timeout_seconds",
+                "environment_mode",
+                "network_policy"
+            ],
+            "properties": {
+                "mode": {"enum": ["compatible", "restricted"]},
+                "executable_selection": {"enum": ["path_search", "explicit"]},
+                "expected_version": {"type": "string", "minLength": 1},
+                "scenario_timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 3600},
+                "diagnostic_timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 900},
+                "environment_mode": {"enum": ["inherited", "sanitized"]},
+                "network_policy": {"enum": ["inherited", "best_effort_offline"]}
+            }
+        },
+        "composerExecutionProvenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "mode",
+                "composer_version",
+                "expected_version",
+                "version_matches_expectation",
+                "executable_selection",
+                "scenario_timeout_seconds",
+                "diagnostic_timeout_seconds",
+                "environment_mode",
+                "network_policy",
+                "repository_source_mode",
+                "composer_home",
+                "global_configuration_inherited",
+                "credentials_may_be_inherited",
+                "offline_requested",
+                "scripts_enabled",
+                "plugins_enabled",
+                "installation_enabled",
+                "audit_enabled",
+                "interaction_enabled",
+                "progress_enabled",
+                "process_os_isolation"
+            ],
+            "properties": {
+                "mode": {"enum": ["compatible", "restricted"]},
+                "composer_version": {"type": ["string", "null"], "minLength": 1},
+                "expected_version": {"type": "string", "minLength": 1},
+                "version_matches_expectation": {"type": ["boolean", "null"]},
+                "executable_selection": {"enum": ["path_search", "explicit"]},
+                "scenario_timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 3600},
+                "diagnostic_timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 900},
+                "environment_mode": {"enum": ["inherited", "sanitized"]},
+                "network_policy": {"enum": ["inherited", "best_effort_offline"]},
+                "repository_source_mode": {"enum": ["project_and_global", "project_only"]},
+                "composer_home": {"enum": ["inherited", "analyzer_owned"]},
+                "global_configuration_inherited": {"type": "boolean"},
+                "credentials_may_be_inherited": {"type": "boolean"},
+                "offline_requested": {"type": "boolean"},
+                "scripts_enabled": {"const": false},
+                "plugins_enabled": {"const": false},
+                "installation_enabled": {"const": false},
+                "audit_enabled": {"const": false},
+                "interaction_enabled": {"const": false},
+                "progress_enabled": {"const": false},
+                "process_os_isolation": {"const": false}
+            },
+            "allOf": [
+                {
+                    "if": {"properties": {"mode": {"const": "restricted"}}, "required": ["mode"]},
+                    "then": {"properties": {
+                        "environment_mode": {"const": "sanitized"},
+                        "network_policy": {"const": "best_effort_offline"},
+                        "repository_source_mode": {"const": "project_only"},
+                        "composer_home": {"const": "analyzer_owned"},
+                        "global_configuration_inherited": {"const": false},
+                        "credentials_may_be_inherited": {"const": false},
+                        "offline_requested": {"const": true}
+                    }},
+                    "else": {"properties": {
+                        "environment_mode": {"const": "inherited"},
+                        "network_policy": {"const": "inherited"},
+                        "repository_source_mode": {"const": "project_and_global"},
+                        "composer_home": {"const": "inherited"},
+                        "global_configuration_inherited": {"const": true},
+                        "credentials_may_be_inherited": {"const": true},
+                        "offline_requested": {"const": false}
+                    }}
+                }
+            ]
+        },
+        "targetPlatformProfileSummary": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "schema_version",
+                        "completeness",
+                        "sha256",
+                        "provenance"
+                    ],
+                    "properties": {
+                        "schema_version": {"const": "1.0"},
+                        "completeness": {"enum": ["partial", "complete"]},
+                        "sha256": {"$ref": "#/$defs/sha256"},
+                        "provenance": {"enum": ["php_api", "file"]}
+                    }
+                },
+                {"type": "null"}
+            ]
+        },
+        "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "package",
+                "constraint"
+            ],
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "constraint": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "projectState": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "path",
+                "platform_php",
+                "root_requirements",
+                "locked_packages"
+            ],
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "platform_php": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "root_requirements": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "locked_packages": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "platformProvenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "analyzer",
+                "current_php",
+                "target_php",
+                "extensions",
+                "profile"
+            ],
+            "properties": {
+                "analyzer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "php_version",
+                        "provenance"
+                    ],
+                    "properties": {
+                        "php_version": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "provenance": {
+                            "const": "runtime"
+                        }
+                    }
+                },
+                "current_php": {
+                    "$ref": "#/$defs/phpProvenance"
+                },
+                "target_php": {
+                    "$ref": "#/$defs/phpProvenance"
+                },
+                "extensions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "provenance",
+                        "explicitly_modeled",
+                        "completeness",
+                        "unmodeled_provenance",
+                        "assumptions"
+                    ],
+                    "properties": {
+                        "provenance": {
+                            "enum": [
+                                "analyzer_runtime",
+                                "composer_config",
+                                "request",
+                                "profile",
+                                "closed_world",
+                                "mixed"
+                            ]
+                        },
+                        "explicitly_modeled": {
+                            "type": "boolean"
+                        },
+                        "completeness": {
+                            "enum": [
+                                "none",
+                                "partial",
+                                "complete"
+                            ]
+                        },
+                        "unmodeled_provenance": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "enum": [
+                                "analyzer_runtime",
+                                null
+                            ]
+                        },
+                        "assumptions": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/$defs/extensionAssumption"
+                            }
+                        }
+                    }
+                },
+                "profile": {
+                    "$ref": "#/$defs/targetPlatformProfileReport"
+                }
+            }
+        },
+        "targetPlatformProfileReport": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "schema_version",
+                        "completeness",
+                        "sha256",
+                        "provenance",
+                        "supported_classes",
+                        "closed_world",
+                        "toolchain_bound",
+                        "effective"
+                    ],
+                    "properties": {
+                        "schema_version": {"const": "1.0"},
+                        "completeness": {"enum": ["partial", "complete"]},
+                        "sha256": {"$ref": "#/$defs/sha256"},
+                        "provenance": {"enum": ["php_api", "file"]},
+                        "supported_classes": {
+                            "const": [
+                                "php",
+                                "extension",
+                                "library",
+                                "php_subtype",
+                                "composer_platform"
+                            ]
+                        },
+                        "closed_world": {"type": "boolean"},
+                        "toolchain_bound": {
+                            "const": [
+                                "composer",
+                                "composer-plugin-api",
+                                "composer-runtime-api"
+                            ]
+                        },
+                        "effective": {
+                            "type": "array",
+                            "uniqueItems": true,
+                            "items": {"$ref": "#/$defs/effectivePlatformDecision"}
+                        }
+                    },
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {"completeness": {"const": "complete"}},
+                                "required": ["completeness"]
+                            },
+                            "then": {
+                                "properties": {
+                                    "closed_world": {"const": true},
+                                    "effective": {
+                                        "items": {
+                                            "not": {
+                                                "properties": {
+                                                    "state": {"const": "present"},
+                                                    "version": {"type": "null"}
+                                                },
+                                                "required": ["state", "version"]
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "else": {"properties": {"closed_world": {"const": false}}}
+                        }
+                    ]
+                },
+                {"type": "null"}
+            ]
+        },
+        "platformPackageClass": {
+            "enum": [
+                "php",
+                "extension",
+                "library",
+                "php_subtype",
+                "composer_platform"
+            ]
+        },
+        "effectivePlatformDecision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "name",
+                "class",
+                "state",
+                "version",
+                "provenance",
+                "simulation"
+            ],
+            "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "class": {"$ref": "#/$defs/platformPackageClass"},
+                "state": {"enum": ["present", "absent"]},
+                "version": {"type": ["string", "null"]},
+                "provenance": {
+                    "enum": ["request", "composer_config", "profile", "closed_world"]
+                },
+                "simulation": {"enum": ["composer_config", "toolchain_bound"]}
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"state": {"const": "absent"}},
+                        "required": ["state"]
+                    },
+                    "then": {"properties": {"version": {"type": "null"}}}
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "state": {"const": "present"},
+                            "version": {"type": "null"}
+                        },
+                        "required": ["state", "version"]
+                    },
+                    "then": {
+                        "properties": {
+                            "class": {"const": "extension"},
+                            "provenance": {"const": "request"},
+                            "simulation": {"const": "composer_config"}
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {"class": {"const": "php"}},
+                        "required": ["class"]
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {"const": "php"},
+                            "state": {"const": "present"},
+                            "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+                            "simulation": {"const": "composer_config"}
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {"class": {"const": "extension"}},
+                        "required": ["class"]
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {"type": "string", "pattern": "^ext-[a-z0-9](?:[_.-]?[a-z0-9]+)*$"},
+                            "simulation": {"const": "composer_config"}
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {"class": {"const": "library"}},
+                        "required": ["class"]
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {"type": "string", "pattern": "^lib-[a-z0-9](?:[_.-]?[a-z0-9]+)*$"},
+                            "simulation": {"const": "composer_config"}
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {"class": {"const": "php_subtype"}},
+                        "required": ["class"]
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {"enum": ["php-64bit", "php-debug", "php-ipv6", "php-zts"]},
+                            "simulation": {"const": "composer_config"}
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {"class": {"const": "composer_platform"}},
+                        "required": ["class"]
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {"enum": ["composer", "composer-plugin-api", "composer-runtime-api"]},
+                            "simulation": {"const": "toolchain_bound"}
+                        }
+                    }
+                }
+            ]
+        },
+        "phpProvenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "version",
+                "provenance"
+            ],
+            "properties": {
+                "version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "provenance": {
+                    "enum": [
+                        "request",
+                        "profile",
+                        "composer_config",
+                        "unknown"
+                    ]
+                }
+            }
+        },
+        "extensionAssumption": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "name",
+                "state",
+                "version",
+                "provenance"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "pattern": "^ext-[a-z0-9](?:[_.-]?[a-z0-9]+)*$"
+                },
+                "state": {
+                    "enum": [
+                        "present",
+                        "absent"
+                    ]
+                },
+                "version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "provenance": {
+                    "enum": [
+                        "request",
+                        "composer_config",
+                        "profile",
+                        "closed_world"
+                    ]
+                }
+            }
+        },
+        "resolution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "status",
+                "scenarios"
+            ],
+            "properties": {
+                "status": {
+                    "enum": [
+                        "feasible",
+                        "feasible_with_changes",
+                        "blocked",
+                        "unknown"
+                    ]
+                },
+                "scenarios": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/scenario"
+                    }
+                }
+            }
+        },
+        "stagedResolution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "execution_state",
+                "status",
+                "provider",
+                "stages",
+                "blocker_registry",
+                "source_impact",
+                "stop_reason",
+                "budgets",
+                "evidence"
+            ],
+            "properties": {
+                "execution_state": {
+                    "enum": ["evaluated", "skipped"]
+                },
+                "status": {
+                    "enum": ["feasible", "feasible_with_changes", "blocked", "unknown"]
+                },
+                "provider": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/stageAnalysis"}
+                },
+                "blocker_registry": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/stageBlocker"}
+                },
+                "source_impact": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/sourceImpactFinding"}
+                },
+                "stop_reason": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                },
+                "budgets": {"$ref": "#/$defs/stagedBudgets"},
+                "evidence": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {"$ref": "#/$defs/evidenceId"}
+                }
+            }
+        },
+        "stagedBudgets": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "max_hops",
+                "max_attempts_per_stage",
+                "max_scenarios",
+                "max_composer_processes",
+                "scenario_timeout_seconds",
+                "stage_timeout_seconds",
+                "aggregate_timeout_seconds",
+                "memory_bytes",
+                "json_report_bytes",
+                "markdown_report_bytes"
+            ],
+            "properties": {
+                "max_hops": {"const": 6},
+                "max_attempts_per_stage": {"const": 3},
+                "max_scenarios": {"const": 18},
+                "max_composer_processes": {"const": 128},
+                "scenario_timeout_seconds": {"const": 300},
+                "stage_timeout_seconds": {"const": 900},
+                "aggregate_timeout_seconds": {"const": 1800},
+                "memory_bytes": {"const": 268435456},
+                "json_report_bytes": {"const": 524288},
+                "markdown_report_bytes": {"const": 262144}
+            }
+        },
+        "stageAnalysis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id",
+                "framework",
+                "from_major",
+                "to_major",
+                "execution_state",
+                "resolution_status",
+                "targets",
+                "analysis_php",
+                "target_evidence",
+                "platform",
+                "composer_execution",
+                "duration_ms",
+                "evidence",
+                "predecessor_state",
+                "input_state",
+                "output_state",
+                "attempts",
+                "selected_attempt",
+                "package_changes",
+                "blockers",
+                "source_snapshot",
+                "source_snapshot_note",
+                "source_findings",
+                "source_impact",
+                "risk",
+                "effort",
+                "recommended_actions",
+                "tests",
+                "stop_reason"
+            ],
+            "properties": {
+                "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"},
+                "framework": {"type": "string", "minLength": 1},
+                "from_major": {"type": "integer", "minimum": 0},
+                "to_major": {"type": "integer", "minimum": 1},
+                "execution_state": {"enum": ["evaluated", "skipped"]},
+                "resolution_status": {
+                    "enum": ["feasible", "feasible_with_changes", "blocked", "unknown", null]
+                },
+                "targets": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/target"}
+                },
+                "analysis_php": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+                "target_evidence": {"$ref": "#/$defs/evidenceReferences"},
+                "platform": {
+                    "oneOf": [
+                        {"$ref": "#/$defs/stagePlatform"},
+                        {"type": "null"}
+                    ]
+                },
+                "composer_execution": {
+                    "oneOf": [
+                        {"$ref": "#/$defs/stageComposerExecution"},
+                        {"type": "null"}
+                    ]
+                },
+                "duration_ms": {"type": "integer", "minimum": 0},
+                "evidence": {"$ref": "#/$defs/evidenceReferences"},
+                "predecessor_state": {"$ref": "#/$defs/nullableStateFingerprint"},
+                "input_state": {"$ref": "#/$defs/nullableStateFingerprint"},
+                "output_state": {"$ref": "#/$defs/nullableStateFingerprint"},
+                "attempts": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/stageAttempt"}
+                },
+                "selected_attempt": {"type": ["integer", "null"], "minimum": 1},
+                "package_changes": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/packageChange"}
+                },
+                "blockers": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {"type": "string", "pattern": "^stage-blocker-[a-f0-9]{20}$"}
+                },
+                "source_snapshot": {"const": "original_project"},
+                "source_snapshot_note": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "source_findings": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/frameworkFinding"}
+                },
+                "source_impact": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {"type": "string", "pattern": "^source-impact-[a-f0-9]{20}$"}
+                },
+                "risk": {"$ref": "#/$defs/stageRisk"},
+                "effort": {"$ref": "#/$defs/stageEffort"},
+                "recommended_actions": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1}
+                },
+                "tests": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/stageTestGuidance"}
+                },
+                "stop_reason": {"type": ["string", "null"], "minLength": 1}
+            }
+        },
+        "stagePlatform": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["analysis_php", "completeness", "profile_sha256", "effective_sha256"],
+            "properties": {
+                "analysis_php": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+                "completeness": {"enum": ["partial", "complete"]},
+                "profile_sha256": {
+                    "oneOf": [
+                        {"$ref": "#/$defs/sha256"},
+                        {"type": "null"}
+                    ]
+                },
+                "effective_sha256": {"$ref": "#/$defs/sha256"}
+            }
+        },
+        "stageComposerExecution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["configuration", "effective_sha256"],
+            "properties": {
+                "configuration": {"$ref": "#/$defs/composerExecutionConfiguration"},
+                "effective_sha256": {"$ref": "#/$defs/sha256"}
+            }
+        },
+        "stageEffort": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stage_id", "range_hours", "confidence", "components", "assumptions"],
+            "properties": {
+                "stage_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"},
+                "range_hours": {"$ref": "#/$defs/hourRange"},
+                "confidence": {"$ref": "#/$defs/confidence"},
+                "components": {
+                    "type": "object",
+                    "additionalProperties": {"$ref": "#/$defs/hourRange"}
+                },
+                "assumptions": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1}
+                }
+            }
+        },
+        "stageRisk": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stage_id", "level", "drivers"],
+            "properties": {
+                "stage_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"},
+                "level": {"enum": ["low", "medium", "high"]},
+                "drivers": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1}
+                }
+            }
+        },
+        "stageAttempt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "number",
+                "strategy",
+                "root_constraint_changes",
+                "scenario",
+                "input_state",
+                "output_state",
+                "blocker_ids",
+                "evidence",
+                "selected"
+            ],
+            "properties": {
+                "number": {"type": "integer", "minimum": 1},
+                "strategy": {
+                    "enum": [
+                        "target_only",
+                        "root_constraint_remediation",
+                        "locked_package_remediation",
+                        "root_and_locked_package_remediation"
+                    ]
+                },
+                "root_constraint_changes": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/rootConstraintChange"}
+                },
+                "scenario": {"$ref": "#/$defs/scenario"},
+                "input_state": {"$ref": "#/$defs/stateFingerprint"},
+                "output_state": {"$ref": "#/$defs/nullableStateFingerprint"},
+                "blocker_ids": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {"type": "string", "pattern": "^stage-blocker-[a-f0-9]{20}$"}
+                },
+                "evidence": {"$ref": "#/$defs/evidenceReferences"},
+                "selected": {"type": "boolean"}
+            }
+        },
+        "stateFingerprint": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "manifest_sha256",
+                "lock_sha256",
+                "platform_sha256",
+                "execution_policy_sha256",
+                "state_sha256"
+            ],
+            "properties": {
+                "manifest_sha256": {"$ref": "#/$defs/sha256"},
+                "lock_sha256": {"$ref": "#/$defs/sha256"},
+                "platform_sha256": {"$ref": "#/$defs/sha256"},
+                "execution_policy_sha256": {"$ref": "#/$defs/sha256"},
+                "state_sha256": {"$ref": "#/$defs/sha256"}
+            }
+        },
+        "nullableStateFingerprint": {
+            "oneOf": [
+                {"$ref": "#/$defs/stateFingerprint"},
+                {"type": "null"}
+            ]
+        },
+        "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "stageBlocker": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id",
+                "stage_id",
+                "attempt",
+                "scenario",
+                "category",
+                "subject",
+                "blocking_package",
+                "requested_constraint",
+                "constraint",
+                "dependency_path",
+                "confidence",
+                "summary",
+                "options",
+                "blocking",
+                "evidence",
+                "first_seen",
+                "last_seen",
+                "lifecycle",
+                "lifecycle_history",
+                "observations"
+            ],
+            "properties": {
+                "id": {"type": "string", "pattern": "^stage-blocker-[a-f0-9]{20}$"},
+                "stage_id": {"type": "string", "minLength": 1},
+                "attempt": {"type": "integer", "minimum": 1},
+                "scenario": {"type": "string", "minLength": 1},
+                "category": {"type": "string", "minLength": 1},
+                "subject": {"type": "string", "minLength": 1},
+                "blocking_package": {"type": ["string", "null"], "minLength": 1},
+                "requested_constraint": {"type": ["string", "null"], "minLength": 1},
+                "constraint": {"type": ["string", "null"], "minLength": 1},
+                "dependency_path": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1}
+                },
+                "confidence": {"$ref": "#/$defs/confidence"},
+                "summary": {"type": "string", "minLength": 1},
+                "options": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1}
+                },
+                "blocking": {"type": "boolean"},
+                "evidence": {"$ref": "#/$defs/evidenceReferences"},
+                "first_seen": {"$ref": "#/$defs/stageObservationPoint"},
+                "last_seen": {"$ref": "#/$defs/stageObservationPoint"},
+                "lifecycle": {"enum": ["detected", "persists", "resolved", "superseded"]},
+                "lifecycle_history": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/blockerLifecycleEvent"}
+                },
+                "observations": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/blockerObservation"}
+                }
+            }
+        },
+        "stageObservationPoint": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stage_id", "attempt", "scenario"],
+            "properties": {
+                "stage_id": {"type": "string", "minLength": 1},
+                "attempt": {"type": "integer", "minimum": 1},
+                "scenario": {"type": "string", "minLength": 1}
+            }
+        },
+        "blockerLifecycleEvent": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "attempt", "scenario", "evidence"],
+            "properties": {
+                "status": {"enum": ["detected", "persists", "resolved", "superseded"]},
+                "attempt": {"type": "integer", "minimum": 1},
+                "scenario": {"type": "string", "minLength": 1},
+                "evidence": {"$ref": "#/$defs/evidenceReferences"}
+            }
+        },
+        "blockerObservation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["attempt", "scenario", "evidence"],
+            "properties": {
+                "attempt": {"type": "integer", "minimum": 1},
+                "scenario": {"type": "string", "minLength": 1},
+                "evidence": {"$ref": "#/$defs/evidenceReferences"}
+            }
+        },
+        "scenario": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "name",
+                "composer_version",
+                "command",
+                "duration_ms",
+                "exit_code",
+                "succeeded",
+                "outcome",
+                "failure_type",
+                "stdout_excerpt",
+                "stderr_excerpt",
+                "candidate_lock",
+                "diagnostics",
+                "temp_path"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "composer_version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "duration_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "exit_code": {
+                    "type": "integer"
+                },
+                "succeeded": {
+                    "type": "boolean"
+                },
+                "outcome": {
+                    "$ref": "#/$defs/scenarioOutcome"
+                },
+                "failure_type": {
+                    "enum": [
+                        "solver",
+                        "operational",
+                        "validation",
+                        null
+                    ]
+                },
+                "stdout_excerpt": {
+                    "type": "string",
+                    "maxLength": 4000
+                },
+                "stderr_excerpt": {
+                    "type": "string",
+                    "maxLength": 4000
+                },
+                "candidate_lock": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/candidateLock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "diagnostics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/composerDiagnostic"
+                    }
+                },
+                "temp_path": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            }
+        },
+        "scenarioOutcome": {
+            "enum": [
+                "success",
+                "solver_failure",
+                "validation_failure",
+                "composer_missing",
+                "repository_metadata_unavailable",
+                "timeout",
+                "invalid_json",
+                "lockfile_missing",
+                "process_failure",
+                "cleanup_failure",
+                "workspace_failure"
+            ]
+        },
+        "composerDiagnostic": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "package",
+                "constraint",
+                "command",
+                "exit_code",
+                "outcome",
+                "stdout_excerpt",
+                "stderr_excerpt"
+            ],
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "constraint": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "exit_code": {
+                    "type": "integer"
+                },
+                "outcome": {
+                    "$ref": "#/$defs/scenarioOutcome"
+                },
+                "stdout_excerpt": {
+                    "type": "string",
+                    "maxLength": 4000
+                },
+                "stderr_excerpt": {
+                    "type": "string",
+                    "maxLength": 4000
+                }
+            }
+        },
+        "candidateLock": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "sha256",
+                "content_hash",
+                "package_count"
+            ],
+            "properties": {
+                "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "content_hash": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "package_count": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "transition": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "package_changes",
+                "root_constraint_changes",
+                "framework_guidance"
+            ],
+            "properties": {
+                "package_changes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/packageChange"
+                    }
+                },
+                "root_constraint_changes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/rootConstraintChange"
+                    }
+                },
+                "framework_guidance": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/frameworkGuidance"
+                    }
+                }
+            }
+        },
+        "frameworkGuidance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "framework",
+                "source_major",
+                "target_major",
+                "status",
+                "hops",
+                "uncertainties",
+                "evidence"
+            ],
+            "properties": {
+                "framework": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "source_major": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 0
+                },
+                "target_major": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 0
+                },
+                "status": {
+                    "enum": [
+                        "supported",
+                        "partially_supported",
+                        "unsupported"
+                    ]
+                },
+                "hops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/frameworkHop"
+                    }
+                },
+                "uncertainties": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "uniqueItems": true
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "frameworkHop": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "from_major",
+                "to_major",
+                "status",
+                "rule_pack",
+                "evidence"
+            ],
+            "properties": {
+                "from_major": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "to_major": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "status": {
+                    "enum": [
+                        "supported",
+                        "unsupported"
+                    ]
+                },
+                "rule_pack": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "packageChange": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "name",
+                "change_type",
+                "from_version",
+                "to_version",
+                "direct",
+                "major_change",
+                "package_families",
+                "from_source_reference",
+                "to_source_reference",
+                "from_dist_reference",
+                "to_dist_reference"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "change_type": {
+                    "enum": [
+                        "added",
+                        "removed",
+                        "upgraded",
+                        "downgraded",
+                        "changed"
+                    ]
+                },
+                "from_version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "to_version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "direct": {
+                    "type": "boolean"
+                },
+                "major_change": {
+                    "type": "boolean"
+                },
+                "package_families": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "uniqueItems": true
+                },
+                "from_source_reference": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "to_source_reference": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "from_dist_reference": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "to_dist_reference": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            }
+        },
+        "rootConstraintChange": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "package",
+                "change_type",
+                "from_constraint",
+                "to_constraint",
+                "reason",
+                "evidence"
+            ],
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "change_type": {
+                    "enum": [
+                        "added",
+                        "updated",
+                        "removed"
+                    ]
+                },
+                "from_constraint": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "to_constraint": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "reason": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "blocker": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "type",
+                "subject",
+                "requested_constraint",
+                "blocker",
+                "locked_version",
+                "conflict",
+                "dependency_path",
+                "options",
+                "summary",
+                "confidence",
+                "evidence"
+            ],
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "subject": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "requested_constraint": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "blocker": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "locked_version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "conflict": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "dependency_path": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "summary": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "confidence": {
+                    "$ref": "#/$defs/confidence"
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "sourceUsage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "file",
+                "symbol",
+                "usage_type",
+                "line",
+                "evidence"
+            ],
+            "properties": {
+                "file": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "symbol": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "usage_type": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "line": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 1
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "sourceImpactFinding": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id",
+                "stage_ids",
+                "affected_package",
+                "ownership",
+                "relevance",
+                "reason",
+                "severity",
+                "occurrences",
+                "evidence"
+            ],
+            "properties": {
+                "id": {"type": "string", "pattern": "^source-impact-[a-f0-9]{20}$"},
+                "stage_ids": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"}
+                },
+                "affected_package": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "ownership": {
+                    "enum": [
+                        "exact",
+                        "ambiguous",
+                        "unknown"
+                    ]
+                },
+                "relevance": {
+                    "enum": [
+                        "package_change",
+                        "framework_rule",
+                        "package_change_and_framework_rule"
+                    ]
+                },
+                "reason": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "severity": {
+                    "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                    ]
+                },
+                "occurrences": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/$defs/sourceUsage"
+                    }
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "frameworkFinding": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "framework",
+                "severity",
+                "summary",
+                "applies_to_hops",
+                "evidence"
+            ],
+            "properties": {
+                "framework": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "severity": {
+                    "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                    ]
+                },
+                "summary": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "applies_to_hops": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/$defs/frameworkHopReference"
+                    },
+                    "uniqueItems": true
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "frameworkHopReference": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "from_major",
+                "to_major"
+            ],
+            "properties": {
+                "from_major": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "to_major": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "plan": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "stages"
+            ],
+            "properties": {
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/planStage"
+                    }
+                }
+            }
+        },
+        "planStage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "stage_id",
+                "name",
+                "summary",
+                "actions",
+                "evidence"
+            ],
+            "properties": {
+                "stage_id": {
+                    "type": ["string", "null"],
+                    "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+                },
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "summary": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "actions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "evidence": {
+                    "$ref": "#/$defs/evidenceReferences"
+                }
+            }
+        },
+        "risk": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "level",
+                "drivers"
+            ],
+            "properties": {
+                "level": {
+                    "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                    ]
+                },
+                "drivers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            }
+        },
+        "effort": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "range_hours",
+                "confidence",
+                "components",
+                "assumptions"
+            ],
+            "properties": {
+                "range_hours": {
+                    "$ref": "#/$defs/hourRange"
+                },
+                "confidence": {
+                    "$ref": "#/$defs/confidence"
+                },
+                "components": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/hourRange"
+                    }
+                },
+                "assumptions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                }
+            }
+        },
+        "hourRange": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+                {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            ],
+            "items": false
+        },
+        "testGuidance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "name",
+                "purpose",
+                "command",
+                "priority"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "purpose": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "command": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "priority": {
+                    "enum": [
+                        "required",
+                        "recommended"
+                    ]
+                }
+            }
+        },
+        "stageTestGuidance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stage_id", "name", "purpose", "command", "priority"],
+            "properties": {
+                "stage_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"},
+                "name": {"type": "string", "minLength": 1},
+                "purpose": {"type": "string", "minLength": 1},
+                "command": {"type": ["string", "null"]},
+                "priority": {"enum": ["required", "recommended"]}
+            }
+        },
+        "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id",
+                "class",
+                "summary",
+                "confidence",
+                "context"
+            ],
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/evidenceId"
+                },
+                "class": {
+                    "enum": [
+                        "E1",
+                        "E2",
+                        "E3",
+                        "E4",
+                        "E5"
+                    ]
+                },
+                "summary": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "confidence": {
+                    "$ref": "#/$defs/confidence"
+                },
+                "context": {
+                    "type": "object"
+                }
+            }
+        },
+        "evidenceReferences": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+                "$ref": "#/$defs/evidenceId"
+            }
+        },
+        "evidenceId": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+        },
+        "confidence": {
+            "enum": [
+                "low",
+                "medium",
+                "high"
+            ]
+        }
+    }
+}

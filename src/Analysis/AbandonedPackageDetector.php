@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Model\Blocker;
+use PhpUpgradePreflight\Core\Model\BlockerType;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
@@ -52,7 +53,7 @@ final class AbandonedPackageDetector
             }
 
             $blockers[] = new Blocker(
-                'abandoned-package',
+                BlockerType::ABANDONED_PACKAGE,
                 $package->name(),
                 'Composer lock metadata marks this package as abandoned.',
                 'high',

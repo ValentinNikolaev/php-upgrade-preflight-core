@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Model;
 
+use PhpUpgradePreflight\Core\Composer\CandidateLockFileReader;
+
 final class CandidateLockEvidence
 {
     private string $sha256;
@@ -25,18 +27,13 @@ final class CandidateLockEvidence
         $this->packageCount = $packageCount;
     }
 
+    /**
+     * @deprecated Filesystem access moved to CandidateLockFileReader; call that reader instead.
+     * @see \PhpUpgradePreflight\Core\Composer\CandidateLockFileReader::read()
+     */
     public static function fromFile(string $path, ComposerLock $lock): self
     {
-        if (!is_file($path)) {
-            throw new \RuntimeException('Unable to fingerprint the candidate Composer lockfile.');
-        }
-
-        $sha256 = @hash_file('sha256', $path);
-        if ($sha256 === false) {
-            throw new \RuntimeException('Unable to fingerprint the candidate Composer lockfile.');
-        }
-
-        return self::fromLock($lock, $sha256);
+        return (new CandidateLockFileReader())->read($path, $lock);
     }
 
     public static function fromLock(ComposerLock $lock, ?string $sha256 = null): self

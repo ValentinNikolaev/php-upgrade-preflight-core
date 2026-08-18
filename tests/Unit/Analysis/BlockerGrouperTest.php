@@ -235,8 +235,8 @@ final class BlockerGrouperTest extends TestCase
             0,
             implode("\n", [
                 'php 8.3.33 The PHP interpreter',
-                '|--root/project (requires php ^8.0)',
-                '`--fixture/dependency 1.0.0 (requires php ^8.0)',
+                '|--root/project (requires php ^8.0) (circular dependency aborted here)',
+                '`--fixture/dependency 1.0.0 (requires php ^8.0) (circular dependency aborted here)',
                 '   `--root/project (requires fixture/dependency ^1.0)',
             ]),
             ''

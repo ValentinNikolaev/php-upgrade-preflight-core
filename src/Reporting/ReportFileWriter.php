@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace PhpUpgradePreflight\Core\Reporting;
 
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
 final class ReportFileWriter
 {
-    private Filesystem $filesystem;
+    private ReportDestinationFilesystem $filesystem;
 
-    public function __construct(?Filesystem $filesystem = null)
+    public function __construct(?ReportDestinationFilesystem $filesystem = null)
     {
-        $this->filesystem = $filesystem ?? new Filesystem();
+        $this->filesystem = $filesystem ?? new SymfonyReportDestinationFilesystem();
     }
 
     public function write(string $projectPath, string $outputPath, string $contents): string
@@ -37,7 +36,7 @@ final class ReportFileWriter
 
         $absolutePath = Path::makeAbsolute($outputPath, $workingDirectory);
         $resolvedPath = $this->resolvedDestination($absolutePath);
-        $resolvedProject = realpath($projectPath);
+        $resolvedProject = $this->filesystem->resolve($projectPath);
 
         if ($resolvedProject === false) {
             throw new \InvalidArgumentException('The analyzed project path does not exist.');
@@ -47,15 +46,15 @@ final class ReportFileWriter
             throw new \InvalidArgumentException('Report output must be outside the analyzed project to preserve its read-only input contract.');
         }
 
-        if (is_dir($absolutePath)) {
+        if ($this->filesystem->isDirectory($absolutePath)) {
             throw new \InvalidArgumentException('The report output path is a directory.');
         }
 
-        if (is_file($absolutePath) && !is_writable($absolutePath)) {
+        if ($this->filesystem->isFile($absolutePath) && !$this->filesystem->isWritable($absolutePath)) {
             throw new \InvalidArgumentException('The report output path is not writable.');
         }
 
-        if (!file_exists($absolutePath) && !is_writable(dirname($absolutePath))) {
+        if (!$this->filesystem->exists($absolutePath) && !$this->filesystem->isWritable(dirname($absolutePath))) {
             throw new \InvalidArgumentException('The report output directory is not writable.');
         }
 
@@ -64,13 +63,13 @@ final class ReportFileWriter
 
     private function resolvedDestination(string $absolutePath): string
     {
-        $resolved = realpath($absolutePath);
+        $resolved = $this->filesystem->resolve($absolutePath);
         if ($resolved !== false) {
             return Path::canonicalize($resolved);
         }
 
-        $parent = realpath(dirname($absolutePath));
-        if ($parent === false || !is_dir($parent)) {
+        $parent = $this->filesystem->resolve(dirname($absolutePath));
+        if ($parent === false || !$this->filesystem->isDirectory($parent)) {
             throw new \InvalidArgumentException('The report output directory does not exist.');
         }
 

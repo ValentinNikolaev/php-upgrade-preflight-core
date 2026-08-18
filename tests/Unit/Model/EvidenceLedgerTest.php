@@ -6,6 +6,7 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Model;
 
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\EvidenceRecorder;
 use PHPUnit\Framework\TestCase;
 
 final class EvidenceLedgerTest extends TestCase
@@ -74,5 +75,88 @@ final class EvidenceLedgerTest extends TestCase
         $ledger->validateReferences(['solver-1', 'solver-1']);
 
         self::assertCount(1, $ledger->all());
+    }
+
+    public function testAddOnceReusesTheFirstIdenticalRecordInANamespace(): void
+    {
+        $ledger = new EvidenceLedger();
+        $first = $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Detected usage.', 'high', ['file' => 'src/A.php']);
+        $second = $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Detected usage.', 'high', ['file' => 'src/A.php']);
+
+        self::assertSame($first, $second);
+        self::assertSame('source-1', $first->id());
+        self::assertCount(1, $ledger->all());
+    }
+
+    public function testAddOnceSeparatesRecordsThatDifferInAnyComparedField(): void
+    {
+        $ledger = new EvidenceLedger();
+        $records = [
+            $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Detected usage.', 'high', ['file' => 'src/A.php']),
+            $ledger->addOnce('source', Evidence::E2_PACKAGE_METADATA, 'Detected usage.', 'high', ['file' => 'src/A.php']),
+            $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Detected other usage.', 'high', ['file' => 'src/A.php']),
+            $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Detected usage.', 'medium', ['file' => 'src/A.php']),
+            $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Detected usage.', 'high', ['file' => 'src/B.php']),
+            $ledger->addOnce('lock', Evidence::E3_PROJECT_SOURCE, 'Detected usage.', 'high', ['file' => 'src/A.php']),
+        ];
+
+        self::assertSame(
+            ['source-1', 'source-2', 'source-3', 'source-4', 'source-5', 'lock-1'],
+            array_map(static fn (Evidence $evidence): string => $evidence->id(), $records)
+        );
+        self::assertSame($records, $ledger->all());
+    }
+
+    public function testAddOnceTreatsReorderedContextKeysAsDistinctEvidence(): void
+    {
+        $ledger = new EvidenceLedger();
+        $ordered = $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Ordered context.', 'high', ['a' => 1, 'b' => 2]);
+        $swapped = $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Ordered context.', 'high', ['b' => 2, 'a' => 1]);
+
+        self::assertNotSame($ordered, $swapped);
+        self::assertSame(['source-1', 'source-2'], [$ordered->id(), $swapped->id()]);
+    }
+
+    public function testAddOnceMatchesRegisteredEvidenceByIdPrefix(): void
+    {
+        $ledger = new EvidenceLedger([
+            new Evidence('source-kernel-1', Evidence::E3_PROJECT_SOURCE, 'Kernel middleware.'),
+        ]);
+
+        $reused = $ledger->addOnce('source', Evidence::E3_PROJECT_SOURCE, 'Kernel middleware.');
+
+        self::assertSame('source-kernel-1', $reused->id());
+        self::assertCount(1, $ledger->all());
+    }
+
+    public function testAddOnceComparesTheStoredRedactedSummaryNotTheRawInput(): void
+    {
+        $ledger = new EvidenceLedger();
+        $summary = 'Authorization: Bearer abcdef1234567890';
+        $first = $ledger->addOnce('solver', Evidence::E1_SOLVER, $summary);
+        $second = $ledger->addOnce('solver', Evidence::E1_SOLVER, $summary);
+        $redacted = $ledger->addOnce('solver', Evidence::E1_SOLVER, $first->summary());
+
+        self::assertNotSame($summary, $first->summary());
+        self::assertNotSame($first, $second);
+        self::assertSame($first, $redacted);
+        self::assertSame(['solver-1', 'solver-2'], array_map(
+            static fn (Evidence $evidence): string => $evidence->id(),
+            $ledger->all()
+        ));
+    }
+
+    public function testTheLedgerRecordsThroughTheNarrowRecorderContract(): void
+    {
+        $ledger = new EvidenceLedger();
+
+        self::assertSame('solver-1', $this->recordOnce($ledger, 'First result.')->id());
+        self::assertSame('solver-1', $this->recordOnce($ledger, 'First result.')->id());
+        self::assertSame('solver-2', $this->recordOnce($ledger, 'Second result.')->id());
+    }
+
+    private function recordOnce(EvidenceRecorder $recorder, string $summary): Evidence
+    {
+        return $recorder->addOnce('solver', Evidence::E1_SOLVER, $summary);
     }
 }

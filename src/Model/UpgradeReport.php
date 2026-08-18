@@ -6,6 +6,13 @@ namespace PhpUpgradePreflight\Core\Model;
 
 use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 
+/**
+ * The canonical report model.
+ *
+ * Eleven of the constructor parameters are bare arrays, so a positional swap would be
+ * type-silent. Construct this class with named arguments; {@see \PhpUpgradePreflight\Core\Analysis\ReportAssembler}
+ * is the only production construction site and does exactly that.
+ */
 final class UpgradeReport
 {
     private ReportMetadata $metadata;
@@ -37,6 +44,7 @@ final class UpgradeReport
     private array $uncertainties;
     /** @var list<Evidence> */
     private array $evidence;
+    private StagedResolution $stagedResolution;
 
     /**
      * @param list<ScenarioResult> $scenarios
@@ -68,7 +76,8 @@ final class UpgradeReport
         array $tests = [],
         array $actionableSourceImpact = [],
         array $frameworkGuidance = [],
-        ?TargetPlatform $targetPlatform = null
+        ?TargetPlatform $targetPlatform = null,
+        ?StagedResolution $stagedResolution = null
     ) {
         $this->metadata = new ReportMetadata();
         $this->request = $request;
@@ -88,9 +97,11 @@ final class UpgradeReport
         $this->tests = array_values($tests);
         $this->uncertainties = array_values(array_unique(array_merge(
             $uncertainties,
-            $this->platformUncertainties()
+            $this->platformUncertainties(),
+            $this->composerExecutionUncertainties()
         )));
         $this->evidence = array_values($evidence);
+        $this->stagedResolution = $stagedResolution ?? StagedResolution::skipped('stage_target_provider_unavailable');
 
         $this->validateFrameworkFindingScopes();
 
@@ -228,6 +239,11 @@ final class UpgradeReport
         return 'unknown';
     }
 
+    public function stagedResolution(): StagedResolution
+    {
+        return $this->stagedResolution;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
@@ -236,10 +252,12 @@ final class UpgradeReport
             'request_summary' => $this->request->toArray(),
             'project_state' => $this->projectState->toArray(),
             'platform' => $this->platform->toArray(),
+            'composer_execution' => $this->request->composerExecution()->provenance($this->composerVersion()),
             'resolution' => [
                 'status' => $this->resolutionStatus(),
                 'scenarios' => array_map(static fn (ScenarioResult $scenario): array => $scenario->toArray(), $this->scenarios),
             ],
+            'staged_resolution' => $this->stagedResolution->toArray(),
             'transition' => [
                 'package_changes' => array_map(static fn (PackageChange $change): array => $change->toArray(), $this->lockDiff->packageChanges()),
                 'root_constraint_changes' => array_map(
@@ -282,6 +300,7 @@ final class UpgradeReport
     /** @return list<string> */
     private function evidenceReferences(): array
     {
+        /** @var list<string> $references */
         $references = [];
 
         foreach ($this->blockers as $index => $blocker) {
@@ -319,6 +338,8 @@ final class UpgradeReport
             $references = $this->appendFindingReferences($references, $change->evidence(), sprintf('Root constraint change at index %d', $index));
         }
 
+        $references = array_values(array_merge($references, $this->stagedResolution->evidenceReferences()));
+
         foreach ($this->planStages as $index => $stage) {
             $references = $this->appendFindingReferences($references, $stage->evidence(), sprintf('Plan stage at index %d', $index));
         }
@@ -332,7 +353,7 @@ final class UpgradeReport
             }
         }
 
-        return $references;
+        return array_values($references);
     }
 
     /** @return list<string> */
@@ -349,6 +370,31 @@ final class UpgradeReport
         }
 
         return [];
+    }
+
+    private function composerVersion(): ?string
+    {
+        foreach ($this->scenarios as $scenario) {
+            if ($scenario->composerVersion() !== null) {
+                return $scenario->composerVersion();
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<string> */
+    private function composerExecutionUncertainties(): array
+    {
+        if ($this->request->composerExecution()->isRestricted()) {
+            return [
+                'Restricted Composer execution uses sanitized analyzer-owned Composer state and best-effort offline behavior; it is not a process or OS network sandbox, and user-selected executables plus Git/SSH helpers remain residual boundaries.',
+            ];
+        }
+
+        return [
+            'Compatible Composer execution may inherit global configuration, credentials, proxies, caches, repository access, and other analyzer-host state.',
+        ];
     }
 
     private function validateFrameworkFindingScopes(): void
@@ -375,7 +421,11 @@ final class UpgradeReport
         }
     }
 
-    /** @param list<string> $references @param list<string> $findingReferences @return list<string> */
+    /**
+     * @param list<string> $references
+     * @param list<string> $findingReferences
+     * @return list<string>
+     */
     private function appendFindingReferences(array $references, array $findingReferences, string $description): array
     {
         if ($findingReferences === []) {
@@ -386,7 +436,7 @@ final class UpgradeReport
             $references[] = $reference;
         }
 
-        return $references;
+        return array_values($references);
     }
 
     private function containsEvidenceReference(string $text, string $id): bool

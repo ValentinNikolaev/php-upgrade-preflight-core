@@ -16,20 +16,41 @@ final class ComposerDiagnostic
     private int $exitCode;
     private string $stdout;
     private string $stderr;
+    private string $outcome;
 
-    /** @param list<string> $command */
+    /**
+     * @param list<string> $command
+     * @param ?string $outcome How the diagnostic process itself ended, using the
+     *        {@see ScenarioResult::supportedOutcomes()} vocabulary. A nonzero
+     *        exit status is ordinary evidence for `composer prohibits`, so the
+     *        outcome, not the exit code, distinguishes a timeout or a missing
+     *        Composer binary from a diagnostic that produced usable output.
+     *        Defaults to `success` when the caller supplies none, because a non-zero
+     *        `composer prohibits` exit is ordinary evidence rather than a failed probe.
+     */
     public function __construct(
         string $package,
         string $constraint,
         array $command,
         int $exitCode,
         string $stdout,
-        string $stderr
+        string $stderr,
+        ?string $outcome = null
     ) {
         foreach ($command as $argument) {
             if (!is_string($argument)) {
                 throw new \InvalidArgumentException('Composer diagnostic command arguments must be strings.');
             }
+        }
+
+        // A non-zero exit is the ORDINARY result of `composer prohibits` — it means the relation was
+        // found, which is exactly the evidence a diagnostic exists to capture. Only unusable
+        // execution (timeout, missing binary, unreadable repository metadata) downgrades the
+        // outcome, and the runner passes that explicitly. Defaulting on exit status alone would
+        // publish `process_failure` for evidence the classifier records as `success`.
+        $outcome = $outcome ?? ScenarioResult::OUTCOME_SUCCESS;
+        if (!in_array($outcome, ScenarioResult::supportedOutcomes(), true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported Composer diagnostic outcome "%s".', $outcome));
         }
 
         $this->package = $package;
@@ -38,6 +59,7 @@ final class ComposerDiagnostic
         $this->exitCode = $exitCode;
         $this->stdout = SensitiveOutputRedactor::redact($stdout);
         $this->stderr = SensitiveOutputRedactor::redact($stderr);
+        $this->outcome = $outcome;
     }
 
     public function package(): string
@@ -71,7 +93,12 @@ final class ComposerDiagnostic
         return $this->stderr;
     }
 
-    /** @return array{package: string, constraint: string, command: list<string>, exit_code: int, stdout_excerpt: string, stderr_excerpt: string} */
+    public function outcome(): string
+    {
+        return $this->outcome;
+    }
+
+    /** @return array{package: string, constraint: string, command: list<string>, exit_code: int, outcome: string, stdout_excerpt: string, stderr_excerpt: string} */
     public function toArray(): array
     {
         return [
@@ -79,6 +106,7 @@ final class ComposerDiagnostic
             'constraint' => $this->constraint,
             'command' => $this->command,
             'exit_code' => $this->exitCode,
+            'outcome' => $this->outcome,
             'stdout_excerpt' => OutputExcerpt::bounded($this->stdout),
             'stderr_excerpt' => OutputExcerpt::bounded($this->stderr),
         ];

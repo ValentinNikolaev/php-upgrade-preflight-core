@@ -109,6 +109,43 @@ final class PathExposurePolicyTest extends TestCase
         self::assertStringNotContainsStringIgnoringCase('private-project', $sanitized);
     }
 
+    /**
+     * A caller that joins a Windows root with forward slashes hands Composer a path
+     * that matches neither the fully backslashed nor the fully forward-slashed
+     * spelling of the same directory, so the mixed form has to be redacted too.
+     */
+    public function testMixedSeparatorSpellingsOfTheSamePathAreRedacted(): void
+    {
+        $project = 'D:\\a\\private-project\\private-project';
+        $mixed = $project . '/tests/fixtures/projects/target';
+        $text = implode("\n", [
+            'Project path: ' . $mixed,
+            'Manifest: ' . $mixed . '/composer.json',
+            'Reverse mix: D:/a/private-project/private-project\\tests\\fixtures',
+        ]);
+
+        $sanitized = PathExposurePolicy::redactComposerText($text, $project);
+
+        self::assertSame(3, substr_count($sanitized, PathExposurePolicy::PROJECT_ROOT));
+        self::assertStringNotContainsStringIgnoringCase('private-project', $sanitized);
+    }
+
+    public function testMixedSeparatorProjectRootsAreRedactedFromCanonicalReports(): void
+    {
+        $project = 'D:\\a\\private-project/private-project';
+        $canonical = [
+            'request_summary' => ['project_path' => $project, 'output_path' => null],
+            'project_state' => ['path' => $project],
+            'uncertainties' => [sprintf('Failure in "%s\\composer.json".', $project)],
+        ];
+
+        $sanitized = PathExposurePolicy::sanitizeCanonicalReport($canonical, $project);
+        $encoded = json_encode($sanitized, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+
+        self::assertIsString($encoded);
+        self::assertStringNotContainsStringIgnoringCase('private-project', $encoded);
+    }
+
     public function testPathPrefixesDoNotCorruptPackageNamesOrSiblingPaths(): void
     {
         $text = implode("\n", [
@@ -123,11 +160,29 @@ final class PathExposurePolicyTest extends TestCase
 
         $sanitized = PathExposurePolicy::redactComposerText($text, '/app', null, ['/repo']);
 
-        self::assertSame(3, substr_count($sanitized, PathExposurePolicy::PROJECT_ROOT));
-        self::assertSame(2, substr_count($sanitized, PathExposurePolicy::LOCAL_REPOSITORY));
+        self::assertSame(2, substr_count($sanitized, PathExposurePolicy::PROJECT_ROOT));
+        self::assertSame(1, substr_count($sanitized, PathExposurePolicy::LOCAL_REPOSITORY));
+        self::assertStringContainsString('[REDACTED_URL]', $sanitized);
         self::assertStringContainsString('vendor/application', $sanitized);
         self::assertStringContainsString('/application', $sanitized);
         self::assertStringContainsString('/repository', $sanitized);
+    }
+
+    public function testComposerTextRedactsUnknownRemoteRepositoryUrlsAcrossSchemes(): void
+    {
+        $text = implode("\n", [
+            'Composer repository: https://private.example.invalid/packages.json',
+            'VCS repository: ssh://git@private.example.invalid/team/package.git',
+            'Custom repository: s3://private-bucket/composer/packages.json',
+            'Local repository: file:///private/packages',
+        ]);
+
+        $sanitized = PathExposurePolicy::redactComposerText($text);
+
+        self::assertSame(3, substr_count($sanitized, '[REDACTED_URL]'));
+        self::assertStringNotContainsString('private.example.invalid', $sanitized);
+        self::assertStringNotContainsString('private-bucket', $sanitized);
+        self::assertStringContainsString(PathExposurePolicy::LOCAL_REPOSITORY, $sanitized);
     }
 
     public function testEncodedPathsAssociativeKeysAndObjectsAreSanitized(): void

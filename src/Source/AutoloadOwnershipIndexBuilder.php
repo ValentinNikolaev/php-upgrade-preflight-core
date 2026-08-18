@@ -34,7 +34,10 @@ final class AutoloadOwnershipIndexBuilder
         $this->maxExactFiles = $maxExactFiles;
     }
 
-    /** @param list<string> $uncertainties @param ?list<string> $requestedSymbols */
+    /**
+     * @param list<string> $uncertainties
+     * @param ?list<string> $requestedSymbols
+     */
     public function build(
         ProjectState $project,
         array &$uncertainties = [],
@@ -346,7 +349,10 @@ final class AutoloadOwnershipIndexBuilder
         return $owner === SymbolOwnershipIndex::ROOT_OWNER ? 'Root package' : sprintf('Locked package "%s"', $owner);
     }
 
-    /** @param ?list<string> $symbols @return null|array{exact: array<string, true>, folded: array<string, true>} */
+    /**
+     * @param ?list<string> $symbols
+     * @return null|array{exact: array<string, true>, folded: array<string, true>}
+     */
     private function requestedSymbolMap(?array $symbols): ?array
     {
         if ($symbols === null) {

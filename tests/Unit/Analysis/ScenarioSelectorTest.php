@@ -135,7 +135,10 @@ final class ScenarioSelectorTest extends TestCase
         );
     }
 
-    /** @param list<Scenario> $scenarios @return list<string> */
+    /**
+     * @param list<Scenario> $scenarios
+     * @return list<string>
+     */
     private function names(array $scenarios): array
     {
         return array_map(static fn (Scenario $scenario): string => $scenario->name(), $scenarios);

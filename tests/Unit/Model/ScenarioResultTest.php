@@ -58,6 +58,34 @@ final class ScenarioResultTest extends TestCase
         );
     }
 
+    public function testItRejectsAFailedOutcomeContainingACandidateProjectState(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('cannot contain a candidate project state');
+
+        new ScenarioResult(
+            $this->scenario(),
+            1,
+            '',
+            'Process failed.',
+            null,
+            null,
+            ScenarioResult::FAILURE_OPERATIONAL,
+            null,
+            [],
+            0,
+            null,
+            [],
+            ScenarioResult::OUTCOME_PROCESS_FAILURE,
+            false,
+            new \PhpUpgradePreflight\Core\Model\ProjectState(
+                __DIR__,
+                new \PhpUpgradePreflight\Core\Model\ComposerJson([]),
+                new \PhpUpgradePreflight\Core\Model\ComposerLock([])
+            )
+        );
+    }
+
     public function testSerializedOutputExcerptsAreBoundedToFourThousandBytes(): void
     {
         $scenario = new Scenario(

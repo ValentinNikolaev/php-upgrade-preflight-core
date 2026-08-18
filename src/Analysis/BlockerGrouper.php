@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Model\Blocker;
+use PhpUpgradePreflight\Core\Model\BlockerType;
 use PhpUpgradePreflight\Core\Model\ComposerDiagnostic;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\Evidence;
@@ -71,7 +72,8 @@ final class BlockerGrouper
             ])->id();
 
             foreach ($this->parser->parse($result, $evidenceId, $platform) as $blocker) {
-                if ($blocker->type() === 'abandoned-package' && isset($abandonedPackageIndexes[$blocker->subject()])) {
+                if ($blocker->type() === BlockerType::ABANDONED_PACKAGE
+                    && isset($abandonedPackageIndexes[$blocker->subject()])) {
                     $index = $abandonedPackageIndexes[$blocker->subject()];
                     $blockers[$index] = $blockers[$index]->withAdditionalEvidence($blocker->evidence());
 
@@ -89,7 +91,7 @@ final class BlockerGrouper
                 $index = count($blockers);
                 $blockers[] = $blocker;
 
-                if ($blocker->type() === 'abandoned-package') {
+                if ($blocker->type() === BlockerType::ABANDONED_PACKAGE) {
                     $abandonedPackageIndexes[$blocker->subject()] = $index;
                 }
 
@@ -97,7 +99,7 @@ final class BlockerGrouper
             }
         }
 
-        return $blockers;
+        return array_values($blockers);
     }
 
     /** @param list<ScenarioResult> $scenarioResults */

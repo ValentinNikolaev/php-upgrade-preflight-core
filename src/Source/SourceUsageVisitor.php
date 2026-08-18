@@ -10,7 +10,7 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeVisitorAbstract;
 
-final class SourceUsageVisitor extends NodeVisitorAbstract
+final class SourceUsageVisitor extends NodeVisitorAbstract implements SourceUsageCollector
 {
     /** @var list<array{symbol: string, usage_type: string, line: int}> */
     private array $usages = [];

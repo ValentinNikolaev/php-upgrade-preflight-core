@@ -131,6 +131,30 @@ final class PathExposurePolicy
         return $paths;
     }
 
+    /**
+     * @param array<string, mixed> $composerData
+     * @return list<string>
+     */
+    public static function composerRepositoryReferences(array $composerData, string $projectPath): array
+    {
+        $references = self::localRepositoryPaths($composerData, $projectPath);
+        $repositories = $composerData['repositories'] ?? null;
+        if (!is_array($repositories)) {
+            return $references;
+        }
+
+        foreach ($repositories as $repository) {
+            if (is_array($repository) && is_string($repository['url'] ?? null) && $repository['url'] !== '') {
+                $references[] = $repository['url'];
+            }
+        }
+
+        $references = array_values(array_unique($references));
+        usort($references, static fn (string $left, string $right): int => strlen($right) <=> strlen($left));
+
+        return $references;
+    }
+
     /** @param list<string> $repositoryPaths */
     public static function redactComposerText(
         string $value,
@@ -148,10 +172,14 @@ final class PathExposurePolicy
         foreach ($repositoryPaths as $repositoryPath) {
             if ($repositoryPath !== '' && self::isRepositoryReference($repositoryPath)) {
                 $paths[$repositoryPath] = self::LOCAL_REPOSITORY;
+            } elseif ($repositoryPath !== '' && self::isRemoteUrl($repositoryPath)) {
+                $paths[$repositoryPath] = SensitiveOutputRedactor::REDACTED_URL;
             }
         }
 
-        return SensitiveOutputRedactor::redact(self::redactPathText($value, $paths));
+        return self::redactRemoteUrls(
+            SensitiveOutputRedactor::redact(self::redactPathText($value, $paths))
+        );
     }
 
     public static function workspaceForReport(?string $workspacePath, bool $debug): ?string
@@ -177,24 +205,32 @@ final class PathExposurePolicy
     /** @param array<string, string> $paths */
     public static function redactPaths(string $value, array $paths): string
     {
+        /** @var array<string, array{marker: string, length: int}> $replacements */
         $replacements = [];
         foreach ($paths as $path => $marker) {
             foreach (self::pathVariants($path) as $variant) {
-                $replacements[$variant] = $marker;
+                $pattern = '~(?<![A-Za-z0-9_.-])'
+                    . self::pathPatternBody($variant)
+                    . '(?=$|[\\\\/\s<>"\'`,;:)&?=#\]}]|\.(?:\s|$))~'
+                    . (self::isWindowsPath($variant) ? 'i' : '');
+                $replacements[$pattern] = [
+                    'marker' => $marker,
+                    'length' => max(strlen($variant), $replacements[$pattern]['length'] ?? 0),
+                ];
             }
         }
 
-        uksort(
+        uasort(
             $replacements,
-            static fn (string $left, string $right): int => strlen($right) <=> strlen($left)
+            /**
+             * @param array{marker: string, length: int} $left
+             * @param array{marker: string, length: int} $right
+             */
+            static fn (array $left, array $right): int => $right['length'] <=> $left['length']
         );
 
-        foreach ($replacements as $path => $marker) {
-            $pattern = '~(?<![A-Za-z0-9_.-])'
-                . preg_quote($path, '~')
-                . '(?=$|[\\\\/\s<>"\'`,;:)&?=#\]}]|\.(?:\s|$))~'
-                . (self::isWindowsPath($path) ? 'i' : '');
-            $redacted = preg_replace($pattern, $marker, $value);
+        foreach ($replacements as $pattern => $replacement) {
+            $redacted = preg_replace($pattern, $replacement['marker'], $value);
             if ($redacted === null) {
                 return SensitiveOutputRedactor::REDACTED;
             }
@@ -202,6 +238,39 @@ final class PathExposurePolicy
         }
 
         return $value;
+    }
+
+    /**
+     * Builds the pattern body for one path variant.
+     *
+     * A single value can carry a path with mixed separators: Composer echoes the
+     * project path exactly as the caller spelled it, and callers routinely join a
+     * Windows root with forward slashes. Quoting the variant verbatim would only
+     * redact the separator spelling the variant happens to use, so interior
+     * separators match any run, which also covers the doubled and escaped forms
+     * found in JSON and Composer transcripts.
+     *
+     * The leading separators of a rooted path stay literal. A flexible run there
+     * would reach backwards into a `file://` scheme and swallow its slashes, and
+     * {@see pathVariants} already supplies every spelling of that prefix.
+     */
+    private static function pathPatternBody(string $path): string
+    {
+        $root = '';
+        if (preg_match('~^[\\\\/]+~', $path, $matches) === 1) {
+            $root = $matches[0];
+            $path = substr($path, strlen($root));
+        }
+
+        $segments = array_filter(
+            explode('/', str_replace('\\', '/', $path)),
+            static fn (string $segment): bool => $segment !== ''
+        );
+
+        return preg_quote($root, '~') . implode('[\\\\/]+', array_map(
+            static fn (string $segment): string => preg_quote($segment, '~'),
+            $segments
+        ));
     }
 
     /**
@@ -332,6 +401,25 @@ final class PathExposurePolicy
             || preg_match('~^file:(?://|(?:\\\\+/){2})~i', $path) === 1
             || preg_match('/^~[\\\\\/]/', $path) === 1
             || preg_match('/\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)|%[A-Za-z_][A-Za-z0-9_]*%/', $path) === 1;
+    }
+
+    private static function isRemoteUrl(string $value): bool
+    {
+        return preg_match('~^[A-Za-z][A-Za-z0-9+.-]*://~', $value) === 1
+            && !str_starts_with(strtolower($value), 'file://');
+    }
+
+    private static function redactRemoteUrls(string $value): string
+    {
+        $redacted = preg_replace_callback(
+            '~(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9+.-]*):(?://|(?:\\\\+/){2})[^\s<>"\']+~i',
+            static fn (array $matches): string => strtolower($matches[1]) === 'file'
+                ? $matches[0]
+                : SensitiveOutputRedactor::REDACTED_URL,
+            $value
+        );
+
+        return $redacted ?? SensitiveOutputRedactor::REDACTED;
     }
 
     private static function containsEnvironmentVariable(string $path): bool

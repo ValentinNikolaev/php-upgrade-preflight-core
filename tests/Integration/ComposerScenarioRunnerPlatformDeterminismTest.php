@@ -13,6 +13,7 @@ use PhpUpgradePreflight\Core\Model\ExtensionAssumption;
 use PhpUpgradePreflight\Core\Model\Scenario;
 use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\TargetPlatform;
+use PhpUpgradePreflight\Core\Model\TargetPlatformProfile;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
 use PhpUpgradePreflight\Tests\Support\FixtureSnapshot;
@@ -133,6 +134,40 @@ final class ComposerScenarioRunnerPlatformDeterminismTest extends TestCase
         );
     }
 
+    public function testCompleteProfileHidesAnUnlistedHostExtension(): void
+    {
+        [$result, $blockers, $platform] = $this->runProfileFixture(
+            'fixture/extension-disabled',
+            $this->completeProfile(['php' => PHP_VERSION])
+        );
+
+        self::assertTrue($result->isSolverFailure(), $result->stdout() . $result->stderr());
+        self::assertStringContainsString('ext-json', strtolower($result->stdout() . $result->stderr()));
+        $this->assertExtensionBlocker($blockers, 'extension-missing', 'ext-json', '*');
+        self::assertTrue($platform->isCompleteProfile());
+        self::assertNull($platform->extensionAssumption('ext-json'));
+    }
+
+    public function testCompleteProfileAppliesExplicitExtensionLibraryAndPhpSubtypeValuesOffline(): void
+    {
+        [$result, $blockers, $platform] = $this->runProfileFixture(
+            'fixture/platform-profile',
+            $this->completeProfile([
+                'php' => PHP_VERSION,
+                'php-64bit' => PHP_VERSION,
+                'ext-preflight-profile' => '2.1.0',
+                'lib-icu' => '73.2',
+            ])
+        );
+
+        self::assertTrue($result->succeeded(), $result->stdout() . $result->stderr());
+        self::assertSame([], $blockers);
+        self::assertNotNull($result->lock()?->package('fixture/platform-profile'));
+        self::assertSame('73.2', $platform->platformPackage('lib-icu')?->version());
+        self::assertSame('2.1.0', $platform->platformPackage('ext-preflight-profile')?->version());
+        self::assertSame(PHP_VERSION, $platform->platformPackage('php-64bit')?->version());
+    }
+
     /**
      * @param list<ExtensionAssumption> $assumptions
      * @return array{0: ScenarioResult, 1: list<Blocker>, 2: TargetPlatform}
@@ -172,6 +207,55 @@ final class ComposerScenarioRunnerPlatformDeterminismTest extends TestCase
         $snapshot->assertUnchanged($this);
 
         return [$result, $blockers, $platform];
+    }
+
+    /** @return array{0: ScenarioResult, 1: list<Blocker>, 2: TargetPlatform} */
+    private function runProfileFixture(string $package, TargetPlatformProfile $profile): array
+    {
+        $projectPath = $this->projectPath();
+        $snapshot = FixtureSnapshot::capture(dirname($projectPath));
+        $project = (new ProjectStateBuilder())->build($projectPath);
+        $request = new UpgradeRequest(
+            $projectPath,
+            [new UpgradeTarget($package, '1.0.0')],
+            null,
+            null,
+            [],
+            [],
+            'json',
+            null,
+            false,
+            [],
+            $profile
+        );
+        $platform = TargetPlatform::fromRequest($request, $project);
+        $result = (new ComposerScenarioRunner())->run(
+            $project,
+            $request,
+            new Scenario('complete-platform-fixture', $request->targets(), false),
+            $platform
+        );
+        $blockers = (new BlockerGrouper())->group(
+            [$result],
+            new EvidenceLedger(),
+            $project->composerLock(),
+            [],
+            $platform
+        );
+
+        $snapshot->assertUnchanged($this);
+
+        return [$result, $blockers, $platform];
+    }
+
+    /** @param array<string, string|false> $packages */
+    private function completeProfile(array $packages): TargetPlatformProfile
+    {
+        return TargetPlatformProfile::fromArray([
+            'schema_version' => '1.0',
+            'completeness' => 'complete',
+            'packages' => $packages,
+        ]);
     }
 
     /** @param list<Blocker> $blockers */

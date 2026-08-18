@@ -34,8 +34,10 @@ final class ProjectStateBuilder
 
     public function load(string $projectPath): ProjectStateLoadResult
     {
+        $composerJsonPath = $projectPath . DIRECTORY_SEPARATOR . 'composer.json';
+
         try {
-            $composerJson = $this->reader->read($projectPath . DIRECTORY_SEPARATOR . 'composer.json');
+            $composerJson = $this->reader->read($composerJsonPath);
         } catch (JsonFileException $exception) {
             return new ProjectStateLoadResult(
                 new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([])),
@@ -43,16 +45,28 @@ final class ProjectStateBuilder
             );
         }
 
+        // The manifest model rejects a contradictory manifest at construction, so it is
+        // built once, here, where the rejection can still become a structured result.
+        try {
+            $manifest = new ComposerJson($composerJson);
+        } catch (\InvalidArgumentException $exception) {
+            return new ProjectStateLoadResult(
+                new ProjectState($projectPath, new ComposerJson([]), new ComposerLock([])),
+                new InvalidJsonException(
+                    $composerJsonPath,
+                    sprintf('Invalid Composer file "composer.json": %s', $exception->getMessage())
+                )
+            );
+        }
+
         try {
             $composerLock = $this->reader->read($projectPath . DIRECTORY_SEPARATOR . 'composer.lock');
         } catch (JsonFileException $exception) {
             return new ProjectStateLoadResult(
-                new ProjectState($projectPath, new ComposerJson($composerJson), new ComposerLock([])),
+                new ProjectState($projectPath, $manifest, new ComposerLock([])),
                 $exception
             );
         }
-
-        $manifest = new ComposerJson($composerJson);
 
         return new ProjectStateLoadResult(
             new ProjectState(
