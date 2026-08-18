@@ -5,15 +5,15 @@
 
 PHP Upgrade Preflight analyzes Composer-based PHP upgrades before you change the target project. It copies `composer.json` and `composer.lock` into temporary workspaces, runs isolated Composer scenarios, scans source files, and produces a canonical JSON report or a Markdown projection.
 
-The v0.3 release candidate on `main` runs on PHP `^8.0` (PHP 8.0 through PHP 8.x). Its Laravel adapter retains Laravel 7 to 8 and direct 7 to 9 guidance plus adjacent Laravel 8 to 9 through 12 to 13 rule packs. Rooted `laravel/framework` projects can run sequential Composer evidence across every contiguous adjacent path from Laravel 7 through 13, while the direct final-target result remains independent.
+v0.3 runs on PHP `^8.0` (PHP 8.0 through PHP 8.x). Its Laravel adapter retains Laravel 7 to 8 and direct 7 to 9 guidance plus adjacent Laravel 8 to 9 through 12 to 13 rule packs. Rooted `laravel/framework` projects can run sequential Composer evidence across every contiguous adjacent path from Laravel 7 through 13, while the direct final-target result remains independent.
 
 The Laravel adapter can be installed alongside Laravel 8 on PHP 8.0, Laravel 9 on PHP 8.0.2, Laravel 10 on PHP 8.1, Laravel 11/12 on PHP 8.2, and Laravel 13 on PHP 8.3. Host installability and analyzed target requirements remain separate: an external analyzer may model a newer target through Composer platform simulation.
 
 ## Public beta and compatibility
 
-The released v0.2.x line keeps the public PHP operation, CLI and Artisan behavior, adapter metadata, exit policy, schema `0.7` compatibility, and supported transition claims backward-compatible across patch releases. Bug fixes, security fixes, and evidence corrections may still change individual findings or diagnostics without changing those contracts.
+The released v0.3.x line keeps the public PHP operation, CLI and Artisan behavior, required adapter interfaces and discovery metadata, exit policy, schema `0.8` compatibility, and supported transition and staged-analysis claims backward-compatible across patch releases. Bug fixes, security fixes, and evidence corrections may still change individual findings or diagnostics without changing those contracts.
 
-The `main` branch is preparing v0.3.0 and identifies candidate reports as tool `0.3.0` with schema `0.8`; its Composer aliases remain `0.3.x-dev` with `^0.3` internal constraints. v0.3.0 is not yet a published package release. Released v0.2.1 remains the installable and security-supported line while signed tags, archives, Packagist synchronization, and the published-package quick start are pending.
+v0.3.1 is the latest published release. It identifies reports as tool `0.3.1` with schema `0.8`, unchanged from v0.3.0; development on `main` uses `0.3.x-dev` Composer aliases with `^0.3` internal constraints. The earlier `0.2.x` and `0.1.x` lines are archival: their signed artifacts stay available and immutable, but they receive no further features, bug fixes, or security fixes. See [Project status and licensing](docs/project-status.md) for the upgrade path.
 
 Public beta is not a production-readiness claim. The analyzer provides decision-support evidence: it does not perform an upgrade, execute the analyzed application, prove runtime compatibility, or guarantee a successful deployment. Review every report and validate the resulting upgrade with the application's own test and deployment process. See [Project status and licensing](docs/project-status.md), [Versioning](docs/versioning.md), and [Limitations and trust boundaries](docs/limitations.md).
 
@@ -24,15 +24,15 @@ Install the CLI and Laravel adapter in a separate tools directory when the targe
 ```bash
 mkdir php-upgrade-tools
 cd php-upgrade-tools
-composer require php-upgrade-preflight/cli:^0.2 php-upgrade-preflight/laravel:^0.2
+composer require php-upgrade-preflight/cli:^0.3 php-upgrade-preflight/laravel:^0.3
 ```
 
-This separate Composer tools-directory installation is the supported external execution path for the currently published v0.2 line. v0.2 does not ship or support a PHAR or a versioned container image; the repository Docker files are development tooling, not release artifacts. The commands will switch to `^0.3` only after v0.3.0 tags and packages are published and verified.
+This separate Composer tools-directory installation is the supported external execution path. v0.3 does not ship or support a PHAR or a versioned container image; the repository Docker files are development tooling, not release artifacts.
 
 You can install both packages as development dependencies in a project that already runs PHP 8.0 or later:
 
 ```bash
-composer require --dev php-upgrade-preflight/cli:^0.2 php-upgrade-preflight/laravel:^0.2
+composer require --dev php-upgrade-preflight/cli:^0.3 php-upgrade-preflight/laravel:^0.3
 ```
 
 See [Installation](docs/installation.md) and [External analysis](docs/external-analysis.md) for package choices, Windows commands, and the PHP 7.4 workflow.
@@ -83,7 +83,7 @@ The analyzer keeps exact project and source paths for internal filesystem access
 
 ## Reports
 
-JSON is the canonical report. The v0.3.0 release candidate produces schema `0.8`; published v0.2.1 produces schema `0.7`, and v0.1 produced schema `0.6`. Reports contain:
+JSON is the canonical report. The published v0.3.x line produces schema `0.8`; v0.2.1 produced schema `0.7`, and v0.1 produced schema `0.6`. Reports contain:
 
 - scenario commands, solver outcomes, diagnostics, and candidate-lock fingerprints;
 - safe Composer execution provenance, including compatible/restricted mode, version expectation, timeouts, inherited state, and offline policy;
@@ -117,7 +117,7 @@ Third-party adapter packages register themselves through Composer metadata, so t
 - [Project status and licensing](docs/project-status.md)
 - [v0.2 report and transition contract](docs/v0.2-contract.md)
 - [v0.3 staged-analysis contract](docs/v0.3-contract.md)
-- [v0.3.0 release-candidate notes](docs/releases/v0.3.0.md)
+- [v0.3.0 release notes](docs/releases/v0.3.0.md)
 - [Laravel v0.2 transition scope](docs/laravel-v0.2-transition-scope.md)
 - [Limitations and trust boundaries](docs/limitations.md)
 - [Troubleshooting](docs/troubleshooting.md)

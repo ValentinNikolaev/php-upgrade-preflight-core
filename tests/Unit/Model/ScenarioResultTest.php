@@ -104,10 +104,12 @@ final class ScenarioResultTest extends TestCase
 
         $serialized = $result->toArray();
 
-        self::assertSame(4000, strlen($serialized['stdout_excerpt']));
-        self::assertSame(str_repeat('o', 4000), $serialized['stdout_excerpt']);
-        self::assertSame(4000, strlen($serialized['stderr_excerpt']));
-        self::assertSame(str_repeat('e', 4000), $serialized['stderr_excerpt']);
+        self::assertLessThanOrEqual(4000, strlen($serialized['stdout_excerpt']));
+        self::assertStringStartsWith(str_repeat('o', 100), $serialized['stdout_excerpt']);
+        self::assertStringEndsWith('[TRUNCATED: 4001 bytes of output omitted]', $serialized['stdout_excerpt']);
+        self::assertLessThanOrEqual(4000, strlen($serialized['stderr_excerpt']));
+        self::assertStringStartsWith(str_repeat('e', 100), $serialized['stderr_excerpt']);
+        self::assertStringEndsWith('[TRUNCATED: 4002 bytes of output omitted]', $serialized['stderr_excerpt']);
     }
 
     public function testSerializedDiagnosticOutputExcerptsAreBoundedToFourThousandBytes(): void

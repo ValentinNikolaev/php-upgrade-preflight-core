@@ -7,6 +7,12 @@ namespace PhpUpgradePreflight\Core\Support;
 final class SensitiveOutputRedactor
 {
     public const REDACTED = '[REDACTED]';
+    /**
+     * Returned when a pattern fails at runtime — a PCRE backtrack or recursion limit — instead of
+     * matching nothing. The value is still withheld, and the distinct marker keeps a failed pass
+     * distinguishable from a value that was genuinely redacted.
+     */
+    public const REDACTION_FAILED = '[REDACTION_FAILED]';
     public const REDACTED_TOKEN = '[REDACTED_TOKEN]';
     public const REDACTED_URL = '[REDACTED_URL]';
 
@@ -149,7 +155,7 @@ final class SensitiveOutputRedactor
         while (true) {
             $matched = preg_match($pattern, $value, $matches, PREG_OFFSET_CAPTURE, $offset);
             if ($matched === false) {
-                return self::REDACTED;
+                return self::REDACTION_FAILED;
             }
 
             if ($matched === 0) {
@@ -176,7 +182,7 @@ final class SensitiveOutputRedactor
         while (true) {
             $matched = preg_match($pattern, $value, $matches, PREG_OFFSET_CAPTURE, $offset);
             if ($matched === false) {
-                return self::REDACTED;
+                return self::REDACTION_FAILED;
             }
 
             if ($matched === 0) {
@@ -481,13 +487,13 @@ final class SensitiveOutputRedactor
     {
         $redacted = preg_replace_callback($pattern, $callback, $value);
 
-        return $redacted === null ? self::REDACTED : $redacted;
+        return $redacted === null ? self::REDACTION_FAILED : $redacted;
     }
 
     private static function replace(string $pattern, string $replacement, string $value): string
     {
         $redacted = preg_replace($pattern, $replacement, $value);
 
-        return $redacted === null ? self::REDACTED : $redacted;
+        return $redacted === null ? self::REDACTION_FAILED : $redacted;
     }
 }

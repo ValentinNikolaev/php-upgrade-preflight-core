@@ -8,7 +8,7 @@ JSON reports use a versioned consumer contract. Tool releases and schema release
     "schema_version": "0.8",
     "tool": {
       "name": "php-upgrade-preflight",
-      "version": "0.3.0"
+      "version": "0.3.1"
     }
   }
 }
@@ -18,7 +18,7 @@ Select a parser or validator through `metadata.schema_version`. Do not infer the
 
 ## Current contract
 
-The v0.3.0 release candidate writes the strict Draft 2020-12 [`upgrade-report-v0.8.schema.json`](../packages/core/resources/schema/upgrade-report-v0.8.schema.json). It rejects unknown properties and adds required staged execution, adjacent-stage attempts, selected-state fingerprints, a lifecycle-preserving blocker registry, nullable target-platform-profile fields, and Composer execution provenance to the schema 0.7 shape. Schema `0.8` is not a published package contract until the matching v0.3.0 tags and packages pass the release gates.
+The published v0.3 line writes the strict Draft 2020-12 [`upgrade-report-v0.8.schema.json`](../packages/core/resources/schema/upgrade-report-v0.8.schema.json). It rejects unknown properties and adds required staged execution, adjacent-stage attempts, selected-state fingerprints, a lifecycle-preserving blocker registry, nullable target-platform-profile fields, and Composer execution provenance to the schema 0.7 shape. Schema `0.8` became a published package contract with v0.3.0.
 
 `request_summary.composer_execution` records the safe requested policy without an executable path. Top-level `composer_execution` adds the detected Composer version, version-match result, repository and global-state inheritance, timeout policy, disabled side effects, offline request, and the explicit fact that process/OS isolation was not supplied. Restricted repository metadata misses use the operational `repository_metadata_unavailable` scenario outcome.
 

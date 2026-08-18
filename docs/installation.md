@@ -21,18 +21,18 @@ The transition catalog covers Laravel 7→8, the retained direct 7→9 path, and
 
 ## Choose the published packages
 
-v0.2.1 is the latest Packagist release. The examples in this section intentionally install `^0.2`; use the [source checkout](#source-checkout) to evaluate the v0.3.0 release candidate. Change the constraints to `^0.3` only after the signed v0.3.0 tags and Packagist packages are published and verified.
+v0.3.1 is the latest Packagist release, so the examples in this section install `^0.3`. The archival `^0.2` packages remain installable but receive no further fixes.
 
 Install `php-upgrade-preflight/cli` for the standalone `upgrade-intel` executable. Add `php-upgrade-preflight/laravel` when you need Laravel detection and rules:
 
 ```bash
-composer require --dev php-upgrade-preflight/cli:^0.2 php-upgrade-preflight/laravel:^0.2
+composer require --dev php-upgrade-preflight/cli:^0.3 php-upgrade-preflight/laravel:^0.3
 ```
 
 Install only the Laravel package when you need the Artisan command and do not need the generic executable:
 
 ```bash
-composer require --dev php-upgrade-preflight/laravel:^0.2
+composer require --dev php-upgrade-preflight/laravel:^0.3
 ```
 
 Install `php-upgrade-preflight/core` directly only when you are building another adapter or calling the PHP API.
@@ -50,7 +50,7 @@ Use a separate tools directory for PHP 7 projects, dependency-constrained applic
 ```bash
 mkdir php-upgrade-tools
 cd php-upgrade-tools
-composer require php-upgrade-preflight/cli:^0.2 php-upgrade-preflight/laravel:^0.2
+composer require php-upgrade-preflight/cli:^0.3 php-upgrade-preflight/laravel:^0.3
 vendor/bin/upgrade-intel --help
 ```
 
@@ -59,7 +59,7 @@ PowerShell:
 ```powershell
 New-Item -ItemType Directory php-upgrade-tools
 Set-Location php-upgrade-tools
-composer require php-upgrade-preflight/cli:^0.2 php-upgrade-preflight/laravel:^0.2
+composer require php-upgrade-preflight/cli:^0.3 php-upgrade-preflight/laravel:^0.3
 vendor\bin\upgrade-intel.bat --help
 ```
 

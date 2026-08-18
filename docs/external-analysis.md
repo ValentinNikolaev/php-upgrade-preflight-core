@@ -2,9 +2,9 @@
 
 External installation separates the analyzer's runtime dependencies from the target application. Use it when the application runs PHP 7.4, when its Composer constraints reject the tool, or when an audit must leave the repository untouched.
 
-For the published v0.2 line and the planned v0.3 line, the supported external path is a Composer installation in a separate tools directory. There is no supported PHAR or published versioned container image. A user-supplied container may still isolate untrusted input, but it is an execution environment for the Composer-installed packages rather than a project release format.
+For the published v0.3 line, the supported external path is a Composer installation in a separate tools directory. There is no supported PHAR or published versioned container image. A user-supplied container may still isolate untrusted input, but it is an execution environment for the Composer-installed packages rather than a project release format.
 
-v0.2.1 is currently the latest Packagist release, so the installation command below uses `^0.2`. The v0.3.0 behavior documented later on this page belongs to the release candidate on `main`; evaluate it from a source checkout until signed v0.3.0 tags and packages are published and verified.
+v0.3.1 is the latest Packagist release, so the installation command below uses `^0.3` and the v0.3 behavior documented on this page is the published behavior.
 
 ## Directory layout
 
@@ -21,7 +21,7 @@ Create the tools installation with PHP 8.0 or later, without changing into the t
 ```bash
 mkdir -p /work/php-upgrade-tools /work/upgrade-reports
 cd /work/php-upgrade-tools
-composer require php-upgrade-preflight/cli:^0.2 php-upgrade-preflight/laravel:^0.2
+composer require php-upgrade-preflight/cli:^0.3 php-upgrade-preflight/laravel:^0.3
 ```
 
 Then run from the tools directory:

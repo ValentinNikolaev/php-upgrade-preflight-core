@@ -279,7 +279,8 @@ final class SensitiveOutputRedactorTest extends TestCase
         }
 
         self::assertStringNotContainsString($secret, $redacted);
-        self::assertStringContainsString(SensitiveOutputRedactor::REDACTED, $redacted);
+        self::assertStringContainsString(SensitiveOutputRedactor::REDACTION_FAILED, $redacted);
+        self::assertStringNotContainsString(SensitiveOutputRedactor::REDACTED . '"', $redacted);
     }
 
     /** @return array{canaries: array<string, string>, safe_values: array<string, string>, stdout: string, stderr: string} */

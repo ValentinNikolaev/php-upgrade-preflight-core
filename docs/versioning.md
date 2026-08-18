@@ -6,9 +6,9 @@ PHP Upgrade Preflight uses Semantic Versioning for tool and package releases, wi
 
 PHP Upgrade Preflight is a public beta while its public PHP API, CLI and Artisan contracts, adapter extension points, package boundaries, and report semantics are still being proven. Public beta is not a production-readiness claim. Analyzer output is decision-support evidence, not a guarantee that an upgraded application will run correctly or deploy successfully. See [Project status and licensing](project-status.md) and [Limitations and trust boundaries](limitations.md).
 
-The currently published v0.2.x line preserves its documented public operation, CLI and Artisan behavior, adapter metadata, exit policy, schema `0.7` compatibility, and transition claims across patch releases. After v0.3.0 is published and verified, v0.3.x patch releases will preserve the corresponding required adapter interfaces, schema `0.8`, and staged-analysis claims.
+The published v0.3.x line preserves its documented public operation, CLI and Artisan behavior, required adapter interfaces and discovery metadata, exit policy, schema `0.8` compatibility, and transition and staged-analysis claims across patch releases. The archival v0.2.x line keeps its own schema `0.7` contracts as immutable evidence but receives no further releases.
 
-The v0.3.0 release candidate prepares a new `0.MINOR` release. It introduces schema `0.8`, an optional stage-target provider, productionized sequential Composer results, and schema `1.0` partial or complete target-platform profiles. Historical v0.2 schemas and signed compatibility artifacts remain immutable, and every intentional migration is documented in the candidate release notes and migration guides.
+v0.3.0 opened a new `0.MINOR` line. It introduced schema `0.8`, an optional stage-target provider, productionized sequential Composer results, and schema `1.0` partial or complete target-platform profiles. Historical v0.2 schemas and signed compatibility artifacts remain immutable, and every intentional migration is documented in the release notes and migration guides.
 
 ## The `0.x` phase
 
@@ -22,15 +22,15 @@ This follows the practical meaning of SemVer's initial-development rule: compati
 
 ## Active release line
 
-Release automation on `main` is prepared for the candidate `0.3.x` release line and requires schema `0.8`, `0.3.x-dev` aliases, and `^0.3` internal constraints. The published and security-supported `0.2.x` line is retained on the `0.2.x` maintenance branch; v0.1.x remains on `0.1.x`. A maintenance release is prepared from its own branch and verifier policy, never by weakening the active `main` verifier.
+Release automation on `main` publishes the active `0.3.x` release line and requires schema `0.8`, `0.3.x-dev` aliases, and `^0.3` internal constraints. The archival `0.2.x` line is retained on the `0.2.x` maintenance branch and v0.1.x on `0.1.x`; both are historical evidence rather than supported lines. Should an archival line ever need a release, it is prepared from its own branch and verifier policy, never by weakening the active `main` verifier.
 
 The signed v0.1.0 release and its schema `0.6` artifacts remain immutable historical contracts. A security or maintenance release on the retired `0.1.x` line requires an explicit coordinated policy change on its maintenance branch; it is not prepared from `main` and does not weaken the archived compatibility checks.
 
-## v0.2 release and v0.3 candidate identity
+## Release identity
 
-The v0.2.1 maintenance baseline identifies reports as tool `0.2.1` with schema `0.7`; v0.2.0 reports use the same schema. Root path repositories and package branch aliases on that line use `0.2.x-dev`, while internal package constraints use `^0.2`. Composer derives exact package releases from matching Git tags; package manifests do not declare a `version` field.
+The archived v0.2.1 baseline identifies reports as tool `0.2.1` with schema `0.7`; v0.2.0 reports use the same schema. Root path repositories and package branch aliases on that line use `0.2.x-dev`, while internal package constraints use `^0.2`. Composer derives exact package releases from matching Git tags; package manifests do not declare a `version` field.
 
-The v0.3.0 candidate identifies reports as tool `0.3.0` with schema `0.8`. The `main` branch aliases and root path versions remain `0.3.x-dev`, while internal constraints remain `^0.3`; those aliases describe Composer's development branch, not a published package version. Exact release versions will come from matching verified Git tags and never use a `-dev` suffix. Future v0.2 maintenance releases retain their historical schema and `0.2.x` policy on the maintenance branch.
+The published v0.3.1 patch identifies reports as tool `0.3.1` with schema `0.8`; v0.3.0 reports use the same schema. The `main` branch aliases and root path versions remain `0.3.x-dev`, while internal constraints remain `^0.3`; those aliases describe Composer's development branch, not a published package version. Exact release versions come from matching verified Git tags and never use a `-dev` suffix.
 
 ## When to release `1.0`
 

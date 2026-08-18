@@ -43,7 +43,7 @@ PHP Upgrade Preflight is a public-beta planning tool that predicts dependency an
 ## Report projection
 
 - JSON is the canonical report and Markdown is a projection of it. A field the report does not carry is rendered as not recorded rather than as a default, so an absent Composer execution policy, timeout, inherited-credential state, stage duration, or staged verdict is missing evidence and not an analyzer conclusion.
-- Composer output excerpts are bounded and redacted before serialization. The report does not mark which excerpts were shortened or whether redaction failed on a specific excerpt, so excerpt text is partial evidence rather than a complete transcript. Consult the original Composer output when an excerpt is the basis of a decision.
+- Composer output excerpts are bounded and redacted before serialization. A shortened excerpt ends with a `[TRUNCATED: N bytes of output omitted]` marker naming the original size, and a redaction pass that fails at runtime withholds the value under `[REDACTION_FAILED]` instead of the ordinary `[REDACTED]`. Excerpt text remains partial evidence: consult the original Composer output when an excerpt is the basis of a decision.
 - A Composer diagnostic carries an explicit `outcome` alongside its exit status, so a probe timeout, a missing Composer executable, and a genuine non-zero result are distinguishable. A diagnostic that did not run proves nothing about the packages it would have examined.
 
 ## Read-only boundary

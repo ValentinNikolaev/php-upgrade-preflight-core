@@ -18,13 +18,13 @@ External analysis needs Composer in the tools environment, not in the target pro
 
 Install the CLI in a separate directory running PHP 8.0 or later. Pass `--from-php=7.4` and the target runtime through `--target-php`. Do not install the analyzer into the PHP 7.4 application.
 
-The currently published version 0.2 packages also require PHP 8.0 or later. Install `php-upgrade-preflight/cli:^0.2` and the required adapter in the separate tools directory; the target application itself does not need to boot. Use `^0.3` only after v0.3.0 is published and verified.
+The published version 0.3 packages also require PHP 8.0 or later. Install `php-upgrade-preflight/cli:^0.3` and the required adapter in the separate tools directory; the target application itself does not need to boot.
 
 ## Laravel rules are unavailable
 
 Install `php-upgrade-preflight/laravel` beside the CLI. An explicit `--framework=laravel` request returns exit code `2` when the adapter is absent.
 
-For the currently published tools installation, require `php-upgrade-preflight/laravel:^0.2` and run `composer show php-upgrade-preflight/laravel` from that tools directory. The adapter is project-locally installable on Laravel 8–13. Analyze Laravel 7 externally because the adapter's host constraints begin at Laravel 8. The equivalent `^0.3` command remains a post-publication instruction.
+For a tools installation, require `php-upgrade-preflight/laravel:^0.3` and run `composer show php-upgrade-preflight/laravel` from that tools directory. The adapter is project-locally installable on Laravel 8–13. Analyze Laravel 7 externally because the adapter's host constraints begin at Laravel 8.
 
 ## Laravel guidance is partial or unsupported
 
@@ -48,7 +48,7 @@ Check the Composer version used by the analyzer. Complete closed-world profiles 
 
 Version 0.2 writes schema `0.7`. Select the parser through `metadata.schema_version`, update raw-source reads from schema 0.6 `source_impact` to schema 0.7 `source_inventory`, and treat schema 0.7 `source_impact` as grouped actionable findings. Also accept the new required `platform` field and `transition.framework_guidance`. Historical schema 0.6 reports remain valid and are not rewritten.
 
-The v0.3.0 release candidate writes schema `0.8`. In addition to the 0.6→0.7 changes above, accept required `staged_resolution`, nullable `request_summary.target_platform_profile`, nullable `platform.profile`, and top-level `composer_execution`. Field absence means an older schema; it is not equivalent to a schema 0.8 `null` profile. Follow the ordered [0.7→0.8 migration](schema.md#migrating-from-07-to-08) and continue dispatching on `metadata.schema_version`.
+The published v0.3 line writes schema `0.8`. In addition to the 0.6→0.7 changes above, accept required `staged_resolution`, nullable `request_summary.target_platform_profile`, nullable `platform.profile`, and top-level `composer_execution`. Field absence means an older schema; it is not equivalent to a schema 0.8 `null` profile. Follow the ordered [0.7→0.8 migration](schema.md#migrating-from-07-to-08) and continue dispatching on `metadata.schema_version`.
 
 ## The output path is rejected
 

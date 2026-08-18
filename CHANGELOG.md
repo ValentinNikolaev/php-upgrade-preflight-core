@@ -4,6 +4,21 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-18
+
+### Fixed
+
+- Marked a shortened Composer output excerpt with `[TRUNCATED: N bytes of output omitted]`, naming the original size. A bounded excerpt previously ended without any indication that output had been cut, so a truncated transcript was indistinguishable from a complete one.
+- Withheld a value under `[REDACTION_FAILED]` when a redaction pattern fails at runtime, instead of the `[REDACTED]` marker used for a value that was genuinely redacted. Redaction still fails closed; the failure is now visible.
+
+### Security
+
+- Bounded the text handed to the redactor to the excerpt budget plus a margin large enough to keep a credential that straddles the excerpt boundary whole. Multi-megabyte solver output previously reached the redaction patterns in full, where a PCRE backtrack limit could fail the pass and replace every scenario diagnostic with a single marker.
+
+### Changed
+
+- Public documentation now describes v0.3.0 as the published and security-supported line and installs `^0.3`. The `0.2.x` and `0.1.x` lines are archival: their signed artifacts and schemas stay available and immutable, but they receive no further releases, security fixes included.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added
@@ -137,7 +152,8 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 - Checksum-verified release-archive consumers that install all three ZIPs, run the CLI, analyze an immutable fixture, and boot Laravel package discovery before publication.
 - Composer-installed CLI entry-point discovery for both generated proxy and standard `vendor/` package layouts.
 
-[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.0
 [0.2.1]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.2.0

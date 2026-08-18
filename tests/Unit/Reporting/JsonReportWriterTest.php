@@ -37,7 +37,7 @@ final class JsonReportWriterTest extends TestCase
         $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('0.8', $decoded['metadata']['schema_version']);
         self::assertSame('php-upgrade-preflight', $decoded['metadata']['tool']['name']);
-        self::assertSame('0.3.0', $decoded['metadata']['tool']['version']);
+        self::assertSame('0.3.1', $decoded['metadata']['tool']['version']);
         self::assertSame('evidence-1', $decoded['evidence'][0]['id']);
         self::assertSame('Valid evidence.', $decoded['evidence'][0]['summary']);
         self::assertSame('unknown', $decoded['resolution']['status']);
@@ -81,10 +81,11 @@ final class JsonReportWriterTest extends TestCase
         $json = (new JsonReportWriter())->render($this->report([], [$scenario]));
         $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
-        self::assertSame(
-            str_repeat('a', 3999),
-            $decoded['resolution']['scenarios'][0]['diagnostics'][0]['stdout_excerpt']
-        );
+        $excerpt = $decoded['resolution']['scenarios'][0]['diagnostics'][0]['stdout_excerpt'];
+        self::assertIsString($excerpt);
+        self::assertLessThanOrEqual(4000, strlen($excerpt));
+        self::assertStringStartsWith(str_repeat('a', 100), $excerpt);
+        self::assertStringEndsWith(' bytes of output omitted]', $excerpt);
     }
 
     public function testLocalRepositoryPathsInLockDerivedEvidenceAreCanonicalized(): void

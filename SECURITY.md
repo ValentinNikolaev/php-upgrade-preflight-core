@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The project accepts security fixes for the latest published `0.2.x` release line. The signed v0.1.x artifacts remain available for historical compatibility verification but are no longer actively supported. v0.3.0 remains a release candidate until its signed tags and Packagist packages are published and verified; development and release-candidate branches may change without a compatibility guarantee.
+The project accepts security fixes for the latest published `0.3.x` release line. The `0.2.x` and `0.1.x` lines are archival: their signed artifacts remain available for historical compatibility verification, and they receive no further fixes, security fixes included. Upgrade to `^0.3` rather than pinning an archival line. Development branches may change without a compatibility guarantee.
 
 ## Report a vulnerability
 
