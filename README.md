@@ -13,7 +13,7 @@ The Laravel adapter can be installed alongside Laravel 8 on PHP 8.0, Laravel 9 o
 
 The released v0.3.x line keeps the public PHP operation, CLI and Artisan behavior, required adapter interfaces and discovery metadata, exit policy, schema `0.8` compatibility, and supported transition and staged-analysis claims backward-compatible across patch releases. Bug fixes, security fixes, and evidence corrections may still change individual findings or diagnostics without changing those contracts.
 
-v0.3.2 is the latest published release. It identifies reports as tool `0.3.2` with schema `0.8`, unchanged from v0.3.0; development on `main` uses `0.3.x-dev` Composer aliases with `^0.3` internal constraints. The earlier `0.2.x` and `0.1.x` lines are archival: their signed artifacts stay available and immutable, but they receive no further features, bug fixes, or security fixes. See [Project status and licensing](docs/project-status.md) for the upgrade path.
+v0.3.3 is the latest published release. It identifies reports as tool `0.3.3` with schema `0.8`, unchanged from v0.3.0; development on `main` uses `0.3.x-dev` Composer aliases with `^0.3` internal constraints. The earlier `0.2.x` and `0.1.x` lines are archival: their signed artifacts stay available and immutable, but they receive no further features, bug fixes, or security fixes. See [Project status and licensing](docs/project-status.md) for the upgrade path.
 
 Public beta is not a production-readiness claim. The analyzer provides decision-support evidence: it does not perform an upgrade, execute the analyzed application, prove runtime compatibility, or guarantee a successful deployment. Review every report and validate the resulting upgrade with the application's own test and deployment process. See [Project status and licensing](docs/project-status.md), [Versioning](docs/versioning.md), and [Limitations and trust boundaries](docs/limitations.md).
 
@@ -38,6 +38,16 @@ composer require --dev php-upgrade-preflight/cli:^0.3 php-upgrade-preflight/lara
 See [Installation](docs/installation.md) and [External analysis](docs/external-analysis.md) for package choices, Windows commands, and the PHP 7.4 workflow.
 
 ## Run an analysis
+
+For an interactive, line-oriented setup that detects the project, separates the current and target PHP versions, validates package targets, and shows the equivalent repeatable command, run:
+
+```bash
+vendor/bin/upgrade-intel wizard
+```
+
+![Interactive `upgrade-intel wizard` demo](docs/assets/upgrade-intel-wizard-demo.gif)
+
+The wizard defaults to a Markdown report in the terminal and can optionally save an identical copy outside the analyzed project. Package discovery starts with local `composer.json` facts; local-cache and configured-repository lookups are explicit choices, and the latter warns before metadata lookup may use network access or inherited credentials. Before analysis, the wizard separately requires an explicit choice between restricted and compatible Composer execution, shows its network and credential implications in the reviewed plan, and adds the matching `--composer-mode` option to the repeatable command. Scripts and CI should continue to use the non-interactive command and explicit options; `--save-report=PATH` preserves the canonical stdout report while saving a copy, whereas the existing `--output=PATH` remains file-only:
 
 ```bash
 vendor/bin/upgrade-intel analyze \
@@ -100,7 +110,7 @@ Six application-shaped Laravel fixtures have approved JSON and Markdown snapshot
 ## Packages
 
 - `php-upgrade-preflight/core` contains the analysis pipeline and report contract.
-- `php-upgrade-preflight/cli` provides `upgrade-intel analyze`.
+- `php-upgrade-preflight/cli` provides the non-interactive `upgrade-intel analyze` command and the interactive `upgrade-intel wizard` workflow.
 - `php-upgrade-preflight/laravel` provides Laravel detection, rules, and `upgrade:analyze`.
 
 Third-party adapter packages register themselves through Composer metadata, so they can provide detection, source paths, rules, and package-family classification without editing the CLI. See [Framework adapters](docs/adapters.md).
@@ -117,6 +127,7 @@ Third-party adapter packages register themselves through Composer metadata, so t
 - [Project status and licensing](docs/project-status.md)
 - [v0.2 report and transition contract](docs/v0.2-contract.md)
 - [v0.3 staged-analysis contract](docs/v0.3-contract.md)
+- [v0.3.3 release notes](docs/releases/v0.3.3.md)
 - [v0.3.0 release notes](docs/releases/v0.3.0.md)
 - [Laravel v0.2 transition scope](docs/laravel-v0.2-transition-scope.md)
 - [Limitations and trust boundaries](docs/limitations.md)

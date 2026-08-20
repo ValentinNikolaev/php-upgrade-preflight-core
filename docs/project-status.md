@@ -2,7 +2,7 @@
 
 ## Public beta
 
-PHP Upgrade Preflight is a public beta. v0.3.2 is the latest published release, verified through signed tags in the monorepo and all three distribution repositories, checksum-bound archives, cross-host release checks, Packagist synchronization, and a published-package quick start. The public PHP API, CLI and Artisan surfaces, adapter extension points, package boundaries, and report semantics are still being proven before `1.0`.
+PHP Upgrade Preflight is a public beta. v0.3.3 is the latest published release, verified through signed tags in the monorepo and all three distribution repositories, checksum-bound archives, cross-host release checks, Packagist synchronization, and a published-package quick start. The public PHP API, CLI and Artisan surfaces, adapter extension points, package boundaries, and report semantics are still being proven before `1.0`.
 
 Public beta is not a production-readiness claim. The analyzer produces decision-support evidence. It does not modify the target project, perform the upgrade, boot or execute the analyzed application, prove runtime compatibility, or guarantee a successful deployment. Users must review every report and validate any resulting upgrade with the application's own tests, runtime checks, security review, and deployment process.
 

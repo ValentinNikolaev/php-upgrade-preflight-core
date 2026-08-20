@@ -104,7 +104,7 @@ Composer metadata generalizes standalone CLI registration; it does not replace L
 
 The repository's test-only `php-upgrade-preflight/test-adapter` package is deliberately outside CLI source. Its Composer metadata is the only production registration path. The `third-party-adapter` fixture proves automatic package detection, its `modules` default source path, a compatibility rule, `test-vendor/*` package-family classification, and a deterministic staged plan in a complete CLI analysis.
 
-The separate `php-upgrade-preflight/legacy-test-adapter` package keeps an old-style implementation that uses only the required v0.2 interfaces. Its package constraint explicitly permits Core `^0.3`; its fixture proves that detection and guidance still work while staged resolution is reported as unavailable. Neither test package is part of the three-package published v0.3.2 package set.
+The separate `php-upgrade-preflight/legacy-test-adapter` package keeps an old-style implementation that uses only the required v0.2 interfaces. Its package constraint explicitly permits Core `^0.3`; its fixture proves that detection and guidance still work while staged resolution is reported as unavailable. Neither test package is part of the three-package published v0.3.3 package set.
 
 ## Optional v0.3 staged targets
 

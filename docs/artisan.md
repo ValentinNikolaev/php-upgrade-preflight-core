@@ -52,10 +52,12 @@ php artisan upgrade:analyze \
   --output=/work/reports/laravel-11.md
 ```
 
-Artisan must boot before it can run the command. The published v0.3.2 adapter is tested as host-installable with Laravel 8–13. Use the external CLI for Laravel 7, when the current PHP interpreter cannot boot the application, when service providers are broken, or when installing the adapter would disturb the dependency graph.
+Artisan must boot before it can run the command. The published v0.3.3 adapter is tested as host-installable with Laravel 8–13. Use the external CLI for Laravel 7, when the current PHP interpreter cannot boot the application, when service providers are broken, or when installing the adapter would disturb the dependency graph.
 
 Laravel guidance covers 7→8, the retained direct 7→9 path, and adjacent 8→9 through 12→13 packs. Gapless adjacent packs compose multi-major guidance. Same-major requests, downgrades, ambiguous or unknown majors, catalog boundaries, and requests whose first required hop is missing are unsupported. A covered prefix before a later gap is `partially_supported`, and guidance stops there.
 
 Schema `0.8` preserves raw `source_inventory` and actionable direct `source_impact`, then adds the same staged result as the generic CLI. Read direct `resolution.status`, `transition.framework_guidance[].status`, and `staged_resolution.status` separately; Composer feasibility and rule-pack coverage do not imply one another.
+
+When the command's attached error output is a terminal, Artisan writes durable phase and Composer-scenario progress lines there. Solver conflicts are labeled `blocked`, Composer validation failures `invalid`, timeouts `timed-out`, unavailable repository metadata `unverified`, and other operational failures `failed`. Redirected, buffered, captured, or otherwise non-terminal command output remains free of progress even when the host process has a terminal, and the canonical JSON or Markdown report on stdout is unchanged.
 
 The command returns `0` after writing any valid report, including a blocked result. It returns `2` for invalid invocation and `1` when it cannot produce a report.

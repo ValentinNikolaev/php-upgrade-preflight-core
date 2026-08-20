@@ -4,7 +4,7 @@ External installation separates the analyzer's runtime dependencies from the tar
 
 For the published v0.3 line, the supported external path is a Composer installation in a separate tools directory. There is no supported PHAR or published versioned container image. A user-supplied container may still isolate untrusted input, but it is an execution environment for the Composer-installed packages rather than a project release format.
 
-v0.3.2 is the latest Packagist release, so the installation command below uses `^0.3` and the v0.3 behavior documented on this page is the published behavior.
+v0.3.3 is the latest Packagist release, so the installation command below uses `^0.3` and the v0.3 behavior documented on this page is the published behavior.
 
 ## Directory layout
 

@@ -1,0 +1,49 @@
+{
+  "$schema": "wiki-evidence.schema.json",
+  "schema_version": 1,
+  "evidence_mode": "release-candidate",
+  "release": "0.3.3",
+  "materialization_gate": "php tools/materialize-release-wikis.php --check",
+  "destinations": [
+    {
+      "set": "common",
+      "destination_repository": "ValentinNikolaev/php-upgrade-preflight",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight.wiki.git",
+      "manifest": "release-wikis/common/wiki-manifest.json",
+      "result": {
+        "status": "published",
+        "wiki_commit": "dd694053da6eafaa4942e2b69847a7774092602c"
+      }
+    },
+    {
+      "set": "core",
+      "destination_repository": "ValentinNikolaev/php-upgrade-preflight-core",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight-core.wiki.git",
+      "manifest": "release-wikis/core/wiki-manifest.json",
+      "result": {
+        "status": "published",
+        "wiki_commit": "8e2a83382cd3f3e7f6cbc1331918ce700a61d9f5"
+      }
+    },
+    {
+      "set": "cli",
+      "destination_repository": "ValentinNikolaev/php-upgrade-preflight-cli",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight-cli.wiki.git",
+      "manifest": "release-wikis/cli/wiki-manifest.json",
+      "result": {
+        "status": "published",
+        "wiki_commit": "0ab103556cf0593fa14e20d8e315bbffcef0c4dd"
+      }
+    },
+    {
+      "set": "laravel",
+      "destination_repository": "ValentinNikolaev/php-upgrade-preflight-laravel",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight-laravel.wiki.git",
+      "manifest": "release-wikis/laravel/wiki-manifest.json",
+      "result": {
+        "status": "published",
+        "wiki_commit": "246d7d19cdcfc7b96db1fc37a7e69c3c50710008"
+      }
+    }
+  ]
+}

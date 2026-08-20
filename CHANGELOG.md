@@ -4,6 +4,28 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-08-21
+
+### Added
+
+- Added the line-oriented `upgrade-intel wizard`, which detects the project, separates current and target PHP, offers locally derivable PHP and package-version candidates, validates package targets through explicitly selected Composer metadata sources, reviews the complete plan, and prints a shell-copyable non-interactive command before analysis.
+- Added typed Core analysis-progress events and terminal-aware CLI and Laravel Artisan renderers. Progress and human diagnostics stay on stderr, non-terminal consumers remain quiet, and canonical JSON or Markdown stdout is unchanged.
+- Added `--save-report=PATH` to keep the canonical report on stdout while saving an identical optional copy outside the analyzed project. The existing `--output=PATH` file-only behavior remains supported.
+- Added read-only Composer package metadata lookup modes for local cache and configured project repositories, with distinct `found`, `no_matching_version`, `not_found`, and operationally `unverified` results.
+- Added a branded, responsive GitHub Pages 404 page with recovery links to the project home, getting-started guide, and repository.
+
+### Changed
+
+- Expanded the release Wiki and CLI documentation with the interactive workflow, package lookup and credential boundaries, cancellation and non-TTY behavior, progress semantics, report-copy behavior, and the new public Core, CLI, and Laravel services.
+- Made Composer scenario status rendering distinguish dependency blockers, invalid analysis input, timeouts, unverified results, and operational failures instead of labeling every unsuccessful scenario as blocked.
+- Redesigned the GitHub Pages landing page around a first-preflight quick start, persistent navigation, a responsive two-column demo gallery, clearer calls to action, and improved focus, contrast, touch-target, and reduced-motion behavior.
+- Expanded the Pages verifier for the redesigned landing page and custom 404 contract, including navigation, recovery links, responsive layout, accessibility hooks, and deployable local references.
+- Changed the Pages workflow to deploy on every push to `main`, so repository changes that affect published claims are no longer skipped by a narrow path filter.
+
+### Fixed
+
+- Corrected the distribution release script's stale `build/` command references and aligned Wiki/release contributor guidance with the mandatory Wiki-before-tag evidence process.
+
 ## [0.3.2] - 2026-08-19
 
 ### Added
@@ -175,7 +197,8 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 - Checksum-verified release-archive consumers that install all three ZIPs, run the CLI, analyze an immutable fixture, and boot Laravel package discovery before publication.
 - Composer-installed CLI entry-point discovery for both generated proxy and standard `vendor/` package layouts.
 
-[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.0

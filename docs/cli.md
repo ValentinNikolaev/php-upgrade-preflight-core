@@ -1,10 +1,44 @@
 # CLI reference
 
-The standalone command accepts one subcommand and `--name=value` options:
+The standalone executable provides a non-interactive analysis command and an explicit interactive wizard:
 
 ```text
 upgrade-intel analyze --target=package:constraint [options]
+upgrade-intel wizard
 ```
+
+`analyze` remains the stable interface for scripts and CI. It never prompts and accepts the documented `--name=value` options. `wizard` requires interactive stdin and stderr, gathers the same request values through prompts, prints a shell-copyable equivalent `analyze` command, and delegates to the same analyzer.
+
+## Interactive wizard
+
+Run the line-oriented workflow when constructing the flags manually is inconvenient:
+
+```bash
+upgrade-intel wizard
+```
+
+The wizard:
+
+- validates a project directory containing readable Composer metadata;
+- shows analyzer-runtime PHP separately from the current project PHP inferred from exact `config.platform.php` data;
+- never silently chooses the analyzer runtime as an upgrade target;
+- requires an explicit Composer execution policy with no security-sensitive default;
+- supports PHP-only, package-only, and combined target selection;
+- lists root `require` and `require-dev` packages and validates every selected target constraint;
+- reviews the complete plan and equivalent command before analysis starts;
+- defaults to Markdown in the terminal, supports explicit JSON, and can save an identical optional copy outside the project.
+
+Package metadata lookup is selected once before package targets are entered:
+
+1. `composer.json` only is the default and starts no Composer process;
+2. local Composer cache requests offline lookup and treats a cache miss as `unverified`, not `not_found`;
+3. configured project repositories may use network access and credentials inherited by compatible Composer execution.
+
+The lookup distinguishes an invalid target, a package found with matching releases, a package found with no release matching the requested constraint, an explicit repository `not_found` result, and an operationally `unverified` result. An unavailable network, cache, authentication context, or malformed metadata never proves that a package does not exist. Repository lookup uses non-interactive Composer metadata commands with plugins and scripts disabled and the diagnostic timeout applied.
+
+The metadata lookup source does not silently determine how the analysis itself runs. The wizard separately requires `restricted` or `compatible` Composer execution, offers no default for that security-sensitive choice, explains whether network access and inherited credentials may be used, and includes the selected `--composer-mode` in both the confirmation plan and equivalent command.
+
+Prompts and other human interaction go to stderr. The wizard always keeps the selected canonical report on stdout and uses `--save-report` when an additional file copy is requested. EOF stops before analysis with code `2`; entering `cancel`, `quit`, or `q` stops before analysis with code `130`. When stdin or stderr is not a terminal, the wizard refuses to prompt and directs the caller to `analyze`.
 
 ## Options
 
@@ -20,7 +54,8 @@ upgrade-intel analyze --target=package:constraint [options]
 | `--source=PATH` | File or directory to scan inside the project. Repeat as needed. |
 | `--framework=NAME` | Installed framework adapter to enable. Repeat as needed. |
 | `--format=json\|markdown` | Report format. Defaults to `json`. |
-| `--output=PATH` | Report file outside the analyzed project. Defaults to stdout. |
+| `--output=PATH` | Write the report only to a file outside the analyzed project. |
+| `--save-report=PATH` | Keep the report on stdout and save an identical file copy outside the project. |
 | `--composer-mode=compatible\|restricted` | Composer execution policy. Defaults to `compatible`. |
 | `--composer-executable=PATH` | Composer command or executable path. Defaults to `composer`; the exact value is not reported. |
 | `--composer-version=CONSTRAINT` | Expected Composer version constraint. Defaults to `>=2.0.0 <3.0.0`. |
@@ -88,13 +123,16 @@ Read `resolution.status`, `transition.framework_guidance[].status`, and `staged_
 
 ## Streams and exit codes
 
-Reports go to stdout unless `--output` is set. Diagnostics go to stderr.
+Reports go to stdout unless legacy file-only `--output` is set. `--save-report` preserves stdout and adds an identical file copy; it cannot be combined with `--output`. Save diagnostics go to stderr.
+
+For a terminal-attached stderr, the default analyzer also emits durable phase and Composer-scenario status lines. Solver conflicts are labeled `blocked`, Composer validation failures `invalid`, timeouts `timed-out`, unavailable repository metadata `unverified`, and other operational failures `failed`. Redirected diagnostics remain free of cursor control and progress output, and report stdout is unchanged.
 
 | Code | Meaning |
 | --- | --- |
 | `0` | Help or a completed canonical report. Inspect the direct and staged status fields. |
 | `1` | An internal or operational failure prevented report production. |
 | `2` | Invalid command syntax, paths, targets, format, framework, or output destination. |
+| `130` | The interactive wizard was cancelled before analysis. |
 
 A solver-blocked upgrade is valid analysis output and returns `0`.
 

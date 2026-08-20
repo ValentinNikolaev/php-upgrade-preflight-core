@@ -19,8 +19,12 @@ use PhpUpgradePreflight\Core\Model\ScenarioResult;
 use PhpUpgradePreflight\Core\Model\TargetPlatform;
 use PhpUpgradePreflight\Core\Model\UpgradeReport;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
-use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
+use PhpUpgradePreflight\Core\Progress\AnalysisPhase;
+use PhpUpgradePreflight\Core\Progress\AnalysisProgressEvent;
+use PhpUpgradePreflight\Core\Progress\AnalysisProgressReporter;
+use PhpUpgradePreflight\Core\Progress\NoOpAnalysisProgressReporter;
 use PhpUpgradePreflight\Core\Source\AutoloadOwnershipIndexBuilder;
+use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
 use PhpUpgradePreflight\Core\Support\PathExposurePolicy;
 
 final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
@@ -39,6 +43,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     private SourceImpactBuilder $sourceImpactBuilder;
     private StagedUpgradeOrchestrator $stagedUpgradeOrchestrator;
     private StageAssessmentBuilder $stageAssessmentBuilder;
+    private AnalysisProgressReporter $progressReporter;
 
     /** @param list<FrameworkIntegration> $frameworks */
     public function __construct(
@@ -56,7 +61,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         ?AutoloadOwnershipIndexBuilder $ownershipIndexBuilder = null,
         ?SourceImpactBuilder $sourceImpactBuilder = null,
         ?StagedUpgradeOrchestrator $stagedUpgradeOrchestrator = null,
-        ?StageAssessmentBuilder $stageAssessmentBuilder = null
+        ?StageAssessmentBuilder $stageAssessmentBuilder = null,
+        ?AnalysisProgressReporter $progressReporter = null
     ) {
         $this->projectStateBuilder = $projectStateBuilder ?? new ProjectStateBuilder();
         $this->scenarioRunner = $scenarioRunner ?? new ComposerScenarioRunner();
@@ -74,15 +80,39 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             ?? new StagedUpgradeOrchestrator($this->scenarioRunner, $this->blockerGrouper, $this->lockDiffBuilder);
         $this->stageAssessmentBuilder = $stageAssessmentBuilder
             ?? new StageAssessmentBuilder($this->sourceImpactBuilder, $this->riskAndEffortEstimator);
+        $this->progressReporter = $progressReporter ?? new NoOpAnalysisProgressReporter();
     }
 
     public function analyzeUpgrade(UpgradeRequest $request): UpgradeReport
     {
+        $this->reportProgress(AnalysisProgressEvent::analysisStarted());
+
+        try {
+            $report = $this->performAnalysis($request);
+            $this->reportProgress(AnalysisProgressEvent::analysisCompleted($report));
+
+            return $report;
+        } catch (\Throwable $failure) {
+            $this->reportProgress(AnalysisProgressEvent::analysisFailed());
+
+            throw $failure;
+        }
+    }
+
+    private function performAnalysis(UpgradeRequest $request): UpgradeReport
+    {
         $evidence = new EvidenceLedger();
+        $this->phaseStarted(AnalysisPhase::PROJECT_LOADING);
         $projectLoad = $this->projectStateBuilder->load($request->projectPath());
         if (!$projectLoad->succeeded()) {
-            return $this->inputFailureReport($request, $projectLoad);
+            $this->phaseCompleted(AnalysisPhase::PROJECT_LOADING, AnalysisProgressEvent::STATUS_FAILED);
+            $this->phaseStarted(AnalysisPhase::REPORT_ASSEMBLY);
+            $report = $this->inputFailureReport($request, $projectLoad);
+            $this->phaseCompleted(AnalysisPhase::REPORT_ASSEMBLY);
+
+            return $report;
         }
+        $this->phaseCompleted(AnalysisPhase::PROJECT_LOADING);
 
         $project = $projectLoad->project();
         $platform = TargetPlatform::fromRequest($request, $project);
@@ -98,10 +128,14 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $analysisUncertainties
         );
 
+        $this->phaseStarted(AnalysisPhase::COMPOSER_FEASIBILITY);
         $this->scenarioRunner->resetAnalysisCaches();
         $scenarioResults = [];
         foreach ($scenarios as $scenario) {
-            $scenarioResults[] = $this->scenarioRunner->run($project, $request, $scenario, $platform);
+            $this->reportProgress(AnalysisProgressEvent::scenarioStarted($scenario));
+            $scenarioResult = $this->scenarioRunner->run($project, $request, $scenario, $platform);
+            $scenarioResults[] = $scenarioResult;
+            $this->reportProgress(AnalysisProgressEvent::scenarioCompleted($scenarioResult));
         }
 
         $bestResult = $this->bestSuccessfulResult($project->composerLock(), $scenarioResults);
@@ -121,6 +155,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $requestedConstraints,
             $platform
         );
+        $this->phaseCompleted(AnalysisPhase::COMPOSER_FEASIBILITY);
+        $this->phaseStarted(AnalysisPhase::STAGED_RESOLUTION);
         $stagedResolution = $this->stagedUpgradeOrchestrator->analyze(
             $activeFrameworks,
             $project,
@@ -128,12 +164,14 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $platform,
             $evidence
         );
+        $this->phaseCompleted(AnalysisPhase::STAGED_RESOLUTION);
         // A metadata-probe workspace the analyzer could not remove leaves state on disk and makes
         // every Composer version or platform answer derived from that probe suspect, so it has to
         // reach the report rather than staying an in-process accessor nobody reads. Candidate locks
         // are collected after the staged chain for the same reason: a scenario or stage lock entry
         // the analyzer could not index is gone once the workspace is removed, and the candidate
         // package count and package changes silently exclude it.
+        $this->phaseStarted(AnalysisPhase::SOURCE_SCAN);
         $sourceUncertainties = array_merge(
             $analysisUncertainties,
             $this->scenarioRunner->probeCleanupUncertainties(),
@@ -148,6 +186,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $request->sourcePaths() !== [],
             $activeFrameworks
         );
+        $this->phaseCompleted(AnalysisPhase::SOURCE_SCAN);
+        $this->phaseStarted(AnalysisPhase::FRAMEWORK_EVALUATION);
         $frameworkGuidance = $this->frameworkRuleEngine->assessTransitions(
             $activeFrameworks,
             $project,
@@ -168,6 +208,8 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             // a contained adapter defect back into a failed report.
             $sourceUncertainties
         );
+        $this->phaseCompleted(AnalysisPhase::FRAMEWORK_EVALUATION);
+        $this->phaseStarted(AnalysisPhase::REPORT_ASSEMBLY);
         $ownershipIndex = $this->ownershipIndexBuilder->build(
             $project,
             $sourceUncertainties,
@@ -204,7 +246,7 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $stagedResolution
         );
 
-        return $this->reportAssembler->assemble(
+        $report = $this->reportAssembler->assemble(
             $request,
             $project,
             $scenarioResults,
@@ -221,6 +263,30 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $platform,
             $stagedResolution
         );
+        $this->phaseCompleted(AnalysisPhase::REPORT_ASSEMBLY);
+
+        return $report;
+    }
+
+    private function phaseStarted(string $phase): void
+    {
+        $this->reportProgress(AnalysisProgressEvent::phaseStarted($phase));
+    }
+
+    private function phaseCompleted(
+        string $phase,
+        string $status = AnalysisProgressEvent::STATUS_SUCCEEDED
+    ): void {
+        $this->reportProgress(AnalysisProgressEvent::phaseCompleted($phase, $status));
+    }
+
+    private function reportProgress(AnalysisProgressEvent $event): void
+    {
+        try {
+            $this->progressReporter->report($event);
+        } catch (\Throwable) {
+            // Progress is observational and cannot alter or mask analysis behavior.
+        }
     }
 
     private function inputFailureReport(UpgradeRequest $request, ProjectStateLoadResult $projectLoad): UpgradeReport
