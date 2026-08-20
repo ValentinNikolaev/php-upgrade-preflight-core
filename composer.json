@@ -2,7 +2,7 @@
   "name": "php-upgrade-preflight/core",
   "description": "Deterministic Composer/PHP upgrade analysis core.",
   "type": "library",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MIT",
   "keywords": [
     "composer",
     "dependency-analysis",

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ValentinNikolaev/php-upgrade-preflight/blob/main/docs/releases/wiki-evidence-historical.schema.json",
+  "title": "PHP Upgrade Preflight historical Wiki baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "evidence_mode",
+    "release",
+    "checked_at",
+    "destinations"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "wiki-evidence-historical.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_mode": {
+      "const": "historical-baseline"
+    },
+    "release": {
+      "const": "0.3.1"
+    },
+    "checked_at": {
+      "const": "2026-08-19"
+    },
+    "destinations": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["set", "wiki_repository", "result"],
+        "properties": {
+          "set": {
+            "enum": ["common", "core", "cli", "laravel"]
+          },
+          "wiki_repository": {
+            "type": "string"
+          },
+          "result": {
+            "const": "repository-not-found"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "wiki-evidence-historical.schema.json",
+  "schema_version": 1,
+  "evidence_mode": "historical-baseline",
+  "release": "0.3.1",
+  "checked_at": "2026-08-19",
+  "destinations": [
+    {
+      "set": "common",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight.wiki.git",
+      "result": "repository-not-found"
+    },
+    {
+      "set": "core",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight-core.wiki.git",
+      "result": "repository-not-found"
+    },
+    {
+      "set": "cli",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight-cli.wiki.git",
+      "result": "repository-not-found"
+    },
+    {
+      "set": "laravel",
+      "wiki_repository": "https://github.com/ValentinNikolaev/php-upgrade-preflight-laravel.wiki.git",
+      "result": "repository-not-found"
+    }
+  ]
+}

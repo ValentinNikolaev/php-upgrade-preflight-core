@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ValentinNikolaev/php-upgrade-preflight/blob/main/docs/releases/wiki-evidence.schema.json",
+  "title": "PHP Upgrade Preflight release Wiki evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "evidence_mode",
+    "release",
+    "materialization_gate",
+    "destinations"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "wiki-evidence.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_mode": {
+      "const": "release-candidate"
+    },
+    "release": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "materialization_gate": {
+      "const": "php tools/materialize-release-wikis.php --check"
+    },
+    "destinations": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "set",
+          "destination_repository",
+          "wiki_repository",
+          "manifest",
+          "result"
+        ],
+        "properties": {
+          "set": {
+            "enum": ["common", "core", "cli", "laravel"]
+          },
+          "destination_repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "wiki_repository": {
+            "type": "string",
+            "pattern": "^https://github\\.com/ValentinNikolaev/[A-Za-z0-9-]+\\.wiki\\.git$"
+          },
+          "manifest": {
+            "type": "string",
+            "pattern": "^release-wikis/(common|core|cli|laravel)/wiki-manifest\\.json$"
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["status", "wiki_commit"],
+                "properties": {
+                  "status": {
+                    "const": "published"
+                  },
+                  "wiki_commit": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["status", "reviewed_remote_commit", "inventory_check"],
+                "properties": {
+                  "status": {
+                    "const": "unchanged-after-review"
+                  },
+                  "reviewed_remote_commit": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  },
+                  "inventory_check": {
+                    "const": "passed"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

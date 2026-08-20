@@ -52,7 +52,7 @@ php artisan upgrade:analyze \
   --output=/work/reports/laravel-11.md
 ```
 
-Artisan must boot before it can run the command. The v0.3 release-candidate adapter is tested as host-installable with Laravel 8–13 but is not yet published; use the released v0.2 adapter or evaluate v0.3 from a source checkout until publication. Use the external CLI for Laravel 7, when the current PHP interpreter cannot boot the application, when service providers are broken, or when installing the adapter would disturb the dependency graph.
+Artisan must boot before it can run the command. The published v0.3.2 adapter is tested as host-installable with Laravel 8–13. Use the external CLI for Laravel 7, when the current PHP interpreter cannot boot the application, when service providers are broken, or when installing the adapter would disturb the dependency graph.
 
 Laravel guidance covers 7→8, the retained direct 7→9 path, and adjacent 8→9 through 12→13 packs. Gapless adjacent packs compose multi-major guidance. Same-major requests, downgrades, ambiguous or unknown majors, catalog boundaries, and requests whose first required hop is missing are unsupported. A covered prefix before a later gap is `partially_supported`, and guidance stops there.
 

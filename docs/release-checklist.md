@@ -14,9 +14,10 @@ The active `0.3.x` release line is prepared from `main`. Maintenance releases us
 - [ ] Confirm root path versions, root requirements, and every `dev-main` branch alias use `DEV_VERSION`.
 - [ ] Move releasable changelog entries under a dated `[VERSION]` heading.
 - [ ] Create `docs/releases/v$VERSION.md` with `# PHP Upgrade Preflight v$VERSION` as its first line.
+- [ ] Create `docs/releases/v$VERSION-wiki-evidence.json` from `docs/releases/wiki-evidence.schema.json`, list exactly the common, Core, CLI, and Laravel Wiki destinations, and link it from the release notes. Every destination must record either `published` with its full 40-character Wiki commit SHA, or `unchanged-after-review` with the reviewed remote commit SHA and `inventory_check: passed`.
 - [ ] Validate links in README, package support metadata, schema docs, security policy, changelog, and release notes.
 
-Run `composer release:verify -- VERSION` to enforce the release-series, tool-version, branch-alias, internal-constraint, changelog, and release-notes checks. Composer package versions come from tags; do not add `version` fields to package manifests.
+Run `composer release:verify -- VERSION` to enforce the release-series, tool-version, branch-alias, internal-constraint, changelog, release-note, Wiki-tree, and four-destination Wiki-evidence checks. The command is offline: it validates repository-owned materialized pages and previously recorded real Wiki results but never accesses or pushes a GitHub Wiki. A historical baseline such as v0.3.1 documents missing evidence honestly and cannot satisfy this release-candidate gate. Composer package versions come from tags; do not add `version` fields to package manifests.
 
 ## Deterministic quality gate
 
@@ -71,6 +72,7 @@ The workflow stamps the exact release version only into temporary archive manife
 
 ## Publish
 
+- [ ] Publish or confirm unchanged each of the four Wiki repositories separately, then record its reviewed result or Wiki commit in `docs/releases/v$VERSION.md`; do not add Wiki publication to the three-package distribution loop.
 - [ ] Create the GitHub release from the signed `TAG` and attach release notes derived from the changelog.
 - [ ] Confirm Packagist shows the expected metadata and exact version for every package.
 - [ ] Run the README quick start using only published packages.

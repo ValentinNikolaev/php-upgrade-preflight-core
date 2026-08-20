@@ -1,7 +1,7 @@
 # PHP Upgrade Preflight
 
 > [!IMPORTANT]
-> **Project status: Public beta.** PHP Upgrade Preflight is source-available software, free for noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use requires a separate license. It is not distributed as Open Source.
+> **Project status: Public beta.** PHP Upgrade Preflight is Open Source software under the [MIT License](LICENSE), free for commercial and noncommercial use.
 
 PHP Upgrade Preflight analyzes Composer-based PHP upgrades before you change the target project. It copies `composer.json` and `composer.lock` into temporary workspaces, runs isolated Composer scenarios, scans source files, and produces a canonical JSON report or a Markdown projection.
 
@@ -13,7 +13,7 @@ The Laravel adapter can be installed alongside Laravel 8 on PHP 8.0, Laravel 9 o
 
 The released v0.3.x line keeps the public PHP operation, CLI and Artisan behavior, required adapter interfaces and discovery metadata, exit policy, schema `0.8` compatibility, and supported transition and staged-analysis claims backward-compatible across patch releases. Bug fixes, security fixes, and evidence corrections may still change individual findings or diagnostics without changing those contracts.
 
-v0.3.1 is the latest published release. It identifies reports as tool `0.3.1` with schema `0.8`, unchanged from v0.3.0; development on `main` uses `0.3.x-dev` Composer aliases with `^0.3` internal constraints. The earlier `0.2.x` and `0.1.x` lines are archival: their signed artifacts stay available and immutable, but they receive no further features, bug fixes, or security fixes. See [Project status and licensing](docs/project-status.md) for the upgrade path.
+v0.3.2 is the latest published release. It identifies reports as tool `0.3.2` with schema `0.8`, unchanged from v0.3.0; development on `main` uses `0.3.x-dev` Composer aliases with `^0.3` internal constraints. The earlier `0.2.x` and `0.1.x` lines are archival: their signed artifacts stay available and immutable, but they receive no further features, bug fixes, or security fixes. See [Project status and licensing](docs/project-status.md) for the upgrade path.
 
 Public beta is not a production-readiness claim. The analyzer provides decision-support evidence: it does not perform an upgrade, execute the analyzed application, prove runtime compatibility, or guarantee a successful deployment. Review every report and validate the resulting upgrade with the application's own test and deployment process. See [Project status and licensing](docs/project-status.md), [Versioning](docs/versioning.md), and [Limitations and trust boundaries](docs/limitations.md).
 
@@ -138,6 +138,6 @@ docker compose run --rm php composer check
 
 `composer check` is the offline, deterministic gate: it validates every package manifest, runs the unit, integration, and smoke PHPUnit suites, performs static analysis, and checks formatting. Live compatibility installs and dependency audits run in separate workflows. See [CONTRIBUTING.md](CONTRIBUTING.md) for the documented `test:unit`, `test:integration`, `test:smoke`, and `test:all` commands, focused package tests, and snapshot updates.
 
-## License and commercial use
+## License
 
-Copyright 2026 Valentin Nikolaev. PHP Upgrade Preflight is source-available software, free for noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use requires a separate license from the copyright holder. [Request a commercial license](https://docs.google.com/forms/d/e/1FAIpQLSfUlJJnSoqgUuJnKUCGzQQpIeXZtz471iD_XiPTjdnODbooYw/viewform). The project is not distributed as Open Source. The license text controls if this summary and the license differ.
+Copyright 2026 Valentin Nikolaev. PHP Upgrade Preflight is Open Source software licensed under the [MIT License](LICENSE). Releases up to and including v0.3.1 were published under the PolyForm Noncommercial License 1.0.0 and remain governed by the license they shipped with; the MIT License applies to this repository and to every release published after v0.3.1. The license text controls if this summary and the license differ.

@@ -8,7 +8,7 @@ JSON reports use a versioned consumer contract. Tool releases and schema release
     "schema_version": "0.8",
     "tool": {
       "name": "php-upgrade-preflight",
-      "version": "0.3.1"
+      "version": "0.3.2"
     }
   }
 }

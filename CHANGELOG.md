@@ -4,6 +4,29 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-19
+
+### Added
+
+- Published a public GitHub Pages landing page under `site/`, deployed by its own workflow, with opt-in terminal recordings of the offline demo, an explicit separate-tools-directory install path, and an artifact validator that checks page structure, local references, control contrast, and the licensing and install disclosures before deployment.
+- Added the four-destination release Wiki: canonical pages under `wiki/`, materialized destination copies with per-set manifests and source checksums under `release-wikis/`, and `composer release:wiki:check` wired into `composer check`, so destination copies that drift from their canonical sources fail the gate.
+- Added three reproducible VHS recordings of the offline demo beside the existing staged-upgrade recording: the evidence walk from a staged blocker to its Composer command and solver output, the recursive-digest immutability proof, and the Markdown projection.
+
+### Changed
+
+- Relicensed the project from PolyForm Noncommercial 1.0.0 to the MIT License across the license file, all published package manifests, and public documentation. Releases up to and including v0.3.1 remain governed by the license they shipped with; the MIT License applies to the repository and to every release published after v0.3.1. The commercial-license request form is retired.
+- Opened external code, test, and fixture contributions under the inbound=outbound model: contributions are licensed under the same MIT License, with no contributor license agreement. The former documentation-only contribution policy is retired from the contributing guide, pull-request template, and issue forms.
+- Restructured the release workflow around an authorization job that validates the release event, normalizes the version once for every later job, and verifies the signed annotated tag and its approved release line through the GitHub API instead of a local ancestry check. The workflow can now also be called by another workflow to verify and package a version without publishing it.
+- Made a Wiki update mandatory for any change that creates, prepares, or changes a release tag, and required the same change to refresh every release-pinned string on the public site.
+- Changed the license metadata of the synthetic five-minute-demo fixture packages and demo target manifest from `PolyForm-Noncommercial-1.0.0` to `MIT`, so the demo metadata matches the project's own license, and regenerated the demo `composer.lock` and both committed Laravel 10→13 reports so their candidate-state fingerprints identify the updated fixture content. The demo's findings, blockers, lifecycles, and guidance are unchanged. The immutability-proof recording is re-recorded because it prints the target digest that the fixture edit changes; the deep-dive and Markdown-projection recordings show content the edit does not affect.
+- Regenerated both committed demo reports from one analyzer run through the shared core report writers, via the new `examples/five-minute-demo/regenerate-reports.php`, so the committed Markdown is a projection of the same `UpgradeReport` as the canonical JSON instead of a second run whose measured durations disagree. Because that run analyzes the canonical JSON request, the committed Markdown records `Requested format: json`; the demo README states this explicitly.
+- Moved the demo's analysis request into `PhpUpgradePreflight\Tests\Support\FiveMinuteDemoAnalysis`, so the deterministic test gate and the regeneration script construct one identical request instead of two copies that can drift apart, and added `FixtureSnapshot::differencesFromDisk()` so the regeneration script proves the demo target stayed byte-for-byte unchanged without depending on a test case.
+- Added the two demo scripts to the PHPStan and PHP CS Fixer file sets as individual paths. The `examples/` tree as a whole stays excluded: the demo target is immutable fixture input whose bytes the committed reports fingerprint, so its PHP files must never be analyzed or rewritten by tooling.
+
+### Fixed
+
+- Fixed `examples/five-minute-demo/run-demo.sh`, which crashed before its target-immutability check: it still read a stage's `source_impact` entries as embedded findings, while schema `0.8` records them as references into `staged_resolution.source_impact`. The summary now lives in `examples/five-minute-demo/summarize-report.php`, covers stage source-impact references in its drift projection, and fails loudly on an unresolvable reference instead of printing an empty finding. The deterministic test gate executes it against the checked-in canonical report and asserts that it rejects a drifting stage status, a dangling source-impact reference, and a stage that reports no source impact at all.
+
 ## [0.3.1] - 2026-08-18
 
 ### Fixed
@@ -152,7 +175,8 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 - Checksum-verified release-archive consumers that install all three ZIPs, run the CLI, analyze an immutable fixture, and boot Laravel package discovery before publication.
 - Composer-installed CLI entry-point discovery for both generated proxy and standard `vendor/` package layouts.
 
-[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/ValentinNikolaev/php-upgrade-preflight/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.3.0
 [0.2.1]: https://github.com/ValentinNikolaev/php-upgrade-preflight/releases/tag/v0.2.1

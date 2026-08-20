@@ -2,7 +2,7 @@
 
 ## Public beta
 
-PHP Upgrade Preflight is a public beta. v0.3.1 is the latest published release, verified through signed tags in the monorepo and all three distribution repositories, checksum-bound archives, cross-host release checks, Packagist synchronization, and a published-package quick start. The public PHP API, CLI and Artisan surfaces, adapter extension points, package boundaries, and report semantics are still being proven before `1.0`.
+PHP Upgrade Preflight is a public beta. v0.3.2 is the latest published release, verified through signed tags in the monorepo and all three distribution repositories, checksum-bound archives, cross-host release checks, Packagist synchronization, and a published-package quick start. The public PHP API, CLI and Artisan surfaces, adapter extension points, package boundaries, and report semantics are still being proven before `1.0`.
 
 Public beta is not a production-readiness claim. The analyzer produces decision-support evidence. It does not modify the target project, perform the upgrade, boot or execute the analyzed application, prove runtime compatibility, or guarantee a successful deployment. Users must review every report and validate any resulting upgrade with the application's own tests, runtime checks, security review, and deployment process.
 
@@ -40,10 +40,10 @@ v0.3.0 is a new `0.MINOR` release under SemVer's initial-development phase. It i
 
 The intentional v0.2→v0.3 changes are identified in the changelog, release notes, schema migration, and adapter migration guidance. Historical v0.2 schemas and signed compatibility artifacts remain available as immutable evidence rather than being rewritten for v0.3.
 
-## Source-available licensing
+## Open Source licensing
 
-PHP Upgrade Preflight is source-available software. It is not distributed or described as Open Source.
+PHP Upgrade Preflight is Open Source software under the [MIT License](../LICENSE). Commercial and noncommercial use, modification, and redistribution are permitted under the MIT terms; no separate commercial license exists or is required.
 
-The [PolyForm Noncommercial License 1.0.0](../LICENSE) permits the uses defined there as noncommercial without a commercial license fee. Commercial use is not permitted under that license and requires a separate license from the copyright holder. Use the [commercial license request form](https://docs.google.com/forms/d/e/1FAIpQLSfUlJJnSoqgUuJnKUCGzQQpIeXZtz471iD_XiPTjdnODbooYw/viewform) to request licensing terms. Submitting the form does not grant a license or authorize commercial use.
+Releases up to and including v0.3.1 were published under the PolyForm Noncommercial License 1.0.0. Those signed artifacts remain immutable and stay governed by the license they shipped with. The MIT License applies to this repository and to every release published after v0.3.1.
 
 This page describes the project's product and licensing position; it does not replace or modify the license. The license text controls if this summary and the license differ.
