@@ -4,10 +4,11 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 
 ## [Unreleased]
 
-## [0.3.4] - 2026-10-07
+## [0.3.5] - 2026-10-07
 
 ### Fixed
 
+- Corrected distribution export staging to preserve source Git file modes across Docker/Windows bind mounts; added actual offline Git/Bash regressions for both permission inversions, including a synthetic executable CLI and real POSIX symlink fixtures.
 - Corrected optional PHPUnit and Collision upgrade advice, compatible Guzzle/Pusher ranges, and missing guide-mentioned package replacements and removals within the existing Laravel transition catalog.
 - Added exact source checks for removed Laravel helpers, serializable-closure classes, testing traits, and `HasVersion7Uuids`; excluded unrelated Bus facades from queue-dispatch advice.
 - Corrected Laravel 13 request-forgery advice: the previous CSRF middleware names remain deprecated aliases and receive review guidance rather than a removed-symbol blocker.
@@ -17,13 +18,17 @@ This project follows [Semantic Versioning](https://semver.org/). Report schema v
 ### Changed
 
 - Retained the earlier merged simplification of staged blocker registration without changing blocker ordering or lifecycles. Updated pinned GitHub Actions JavaScript runtimes and corrected documentation about enforced limits, advisory budgets and cross-host fingerprint stability.
-- Advanced current report identity to tool `0.3.4`, keeping schema `0.8`, PHP `^8.0`, `0.3.x-dev` aliases, `^0.3` internal constraints, existing public calls, commands and the three-package release set compatible.
+- Advanced current report identity to tool `0.3.5`, keeping schema `0.8`, PHP `^8.0`, `0.3.x-dev` aliases, `^0.3` internal constraints, existing public calls, commands and the three-package release set compatible.
 
 ### Added
 
 - Added complete pinned Laravel 8–13 upgrade-guide ledgers with explicit manual checks and contract exclusions, plus offline Composer and CLI/Artisan parity cases for Illuminate-only, mixed-target, and same-major requests. Schema `0.8` and the supported staging scope are unchanged.
 - Added paired evaluations of three pinned public Laravel applications and two supplemental snapshots, with input immutability, normalized before/after findings, package inventories and documented operational limits. These are analysis evaluations, not application-runtime upgrade tests.
 - Added optional library-level source-scan controls while preserving existing calls; the default scan caps are 10,000 files, 2 MiB per file, 64 MiB total input and 10,000 usages.
+
+## [0.3.4] - withheld coordinated release
+
+- Three distribution-only candidate tags were pushed before a Git file-mode mismatch was detected. Their signed references remain immutable; no monorepo tag or GitHub release was published. See [the candidate record](docs/releases/v0.3.4.md). The corrected coordinated patch is v0.3.5.
 
 ## [0.3.3] - 2026-08-21
 

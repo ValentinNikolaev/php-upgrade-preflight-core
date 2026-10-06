@@ -21,7 +21,7 @@ The transition catalog covers Laravel 7→8, the retained direct 7→9 path, and
 
 ## Choose the published packages
 
-v0.3.4 is the latest Packagist release, so the examples in this section install `^0.3`. The archival `^0.2` packages remain installable but receive no further fixes.
+v0.3.5 is the latest Packagist release, so the examples in this section install `^0.3`. The archival `^0.2` packages remain installable but receive no further fixes.
 
 Install `php-upgrade-preflight/cli` for the standalone `upgrade-intel` executable. Add `php-upgrade-preflight/laravel` when you need Laravel detection and rules:
 

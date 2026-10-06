@@ -18,7 +18,7 @@ The historical harness identifier `bookstack10` means the supplemental Laravel 9
 
 ## What the saved comparisons show
 
-Baseline tools were the published CLI, core and Laravel packages at exactly 0.3.3, installed in a separate tools directory. The evaluated candidate was an unpublished working tree whose metadata still said 0.3.3; that shared version string was not proof of identical implementation. The JSON records each published source reference separately. Release preparation subsequently advanced current tool identity to 0.3.4 without rewriting these recorded runs.
+Baseline tools were the published CLI, core and Laravel packages at exactly 0.3.3, installed in a separate tools directory. The evaluated candidate was an unpublished working tree whose metadata still said 0.3.3; that shared version string was not proof of identical implementation. The JSON records each published source reference separately. Release preparation subsequently advanced current tool identity to 0.3.4, then 0.3.5 after a distribution export mode defect was found, without rewriting these recorded runs. The exporter repair does not change the evaluated analyzer behavior.
 
 The tools and monorepo candidate have separately locked dependency graphs; the JSON records baseline dependency versions and the candidate's relevant analyzer libraries. This is not a fully controlled dependency-version experiment. Sanitized red/green regression cases independently establish the named corrections, and networked timings are not causal performance comparisons. Reinstalling exact tool versions later can resolve different transitive versions; compare the recorded lock hash/inventory rather than assuming a fresh install reproduces every byte.
 

@@ -30,7 +30,7 @@ The signed v0.1.0 release and its schema `0.6` artifacts remain immutable histor
 
 The archived v0.2.1 baseline identifies reports as tool `0.2.1` with schema `0.7`; v0.2.0 reports use the same schema. Root path repositories and package branch aliases on that line use `0.2.x-dev`, while internal package constraints use `^0.2`. Composer derives exact package releases from matching Git tags; package manifests do not declare a `version` field.
 
-The latest published v0.3.4 patch identifies reports as tool `0.3.4` with schema `0.8`; v0.3.3, v0.3.2, v0.3.1, and v0.3.0 reports identify their matching tool version and use the same schema. The `main` branch aliases and root path versions remain `0.3.x-dev`, while internal constraints remain `^0.3`; those aliases describe Composer's development branch, not a published package version. Exact release versions come from matching verified Git tags and never use a `-dev` suffix.
+The latest published v0.3.5 patch identifies reports as tool `0.3.5` with schema `0.8`; v0.3.3, v0.3.2, v0.3.1, and v0.3.0 reports identify their matching tool version and use the same schema. The `main` branch aliases and root path versions remain `0.3.x-dev`, while internal constraints remain `^0.3`; those aliases describe Composer's development branch, not a published package version. Exact release versions come from matching verified Git tags and never use a `-dev` suffix.
 
 ## When to release `1.0`
 

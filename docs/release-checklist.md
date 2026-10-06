@@ -61,6 +61,7 @@ For v0.3 these Composer packages remain the only supported external distribution
 - [ ] Confirm each split contains its manifest, source, schema resources where applicable, license, shared readme, changelog, security policy, and documentation.
 - [ ] Record each split commit, source monorepo commit, archive filename, SHA-256 digest, and dependency-inventory digest as artifact provenance.
 - [ ] Run `composer validate --strict` at every split root.
+- [ ] Before signing any distribution tag, compare its staged/committed Git tree against the approved source: exact paths, blob IDs and modes (`100644`, `100755`, `120000`) after package-path flattening. Filesystem byte comparisons alone cannot detect executable-bit drift on Docker/Windows bind mounts. Confirm the same tree after any final `git add`.
 - [ ] Create matching signed `TAG` tags on the monorepo and all distribution repositories from the approved commit.
 - [ ] Update all Packagist packages and confirm GitHub synchronization.
 - [ ] Install the released package constraints from Packagist in an empty directory.

@@ -13,7 +13,7 @@ The Laravel adapter can be installed alongside Laravel 8 on PHP 8.0, Laravel 9 o
 
 The released v0.3.x line keeps the public PHP operation, CLI and Artisan behavior, required adapter interfaces and discovery metadata, exit policy, schema `0.8` compatibility, and supported transition and staged-analysis claims backward-compatible across patch releases. Bug fixes, security fixes, and evidence corrections may still change individual findings or diagnostics without changing those contracts.
 
-v0.3.4 is the latest published release. It identifies reports as tool `0.3.4` with schema `0.8`, unchanged from v0.3.0; development on `main` uses `0.3.x-dev` Composer aliases with `^0.3` internal constraints. The earlier `0.2.x` and `0.1.x` lines are archival: their signed artifacts stay available and immutable, but they receive no further features, bug fixes, or security fixes. See [Project status and licensing](docs/project-status.md) for the upgrade path.
+v0.3.5 is the latest published release. It identifies reports as tool `0.3.5` with schema `0.8`, unchanged from v0.3.0; development on `main` uses `0.3.x-dev` Composer aliases with `^0.3` internal constraints. The earlier `0.2.x` and `0.1.x` lines are archival: their signed artifacts stay available and immutable, but they receive no further features, bug fixes, or security fixes. See [Project status and licensing](docs/project-status.md) for the upgrade path.
 
 Public beta is not a production-readiness claim. The analyzer provides decision-support evidence: it does not perform an upgrade, execute the analyzed application, prove runtime compatibility, or guarantee a successful deployment. Review every report and validate the resulting upgrade with the application's own test and deployment process. See [Project status and licensing](docs/project-status.md), [Versioning](docs/versioning.md), and [Limitations and trust boundaries](docs/limitations.md).
 
@@ -127,7 +127,7 @@ Third-party adapter packages register themselves through Composer metadata, so t
 - [Project status and licensing](docs/project-status.md)
 - [v0.2 report and transition contract](docs/v0.2-contract.md)
 - [v0.3 staged-analysis contract](docs/v0.3-contract.md)
-- [v0.3.4 release notes](docs/releases/v0.3.4.md)
+- [v0.3.5 release notes](docs/releases/v0.3.5.md)
 - [v0.3.0 release notes](docs/releases/v0.3.0.md)
 - [Laravel v0.2 transition scope](docs/laravel-v0.2-transition-scope.md)
 - [Laravel coverage review and manual migration checks](docs/laravel-coverage/README.md)
