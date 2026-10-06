@@ -10,6 +10,8 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
+use PhpParser\ErrorHandler;
+use PhpParser\Parser;
 use PhpUpgradePreflight\Core\Composer\ProjectStateBuilder;
 use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
@@ -19,12 +21,177 @@ use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\SourceUsage;
 use PhpUpgradePreflight\Core\Source\SourceUsageCollector;
+use PhpUpgradePreflight\Core\Source\SourceScanLimits;
 use PhpUpgradePreflight\Core\Source\SourceUsageScanner;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
 final class SourceUsageScannerTest extends TestCase
 {
+    public function testSourceScanLimitsRejectNonPositiveValues(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('maxFiles');
+
+        new SourceScanLimits(0, 1, 1, 1);
+    }
+
+    public function testSelectedFilesReportTheLimitWithoutAnEvidenceLedger(): void
+    {
+        $projectPath = $this->createProject("<?php\nApp\\First::run();\n");
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Second.php', "<?php\nApp\\Second::run();\n");
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $files = (new SourceUsageScanner(null, new SourceScanLimits(1, 1024, 2048, 10)))
+                ->selectedPhpFiles($project, ['src'], $uncertainties);
+
+            self::assertCount(1, $files);
+            self::assertStringContainsString('1-file safety limit', $uncertainties[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testFileCountLimitKeepsTheDeterministicPrefixAndReportsOmissions(): void
+    {
+        $projectPath = $this->createProject("<?php\nApp\\First::run();\n");
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Second.php', "<?php\nApp\\Second::run();\n");
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner(null, new SourceScanLimits(1, 1024, 2048, 10)))
+                ->scan($project, ['src'], $evidence, $uncertainties);
+
+            self::assertSame(['App\\First'], array_map(static fn (SourceUsage $usage): string => $usage->symbol(), $usages));
+            self::assertCount(2, $evidence->all());
+            self::assertSame('file_count', $evidence->all()[0]->context()['limit_type']);
+            self::assertStringContainsString('1-file safety limit', $uncertainties[0]);
+            self::assertStringContainsString($evidence->all()[0]->id(), $uncertainties[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testOversizedFileIsSkippedBeforeParsing(): void
+    {
+        $projectPath = $this->createProject("<?php\nApp\\TooLarge::run();\n");
+        $parser = new class () implements Parser {
+            public function parse(string $code, ?ErrorHandler $errorHandler = null): ?array
+            {
+                throw new \LogicException('The parser must not receive an oversized file.');
+            }
+
+            public function getTokens(): array
+            {
+                return [];
+            }
+        };
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner($parser, new SourceScanLimits(10, 8, 1024, 10)))
+                ->scan($project, ['src'], $evidence, $uncertainties);
+
+            self::assertSame([], $usages);
+            self::assertSame('file_bytes', $evidence->all()[0]->context()['limit_type']);
+            self::assertStringContainsString('per-file byte limit', $uncertainties[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testOversizedProbeBytesCountTowardsTheAggregateLimit(): void
+    {
+        $projectPath = $this->createProject("<?php\nApp\\First::run();\n");
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Second.php', "<?php\nApp\\Second::run();\n");
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            (new SourceUsageScanner(null, new SourceScanLimits(10, 8, 9, 10)))
+                ->scan($project, ['src'], $evidence, $uncertainties);
+
+            self::assertSame(
+                ['file_bytes', 'total_bytes'],
+                array_map(static fn (Evidence $item): string => $item->context()['limit_type'], $evidence->all())
+            );
+            self::assertSame(1, $evidence->all()[0]->context()['omitted_count']);
+            self::assertSame(1, $evidence->all()[1]->context()['omitted_count']);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testAggregateByteLimitSkipsFilesThatDoNotFitTheRemainingBudget(): void
+    {
+        $first = "<?php\nApp\\First::run();\n";
+        $projectPath = $this->createProject($first);
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Second.php', "<?php\nApp\\Second::run();\n");
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner(null, new SourceScanLimits(10, 1024, strlen($first) + 5, 10)))
+                ->scan($project, ['src'], $evidence, $uncertainties);
+
+            self::assertSame(['App\\First'], array_map(static fn (SourceUsage $usage): string => $usage->symbol(), $usages));
+            self::assertSame('total_bytes', $evidence->all()[1]->context()['limit_type']);
+            self::assertStringContainsString('aggregate byte limit', $uncertainties[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testExhaustedAggregateByteLimitSkipsRemainingFilesWithoutReadingThem(): void
+    {
+        $first = "<?php\nApp\\First::run();\n";
+        $projectPath = $this->createProject($first);
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Second.php', "<?php\nApp\\Second::run();\n");
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner(null, new SourceScanLimits(10, 1024, strlen($first), 10)))
+                ->scan($project, ['src'], $evidence, $uncertainties);
+
+            self::assertSame(['App\\First'], array_map(static fn (SourceUsage $usage): string => $usage->symbol(), $usages));
+            self::assertSame('total_bytes', $evidence->all()[1]->context()['limit_type']);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testUsageLimitRetainsTheDeterministicPrefixAndReportsOmissions(): void
+    {
+        $projectPath = $this->createProject("<?php\nApp\\First::run();\nApp\\Second::run();\nApp\\Third::run();\n");
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        try {
+            $project = (new ProjectStateBuilder())->build($projectPath);
+            $usages = (new SourceUsageScanner(null, new SourceScanLimits(10, 1024, 2048, 2)))
+                ->scan($project, ['src'], $evidence, $uncertainties);
+
+            self::assertSame(
+                ['App\\First', 'App\\Second'],
+                array_map(static fn (SourceUsage $usage): string => $usage->symbol(), $usages)
+            );
+            self::assertSame('usage_count', $evidence->all()[2]->context()['limit_type']);
+            self::assertStringContainsString('2-usage safety limit', $uncertainties[0]);
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
     public function testMissingExplicitPathProducesAnUncertainty(): void
     {
         $projectPath = dirname(__DIR__, 5) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'project-isolation';

@@ -27,6 +27,88 @@ use Symfony\Component\Filesystem\Filesystem;
 
 final class DefaultUpgradeAnalyzerTest extends TestCase
 {
+    public function testSourceChangedDuringComposerAnalysisIsReportedAsInputDrift(): void
+    {
+        $projectPath = $this->createInputProject('{"require":{"fixture/dependency":"^1.0"}}', '{"packages":[],"packages-dev":[]}');
+        mkdir($projectPath . DIRECTORY_SEPARATOR . 'src', 0700, true);
+        file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Example.php', "<?php\nnew \\Original\\Client();\n");
+        $mutated = false;
+        $runner = new ComposerScenarioRunner(null, null, static function () use ($projectPath, &$mutated): array {
+            if (!$mutated) {
+                file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Example.php', "<?php\nnew \\Changed\\Client();\n");
+                $mutated = true;
+            }
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer(scenarioRunner: $runner))->analyzeUpgrade(
+                new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, null, ['src'])
+            );
+
+            self::assertTrue($mutated);
+            self::assertCount(1, $report->sourceInventory());
+            self::assertStringContainsString('Changed', $report->sourceInventory()[0]->symbol());
+            self::assertStringContainsString('src/Example.php', implode('\n', $report->uncertainties()));
+            self::assertStringContainsString('changed during analysis', implode('\n', $report->uncertainties()));
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testComposerManifestChangedDuringAnalysisIsReportedAsInputDrift(): void
+    {
+        $projectPath = $this->createInputProject('{"require":{"fixture/dependency":"^1.0"}}', '{"packages":[],"packages-dev":[]}');
+        $mutated = false;
+        $runner = new ComposerScenarioRunner(null, null, static function () use ($projectPath, &$mutated): array {
+            if (!$mutated) {
+                file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'composer.json', '{"require":{"fixture/dependency":"^3.0"}}');
+                $mutated = true;
+            }
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer(scenarioRunner: $runner))->analyzeUpgrade(
+                new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')])
+            );
+
+            self::assertTrue($mutated);
+            self::assertStringContainsString('composer.json', implode('\n', $report->uncertainties()));
+            self::assertStringContainsString('changed during analysis', implode('\n', $report->uncertainties()));
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
+    public function testNewSourceFileDuringAnalysisIsReportedAsInputDrift(): void
+    {
+        $projectPath = $this->createInputProject('{"require":{"fixture/dependency":"^1.0"}}', '{"packages":[],"packages-dev":[]}');
+        mkdir($projectPath . DIRECTORY_SEPARATOR . 'src', 0700, true);
+        $mutated = false;
+        $runner = new ComposerScenarioRunner(null, null, static function () use ($projectPath, &$mutated): array {
+            if (!$mutated) {
+                file_put_contents($projectPath . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Added.php', "<?php\nnew \\Added\\Client();\n");
+                $mutated = true;
+            }
+
+            return ['exit_code' => 0, 'stdout' => 'Resolved.', 'stderr' => ''];
+        });
+
+        try {
+            $report = (new DefaultUpgradeAnalyzer(scenarioRunner: $runner))->analyzeUpgrade(
+                new UpgradeRequest($projectPath, [new UpgradeTarget('fixture/dependency', '^2.0')], null, null, ['src'])
+            );
+
+            self::assertTrue($mutated);
+            self::assertStringContainsString('src/Added.php', implode('\n', $report->uncertainties()));
+        } finally {
+            (new Filesystem())->remove($projectPath);
+        }
+    }
+
     public function testInvalidProjectComposerJsonProducesAStructuredReportWithoutRunningComposer(): void
     {
         $processCalls = 0;

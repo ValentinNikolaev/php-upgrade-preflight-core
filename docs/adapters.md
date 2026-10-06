@@ -38,11 +38,15 @@ composer require php-upgrade-preflight/cli vendor/example-adapter
 vendor/bin/upgrade-intel analyze --path=/work/app --target-php=8.2
 ```
 
+Installed adapters are trusted PHP code. Their constructors and capability methods run in the analyzer process with its filesystem, network, environment, and credential privileges. Install only adapters you trust with those privileges. Catching an adapter exception keeps a report available, but does not isolate the adapter or prevent side effects in the analyzed project. The read-only project guarantee therefore assumes trusted adapter code; adapters should inspect metadata and source without booting or modifying the target application.
+
 ## Discovery and activation
 
 Discovery considers packages known to the running Composer installation. Packages that are not installed, or that do not declare the metadata key, do not register an adapter. Package names are processed in lexical order. The resulting integrations are ordered case-insensitively by adapter name, with the class name as the deterministic tie-breaker. Metadata declaration order therefore does not control cross-adapter execution; within one integration, compatibility rules retain the order returned by `rules()`.
 
 With no `--framework` option, every discovered integration may inspect the target project and only integrations whose `detect()` result is positive become active. Explicit `--framework=NAME` selection is case-insensitive, activates only the requested installed adapters, and bypasses their automatic detection. Repeat the option to select multiple adapters.
+
+If automatic `detect()` throws, that integration is skipped and the report records `E2` evidence and uncertainty with reason `detection_failure`. Explicit selection still bypasses detection. A requested name that is not registered remains an invalid invocation.
 
 Laravel keeps the same automatic behavior: the Laravel adapter detects `laravel/framework` or `illuminate/*` in the target project's root requirements or lock data. Its default source paths, rules, transition guidance, and package-family classification are unchanged by metadata-based registration.
 
@@ -96,6 +100,14 @@ Adapter rules are third-party input. A rule that throws — including one that b
 
 Containment is not a supported mode of operation. The report states that the finding is missing, so anything that depended on it loses its signal. Cover both paths in the adapter's own conformance fixtures.
 
+Other runtime capability failures degrade only the affected contribution. Each failure is recorded as `E2` evidence with its adapter or classifier identity, a reason, and the error in redacted evidence context. An uncertainty cites that evidence and any evidence the failed capability registered before throwing:
+
+- `source_paths_failure` — `defaultSourcePaths()` failed. Other adapters' paths remain; if none remain, the generic `src`, `app`, `config`, `routes`, and `tests` defaults apply. Explicit `--source-path` input bypasses adapter defaults.
+- `transition_assessment_failure` — `assessTransition()` failed. That integration contributes no transition guidance, while other guidance and compatibility rules continue.
+- `package_family_failure` — `packageFamilies()` failed or returned an unusable family value. That classifier's contribution is omitted for the affected package and it is not consulted again in the same lock diff. Other classifiers still contribute families.
+
+These failures can leave guidance, source inspection, or package grouping incomplete. An absence of findings after a contained failure does not establish compatibility.
+
 ## CLI and Artisan
 
 Composer metadata generalizes standalone CLI registration; it does not replace Laravel package discovery. Installing `php-upgrade-preflight/laravel` still registers `upgrade:analyze` through its Laravel service provider, and that command still enables the Laravel integration directly. CLI and Artisan use the same analyzer pipeline, Laravel integration, request semantics, source-path defaults, report writers, and exit policy. The entry-point parity suite verifies equivalent canonical reports.
@@ -104,7 +116,7 @@ Composer metadata generalizes standalone CLI registration; it does not replace L
 
 The repository's test-only `php-upgrade-preflight/test-adapter` package is deliberately outside CLI source. Its Composer metadata is the only production registration path. The `third-party-adapter` fixture proves automatic package detection, its `modules` default source path, a compatibility rule, `test-vendor/*` package-family classification, and a deterministic staged plan in a complete CLI analysis.
 
-The separate `php-upgrade-preflight/legacy-test-adapter` package keeps an old-style implementation that uses only the required v0.2 interfaces. Its package constraint explicitly permits Core `^0.3`; its fixture proves that detection and guidance still work while staged resolution is reported as unavailable. Neither test package is part of the three-package published v0.3.3 package set.
+The separate `php-upgrade-preflight/legacy-test-adapter` package keeps an old-style implementation that uses only the required v0.2 interfaces. Its package constraint explicitly permits Core `^0.3`; its fixture proves that detection and guidance still work while staged resolution is reported as unavailable. Neither test package is part of the three-package published v0.3.4 package set.
 
 ## Optional v0.3 staged targets
 

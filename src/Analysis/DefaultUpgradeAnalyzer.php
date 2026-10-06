@@ -102,8 +102,10 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
     private function performAnalysis(UpgradeRequest $request): UpgradeReport
     {
         $evidence = new EvidenceLedger();
+        $inputConsistency = new InputConsistencyTracker($request->projectPath());
         $this->phaseStarted(AnalysisPhase::PROJECT_LOADING);
         $projectLoad = $this->projectStateBuilder->load($request->projectPath());
+        $inputConsistency->checkComposer();
         if (!$projectLoad->succeeded()) {
             $this->phaseCompleted(AnalysisPhase::PROJECT_LOADING, AnalysisProgressEvent::STATUS_FAILED);
             $this->phaseStarted(AnalysisPhase::REPORT_ASSEMBLY);
@@ -117,10 +119,22 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
         $project = $projectLoad->project();
         $platform = TargetPlatform::fromRequest($request, $project);
         $targets = $this->targetNormalizer->normalize($request->targets()->packageTargets(), $request->targetPhp());
-        $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations($project, $request);
-        $packageFamilyClassifiers = $this->frameworkRuleEngine->packageFamilyClassifiers($activeFrameworks);
-        $sourcePaths = $this->frameworkRuleEngine->sourcePaths($project, $request, $activeFrameworks);
         $analysisUncertainties = [];
+        $activeFrameworks = $this->frameworkRuleEngine->activeIntegrations(
+            $project,
+            $request,
+            $evidence,
+            $analysisUncertainties
+        );
+        $packageFamilyClassifiers = $this->frameworkRuleEngine->packageFamilyClassifiers($activeFrameworks);
+        $sourcePaths = $this->frameworkRuleEngine->sourcePaths(
+            $project,
+            $request,
+            $activeFrameworks,
+            $evidence,
+            $analysisUncertainties
+        );
+        $inputConsistency->captureSource($this->sourceUsageScanner, $project, array_values($sourcePaths));
         $scenarios = $this->scenarioSelector->select(
             $targets,
             $request->fromPhp(),
@@ -143,7 +157,13 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
 
         $lockDiff = $bestLock === null
             ? new LockDiff([])
-            : $this->lockDiffBuilder->build($project->composerLock(), $bestLock, $packageFamilyClassifiers);
+            : $this->lockDiffBuilder->build(
+                $project->composerLock(),
+                $bestLock,
+                $packageFamilyClassifiers,
+                $evidence,
+                $analysisUncertainties
+            );
         $requestedConstraints = $project->composerJson()->rootRequirements();
         foreach ($targets->packageTargets() as $target) {
             $requestedConstraints[$target->package()] = $target->constraint();
@@ -178,21 +198,25 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $project->composerLock()->unusablePackageUncertainties(),
             $this->scenarioRunner->candidateLockUncertainties()
         );
+        $readDigests = [];
         $sourceInventory = $this->sourceUsageScanner->scan(
             $project,
             array_values($sourcePaths),
             $evidence,
             $sourceUncertainties,
             $request->sourcePaths() !== [],
-            $activeFrameworks
+            $activeFrameworks,
+            $readDigests
         );
+        $inputConsistency->checkSource($this->sourceUsageScanner, $project, array_values($sourcePaths), $readDigests);
         $this->phaseCompleted(AnalysisPhase::SOURCE_SCAN);
         $this->phaseStarted(AnalysisPhase::FRAMEWORK_EVALUATION);
         $frameworkGuidance = $this->frameworkRuleEngine->assessTransitions(
             $activeFrameworks,
             $project,
             $request,
-            $evidence
+            $evidence,
+            $sourceUncertainties
         );
         $frameworkFindings = $this->frameworkRuleEngine->evaluate(
             $activeFrameworks,
@@ -245,6 +269,10 @@ final class DefaultUpgradeAnalyzer implements UpgradeAnalyzer
             $frameworkFindings,
             $stagedResolution
         );
+
+        $inputConsistency->checkComposer();
+        $inputConsistency->checkSource($this->sourceUsageScanner, $project, array_values($sourcePaths), $readDigests);
+        $sourceUncertainties = array_merge($sourceUncertainties, $inputConsistency->uncertainties());
 
         $report = $this->reportAssembler->assemble(
             $request,

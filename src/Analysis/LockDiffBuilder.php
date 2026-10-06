@@ -6,16 +6,27 @@ namespace PhpUpgradePreflight\Core\Analysis;
 
 use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
+use PhpUpgradePreflight\Core\Model\Evidence;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PhpUpgradePreflight\Core\Model\LockDiff;
 use PhpUpgradePreflight\Core\Model\PackageChange;
 use PhpUpgradePreflight\Core\Model\PackageRef;
 
 final class LockDiffBuilder
 {
-    /** @param list<PackageFamilyClassifier> $familyClassifiers */
-    public function build(ComposerLock $before, ComposerLock $after, array $familyClassifiers = []): LockDiff
-    {
+    /**
+     * @param list<PackageFamilyClassifier> $familyClassifiers
+     * @param list<string> $uncertainties
+     */
+    public function build(
+        ComposerLock $before,
+        ComposerLock $after,
+        array $familyClassifiers = [],
+        ?EvidenceLedger $evidence = null,
+        array &$uncertainties = []
+    ): LockDiff {
         $changes = [];
+        $failedClassifiers = [];
         $beforePackages = $before->packages();
         $afterPackages = $after->packages();
         $names = array_unique(array_merge(array_keys($beforePackages), array_keys($afterPackages)));
@@ -37,7 +48,7 @@ final class LockDiffBuilder
                     null,
                     $to->distReference(),
                     $to->isDirect(),
-                    $this->packageFamilies($name, $familyClassifiers)
+                    $this->packageFamilies($name, $familyClassifiers, $evidence, $uncertainties, $failedClassifiers)
                 );
                 continue;
             }
@@ -54,7 +65,7 @@ final class LockDiffBuilder
                     $from->distReference(),
                     null,
                     $from->isDirect(),
-                    $this->packageFamilies($name, $familyClassifiers)
+                    $this->packageFamilies($name, $familyClassifiers, $evidence, $uncertainties, $failedClassifiers)
                 );
                 continue;
             }
@@ -73,7 +84,7 @@ final class LockDiffBuilder
                     $from->distReference(),
                     $to->distReference(),
                     $to->isDirect(),
-                    $this->packageFamilies($name, $familyClassifiers)
+                    $this->packageFamilies($name, $familyClassifiers, $evidence, $uncertainties, $failedClassifiers)
                 );
             }
         }
@@ -123,18 +134,57 @@ final class LockDiffBuilder
 
     /**
      * @param list<PackageFamilyClassifier> $classifiers
+     * @param list<string> $uncertainties
+     * @param array<int, true> $failedClassifiers
      * @return list<string>
      */
-    private function packageFamilies(string $packageName, array $classifiers): array
-    {
+    private function packageFamilies(
+        string $packageName,
+        array $classifiers,
+        ?EvidenceLedger $evidence,
+        array &$uncertainties,
+        array &$failedClassifiers
+    ): array {
         $families = [];
 
         foreach ($classifiers as $classifier) {
-            foreach ($classifier->packageFamilies($packageName) as $family) {
-                $family = trim($family);
-                if ($family !== '') {
-                    $families[$family] = true;
+            $classifierId = spl_object_id($classifier);
+            if (isset($failedClassifiers[$classifierId])) {
+                continue;
+            }
+
+            try {
+                $classifiedFamilies = [];
+                foreach ($classifier->packageFamilies($packageName) as $family) {
+                    $family = trim($family);
+                    if ($family !== '') {
+                        $classifiedFamilies[$family] = true;
+                    }
                 }
+                $families += $classifiedFamilies;
+            } catch (\Throwable $exception) {
+                $failedClassifiers[$classifierId] = true;
+                $references = [];
+                if ($evidence !== null) {
+                    $references[] = $evidence->add(
+                        'framework-adapter',
+                        Evidence::E2_PACKAGE_METADATA,
+                        'A framework adapter package-family classifier failed.',
+                        'high',
+                        [
+                            'classifier' => get_class($classifier),
+                            'package' => $packageName,
+                            'reason' => 'package_family_failure',
+                            'error' => $exception->getMessage(),
+                        ]
+                    )->id();
+                }
+                $uncertainties[] = sprintf(
+                    'Package-family classifier "%s" failed for "%s", so its package families are missing from this diff%s.',
+                    get_class($classifier),
+                    $packageName,
+                    $references === [] ? '' : ' (' . implode(', ', $references) . ')'
+                );
             }
         }
 

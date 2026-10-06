@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-06",
+  "published_baseline": "0.3.3",
+  "implementation_base": "92b9566d93e50324f46be9cb9a9f63f3033ac3e6",
+  "release_sources": [
+    {"repository": "ValentinNikolaev/php-upgrade-preflight", "tag": "v0.3.3", "tag_object": "95b9a086feba64bb9385d5d2c3c516d8c6dfe1af", "source_commit": "3725603aec5bdb9fa6547846a2e28d355447ef4b", "github_signature_verified": true},
+    {"repository": "ValentinNikolaev/php-upgrade-preflight-core", "package": "php-upgrade-preflight/core", "tag": "v0.3.3", "tag_object": "366e5aea93312ef5344e026b3717c3df5c005fac", "source_commit": "039cf51b5ab7cb4d7576a3830bad7243f95b74e6", "github_signature_verified": true, "packagist_source_and_dist_match": true},
+    {"repository": "ValentinNikolaev/php-upgrade-preflight-cli", "package": "php-upgrade-preflight/cli", "tag": "v0.3.3", "tag_object": "a4dcc3804e143e3e42284bcf568bd491044eb60e", "source_commit": "51d48991e3b9e29ddeb26ffd3913f5b24894b657", "github_signature_verified": true, "packagist_source_and_dist_match": true},
+    {"repository": "ValentinNikolaev/php-upgrade-preflight-laravel", "package": "php-upgrade-preflight/laravel", "tag": "v0.3.3", "tag_object": "58f050358dc3d79677379a2307afb32c70bee1bb", "source_commit": "dc265189607a4e0ea0023ed26d837371e17eefd5", "github_signature_verified": true, "packagist_source_and_dist_match": true}
+  ],
+  "preserved_contracts": {
+    "report_schema": "0.8",
+    "runtime_php": "^8.0",
+    "development_alias": "0.3.x-dev",
+    "internal_constraint": "^0.3",
+    "published_packages": ["core", "cli", "laravel"],
+    "public_operation": "UpgradeAnalyzer::analyzeUpgrade(UpgradeRequest): UpgradeReport",
+    "command_policy": "CLI and Artisan remain projections of the same analyzer; exit zero means a report was produced, not upgrade feasibility.",
+    "guidance": "7->8, retained direct7->9, every adjacent8->9 through12->13; ascending contiguous paths may compose.",
+    "staging": "Exactly one rooted laravel/framework target, supported ascending adjacent majors7-13, exact satisfiable stage PHP; no source remediation simulation.",
+    "independent_dimensions": ["resolution.status", "transition.framework_guidance", "staged_resolution.status"],
+    "immutable_evidence": "Historical schemas, signed contracts and archived release fixtures are not rewritten. New tests and ledgers capture patch expectations separately."
+  },
+  "gap_dispositions": [
+    {"gap": "No real-application evaluation", "classification": "missing-evidence", "owner": "docs/laravel-coverage/application-evaluation.json", "patch_disposition": "Pin public inputs, analyze baseline and candidate outside them, record actual outcomes and manual next work."},
+    {"gap": "Partial guide and package accounting", "classification": "missing-evidence-and-confirmed-defects", "owner": "LaravelRuleCatalog", "patch_disposition": "Account for every pinned guide heading; correct bounded ranges and advisories, record manual and contract-dependent work.", "checks": ["LaravelCompletionPackageRulesTest", "LaravelModernPhpunitRulesTest", "LaravelRuleCatalogValidatorTest"]},
+    {"gap": "Misleading or missing exact source findings", "classification": "confirmed-defects", "owner": "Laravel source visitor and high-signal rules", "patch_disposition": "Match proved symbols and usage types, retain E3/E4 links, distinguish deprecation from removal.", "checks": ["LaravelQueueDispatchVisitorTest", "LaravelHighSignalSourceRuleTest", "LaravelRemovedSourcePipelineTest", "LaravelRemovedSourceStagedReportTest", "FiveMinuteDemoTest"]},
+    {"gap": "Illuminate-only, mixed targets, same-major staging", "classification": "deliberate-limitations", "owner": "LaravelStagePlanner", "patch_disposition": "Preserve staged refusal and direct-target fidelity; document workarounds.", "checks": ["LaravelExcludedTransitionTest", "LaravelFrameworkIntegrationTest"], "handoff": "v0.4 Milestones0-2: rooted-family targets and same-major version identity require explicit contract decisions."},
+    {"gap": "Dynamic source, skeleton and runtime inference", "classification": "deliberate-limitations", "owner": "Laravel source rules and coverage ledgers", "patch_disposition": "Use exact source checks only where evidence permits. Retained Laravel10 skeleton, dynamic names, database state and inherited contracts require accurate confidence/manual actions."},
+    {"gap": "Laravel/Symfony package ownership and several stage providers", "classification": "deliberate-limitations", "owner": "adapter classifiers and core stage-provider selection", "patch_disposition": "Retain current Laravel ownership of symfony/* and provider-conflict skips; do not claim a second adapter exists.", "checks": ["LaravelFrameworkIntegrationTest", "StagePlanResolverTest", "StagedUpgradeOrchestratorTest"], "handoff": "v0.4 Milestone2: deterministic arbitration and package-family collision evidence."}
+  ],
+  "feedback_review": {
+    "window_start": "2026-08-21",
+    "window_end": "2026-10-06",
+    "method": "Retrospective review of public monorepo issues and comments after the baseline release; no external solicitation.",
+    "observed_open_issue": 10,
+    "issue_disposition": "Release-announcement issue, no comments at review; not a reported Laravel regression.",
+    "limitation": "Absence of filed feedback is not proof of compatibility; pinned application evaluation and guide review provide separate evidence."
+  }
+}

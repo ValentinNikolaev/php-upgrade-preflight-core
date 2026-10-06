@@ -1,0 +1,1924 @@
+{
+  "schema_version": 1,
+  "reviewed_date": "2026-10-06",
+  "review_scope": "7->8, retained-direct7->9, adjacent8->9 and9->10. Upstream documents/manifests were read; application runtime upgrades were not executed.",
+  "baseline_report_schema": "0.8",
+  "implementation_status": "Candidate corrections with focused Docker regression evidence; publication/full gates tracked separately.",
+  "sources": [
+    {
+      "id": "guide-8",
+      "repository": "laravel/docs",
+      "commit": "13bfbca86689ae71739debd56e83ed6efc840ab2",
+      "url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md"
+    },
+    {
+      "id": "guide-9",
+      "repository": "laravel/docs",
+      "commit": "177c095cc802ea0a1fa5f765e870c2cccaae9aa2",
+      "url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md"
+    },
+    {
+      "id": "guide-10",
+      "repository": "laravel/docs",
+      "commit": "37e19ec52ec0894e9380fb57f3c5d0dd1f85872a",
+      "url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md"
+    },
+    {
+      "id": "framework-8",
+      "repository": "laravel/framework",
+      "commit": "43bea00fd27c76c01fd009e46725a54885f4d2a5",
+      "url": "https://github.com/laravel/framework/blob/43bea00fd27c76c01fd009e46725a54885f4d2a5/composer.json"
+    },
+    {
+      "id": "framework-9",
+      "repository": "laravel/framework",
+      "commit": "fbe7ed828819eadabb3cb9f95847a2ffe8846fd6",
+      "url": "https://github.com/laravel/framework/blob/fbe7ed828819eadabb3cb9f95847a2ffe8846fd6/composer.json"
+    },
+    {
+      "id": "framework-10",
+      "repository": "laravel/framework",
+      "commit": "61cad00bdaf0f710da070e1596c9ca6d567f4d12",
+      "url": "https://github.com/laravel/framework/blob/61cad00bdaf0f710da070e1596c9ca6d567f4d12/composer.json"
+    },
+    {
+      "id": "collision-6",
+      "repository": "nunomaduro/collision",
+      "commit": "f05978827b9343cba381ca05b8c7deee346b6015",
+      "url": "https://github.com/nunomaduro/collision/blob/f05978827b9343cba381ca05b8c7deee346b6015/composer.json"
+    },
+    {
+      "id": "socialite-5",
+      "repository": "laravel/socialite",
+      "commit": "fa0181ee6204ca28a55cd67145fadd631ac209cf",
+      "url": "https://github.com/laravel/socialite/blob/fa0181ee6204ca28a55cd67145fadd631ac209cf/composer.json"
+    },
+    {
+      "id": "vonage-3",
+      "repository": "laravel/vonage-notification-channel",
+      "commit": "1393b365b7b23d851e995e41d1047ab264c350cd",
+      "url": "https://github.com/laravel/vonage-notification-channel/blob/1393b365b7b23d851e995e41d1047ab264c350cd/UPGRADE.md"
+    }
+  ],
+  "guides": [
+    {
+      "target_major": 8,
+      "transitions": [
+        "7->8"
+      ],
+      "source_commit": "13bfbca86689ae71739debd56e83ed6efc840ab2",
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "coverage_items": [
+        {
+          "heading": "High Impact Changes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Medium Impact Changes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Upgrading To 8.0 From 7.x",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Collections",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Database",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Eloquent",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Events",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Framework",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Mail",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Pagination",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Queue",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Routing",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Scheduling",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Session",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Testing",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Validation",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Estimated Upgrade Time: 15 Minutes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Upstream estimate is not a project-specific effort guarantee.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "PHP 7.3.0 Required",
+          "classification": "implemented",
+          "rule_keys": [
+            "rule-php-constraint"
+          ],
+          "manual_verification_reason": "Target8 encodes ^7.3|^8.0; Composer proves platform requirements.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Updating Dependencies",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "rule-framework-constraint",
+            "rule-package-guzzle",
+            "rule-package-socialite",
+            "rule-package-facade-ignition",
+            "rule-package-laravel-ui",
+            "rule-package-collision",
+            "rule-package-phpunit",
+            "rule-package-horizon",
+            "rule-package-passport",
+            "rule-package-telescope"
+          ],
+          "manual_verification_reason": "Added Guzzle and Socialite. Guzzle uses framework-supported ^6.5.5|^7.0.1; globally installed installer is outside project scope. Review other third-party packages separately.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "The `isset` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test collections containing null and code relying on isset; element values are not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Seeder & Factory Namespaces",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review database/seeds, Database\\Seeders/Factories namespaces and Composer classmap/PSR4 mappings; legacy-factories changes the factory migration choice.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Model Factories",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review factory() definitions/calls; migrate to class factories or deliberately retain laravel/legacy-factories. Runtime registration is not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Castable` Interface",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review castUsing(array $arguments) in custom implementations; method signatures are not validated.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Increment / Decrement Events",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Run increment/decrement observer tests; emitted model events cannot be proved statically.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `EventServiceProvider` Class",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Inspect register overrides for parent::register and test event registration; control flow is not evaluated.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Dispatcher` Contract",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom listen signatures for optional listener; method variance is not analyzed.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Maintenance Mode Updates",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Optional pre-render support: inspect public/index.php for maintenance.php and exercise maintenance deployment. Retaining the skeleton is permitted.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `php artisan down --message` Option",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review deployment scripts for removed --message and use pre-rendered views; shell scripts are not PHP AST inputs.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `php artisan serve --no-reload` Option",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "New optional flag; no existing application migration.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Manager `$app` Property",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Manager subclasses using removed $app; migrate to $container. Runtime class hierarchy/property usage is not resolved.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `elixir` Helper",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "rule-removed-source-symbols-7-8"
+          ],
+          "manual_verification_reason": "Adapter-owned deprecated_asset_helper usage proves global, explicitly global or function-import-resolved elixir() identity before Mix replacement guidance; unused imports and custom namespaced functions do not produce this claim. Unresolved unqualified namespaced fallback requires manual function-identity review rather than a confirmed finding.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `sendNow` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Laravel Mailer sendNow calls and use send; arbitrary object methods do not prove Laravel receiver types.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Pagination Defaults",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Render pagination to confirm Tailwind or explicitly choose Paginator::useBootstrap; CSS choice is not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `retryAfter` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review job/mailer/notification/listener retryAfter declarations and use backoff; inherited queue context is not proved for arbitrary properties.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `timeoutAt` Property",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review queued-job/notification/listener timeoutAt and use retryUntil; lifecycle behavior requires tests.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `allOnQueue()` / `allOnConnection()` Methods",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review withChain paths and use onQueue/onConnection before dispatch. Old names remain valid with global dispatch; method-name-only detection is unsafe.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Failed Jobs Table Batch Support",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Optional batching: verify failed_jobs.uuid, queue.failed.driver=database-uuids and existing-data UUIDs on a disposable database; deployed schema/data are not inspected.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Automatic Controller Namespace Prefixing",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review RouteServiceProvider namespace only when replacing the skeleton; retained namespace commonly remains valid. Test routing/URL generation.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `cron-expression` Library",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Composer handles dragonmantank/cron-expression3; review direct calls against upstream changelog and run scheduling tests.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Session` Contract",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom Session implementations for pull($key,$default=null); interface completeness is not checked.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `decodeResponseJson` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review TestResponse calls with arguments and use json where appropriate; object receivers are not resolved.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `assertExactJson` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Run numeric-key/order assertions and consider assertSimilarJson; intended comparison semantics are not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Database Rule Connections",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test unique/exists rules on models with custom connections; actual database connection behavior is dynamic.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Miscellaneous",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Compare7.x/8.x skeleton changes selectively; optional synchronization is not a required migration.",
+          "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+          "heading_level": 3
+        }
+      ]
+    },
+    {
+      "target_major": 9,
+      "transitions": [
+        "8->9",
+        "retained-direct-7->9"
+      ],
+      "source_commit": "177c095cc802ea0a1fa5f765e870c2cccaae9aa2",
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "coverage_items": [
+        {
+          "heading": "High Impact Changes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Medium Impact Changes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Upgrading To 9.0 From 8.x",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Updating Dependencies",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Application",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Blade",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Collections",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Container",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Database",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Eloquent",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Encryption",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Facades",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Filesystem",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Flysystem 3.x",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Helpers",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "HTTP Client",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Symfony Mailer",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Packages",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Queue",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Session",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Testing",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Validation",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Estimated Upgrade Time: 30 Minutes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Upstream estimate does not replace report effort ranges.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "PHP 8.0.2 Required",
+          "classification": "implemented",
+          "rule_keys": [
+            "rule-php-constraint"
+          ],
+          "manual_verification_reason": "Target9 encodes ^8.0.2; Composer owns candidate proof.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Composer Dependencies",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "rule-framework-constraint",
+            "rule-package-collision",
+            "advisory-facade-ignition-7-9",
+            "rule-package-spatie-ignition-8-9",
+            "rule-package-pusher-8-9",
+            "advisory-nexmo-channel-7-9",
+            "rule-package-guzzle"
+          ],
+          "manual_verification_reason": "Added Nexmo-to-Vonage and Guzzle7 advice; corrected Pusher review range to ^5.0|^6.0|^7.0 using both the guide and exact framework manifest. Retained direct7->9 target guidance remains supported.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "PHP Return Types",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review overriding methods and SessionHandlerInterface implementations for required return types; signature compatibility is not checked.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Application` Contract",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom storagePath/langPath optional $path; container implementations are not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Exception Handler `ignore` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom handler ignore visibility and make public; override visibility is not analyzed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Exception Handler Contract Binding",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review bindings to Illuminate\\Contracts\\Debug\\ExceptionHandler; dynamic container resolution is not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Lazy Collections & The `$loop` Variable",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Render Blade LazyCollection loops and remove $loop dependence; template/runtime types are not resolved.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Checked / Disabled / Selected Blade Directives",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Vue @checked/@disabled/@selected collisions; use @@ escaping. Template compilation is not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Enumerable` Contract",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom implementations for sole; interface completeness is not checked.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `reduceWithKeys` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Laravel collection calls and use reduce; arbitrary method names do not prove receiver types.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `reduceMany` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Laravel collection calls and use reduceSpread; dynamic receiver types are not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Container` Contract",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom implementations for scoped/scopedIf; interface completeness is not checked.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `ContextualBindingBuilder` Contract",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom giveConfig($key,$default=null); method signatures are not analyzed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Postgres \"Schema\" Configuration",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review config/database.php PostgreSQL schema keys and rename search_path; imported/dynamic config is not evaluated.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Schema Builder `registerCustomDoctrineType` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Schema Builder calls and use DB::registerDoctrineType or database configuration; receiver resolution is not performed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Custom Casts & `null`",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Exercise cast set handlers with null; application value handling is not proved.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Belongs To Many `firstOrNew`, `firstOrCreate`, and `updateOrCreate` Methods",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test pivot-versus-related-table matching and second values arrays; behavior depends on schema/data.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `touch` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review overridden touch($attribute=null) signatures and test timestamp behavior.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The Encrypter Contract",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom implementations for getKey; interface completeness is not checked.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `getFacadeAccessor` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom facade return values and use binding strings; runtime container values are not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `FILESYSTEM_DRIVER` Environment Variable",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Optional skeleton rename FILESYSTEM_DISK; retained app can preserve existing wiring.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The \"Cloud\" Disk",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Default-skeleton removal does not require removing a working cloud disk.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Driver Prerequisites",
+          "parent_heading": "Flysystem 3.x",
+          "classification": "implemented",
+          "rule_keys": [
+            "rule-package-flysystem-s3-8-9",
+            "rule-package-flysystem-ftp-8-9",
+            "rule-package-flysystem-sftp-v3-8-9",
+            "advisory-flysystem-sftp-8-9"
+          ],
+          "manual_verification_reason": "^3.0/replacement advice for present adapters; missing runtime driver packages still need config review.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Overwriting Existing Files",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test Storage writes and explicit existence checks; remote disk state is not inspected.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Write Exceptions",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test failed writes and choose throw=true or false handling; driver failures are not simulated.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Reading Missing Files",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test FileNotFoundException expectations and handle null; remote file absence is not proved.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Deleting Missing Files",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test false-versus-true expectations for absent files; remote state is not proved.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Cached Adapters",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review league/flysystem-cached-adapter and disk cache keys; remove cached-adapter configuration and migrate caching.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Custom Filesystems",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Storage::extend callbacks for Illuminate\\Filesystem\\FilesystemAdapter results; callback/container execution is not performed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "SFTP Private-Public Key Passphrase",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review private-key password/passphrase config; environment-derived authentication context is not evaluated.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `data_get` Helper & Iterable Objects",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Expanded iterable support usually requires no migration; test custom iterables if relevant.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `str` Helper",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review global str definitions for helper collision; custom autoloaded definitions have no dedicated rule.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `when` / `unless` Methods",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test closures used as conditions; callback values and receiver types are not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Default Timeout",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test requests exceeding30seconds and set timeout explicitly; external latency is not modeled.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "HTTP Fake & Middleware",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Run fake-client tests with Guzzle middleware; side effects require application execution.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "HTTP Fake & Dependency Injection",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Run constructor-injected Factory tests with Http::fake; container wiring is not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Driver Prerequisites",
+          "parent_heading": "Symfony Mailer",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "advisory-swiftmailer-postmark-7-9"
+          ],
+          "manual_verification_reason": "Added present legacy Postmark replacement; absent Mailgun/Postmark transport/http-client dependencies remain config-aware review.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Updated Return Types",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Mailer send/html/raw/plain callers expecting void and inspect SentMessage interactions.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Renamed \"Swift\" Methods",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review withSwiftMessage/getSwiftMessage/getSwiftMailer/setSwiftMailer/createTransport calls/overrides against Symfony counterparts; dynamic callback/receiver types are not proved.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Proxied `Illuminate\\Mail\\Message` Methods",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Swift-specific fluent message APIs against Symfony Mime Email and send representative mail; proxy dispatch is dynamic.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Generated Messages IDs",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review mime.idgenerator.idright expectations and verify message IDs; transport generation is not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "`MessageSent` Event Changes",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review listeners for Symfony Email in message and SentMessage in sent; event payload usage is dynamic.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Forced Reconnections",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review daemon transport reconnection and recovery behavior; transports are not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "SMTP Stream Options",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review stream config and supported top-level Symfony transport options; dynamic config/endpoints require testing.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "SMTP `auth_mode`",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Authentication is negotiated; remove obsolete custom option only after testing SMTP.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Failed Recipients",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review failed-recipient retrieval and handle TransportExceptionInterface; validate addresses and exercise failed delivery.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `lang` Directory",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review publication destinations against app()->langPath; retaining resources/lang alone does not prove breakage.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `opis/closure` Library",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "rule-removed-source-symbols-8-9"
+          ],
+          "manual_verification_reason": "Added active exact Illuminate\\Queue\\SerializableClosureFactory/SerializableClosure reference detection with laravel/serializable-closure guidance. Direct opis/closure behavior and runtime serialized data still need manual review; imports alone are not findings.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The Failed Job Provider `flush` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review custom flush($hours=null) implementations and queue:flush behavior.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `getSession` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Store/null expectations versus SessionInterface/SessionNotFoundException; test absent-session requests.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `assertDeleted` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review test assertions and rename assertDeleted to assertModelMissing; no receiver-aware test-method rule.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Trusted Proxies",
+          "classification": "implemented",
+          "rule_keys": [
+            "advisory-fideloper-proxy-7-9",
+            "rule-skeleton"
+          ],
+          "manual_verification_reason": "Present package has removal/review advice. Source locations are low-confidence review references; review HEADER_X_FORWARDED_ALL and test proxy headers.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Form Request `validated` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review optional key/default override arguments and test derived requests.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `password` Rule",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review literal/dynamic rules and rename authenticated-current-password validation to current_password; arbitrary password strings do not prove rule use.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Unvalidated Array Keys",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test validated output and decide whether to opt into includeUnvalidatedArrayKeys; intended policy is application-specific.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Miscellaneous",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Compare8.x/9.x skeleton changes selectively; retaining a skeleton is not a required migration.",
+          "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+          "heading_level": 3
+        }
+      ]
+    },
+    {
+      "target_major": 10,
+      "transitions": [
+        "9->10"
+      ],
+      "source_commit": "37e19ec52ec0894e9380fb57f3c5d0dd1f85872a",
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "coverage_items": [
+        {
+          "heading": "High Impact Changes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Medium Impact Changes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Low Impact Changes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Upgrading to 10.0 from 9.x",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 2
+        },
+        {
+          "heading": "Updating Dependencies",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Application",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Authorization",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Cache",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Database",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Eloquent",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Localization",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Logging",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Queues",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Routing",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Testing",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Validation",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Organizational/navigation heading; its child items carry dispositions.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Estimated Upgrade Time: 10 Minutes",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Upstream estimate does not prove project-specific effort.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "PHP 8.1.0 Required",
+          "classification": "implemented",
+          "rule_keys": [
+            "rule-php-constraint"
+          ],
+          "manual_verification_reason": "Target10 encodes ^8.1; Composer proves exact platform compatibility.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Composer 2.2.0 Required",
+          "classification": "implemented",
+          "rule_keys": [
+            "rule-composer-version-9-10"
+          ],
+          "manual_verification_reason": "Composer probe checks minimum2.2 during transition guidance.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Composer Dependencies",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "rule-framework-constraint",
+            "rule-package-sanctum-9-10",
+            "rule-package-dbal-9-10",
+            "rule-package-ignition-9-10",
+            "rule-package-passport-9-10",
+            "rule-package-ui-9-10",
+            "rule-package-phpunit-9-10",
+            "rule-package-collision-9-10"
+          ],
+          "manual_verification_reason": "PHPUnit10/collision7 are optional. Corrected to ^9.5.8|^10.0.7 and ^6.1|^7.0; choosing PHPUnit10 also requires manual phpunit.xml processUncoveredFiles review.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Minimum Stability",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review minimum-stability/prefer-stable and use stable/remove setting where appropriate; solving cannot justify silently changing project policy.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Public Path Binding",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review path.public container bindings and use Application::usePublicPath; dynamic bindings are not executed.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `registerPolicies` Method",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "Framework calls it automatically; removing existing call is optional cleanup.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        },
+        {
+          "heading": "Redis Cache Tags",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Cache::tags with Redis and test tag behavior; guide now references Laravel12.30 restoration. Runtime driver identity is not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Database Expressions",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Expression casts/__toString and use getValue(Grammar); receiver types are not resolved.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Query Exception Constructor",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review direct QueryException construction for connection-name first argument; inventory records class references without arity semantics.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "ULID Columns",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review ulid() migrations without explicit column names; confirm intended uuid/ulid schema on disposable database.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Model \"Dates\" Property",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review Eloquent dates properties and use casts; runtime hierarchy/trait model semantics are not validated.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The Language Directory",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "New skeleton omits lang; existing directories need no compulsory removal/move.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Monolog 3",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Composer proves Monolog3 resolution; review direct handlers and BugSnag/Rollbar integrations against their guides and test runtime logging.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Bus::dispatchNow` Method",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "rule-high-signal-source-9-10"
+          ],
+          "manual_verification_reason": "Existing dispatchSync/dispatch_sync advice retained; visitor now excludes unrelated Vendor\\Facades\\Bus.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `dispatch()` Helper Return Value",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test non-queued class dispatch and use dispatch_sync for handle return values; return expectations/interfaces are not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Middleware Aliases",
+          "classification": "not-applicable",
+          "rule_keys": [],
+          "manual_verification_reason": "routeMiddleware rename to middlewareAliases is optional; retained property is supported.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Rate Limiter Return Values",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test RateLimiter::attempt callback return-value callers; values/intent are not proved.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "The `Redirect::home` Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review canonical Laravel Redirect::home calls and use named routes; no method-sensitive dedicated rule.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Service Mocking",
+          "classification": "patch-correction",
+          "rule_keys": [
+            "rule-removed-source-symbols-9-10"
+          ],
+          "manual_verification_reason": "Added exact removed MocksApplicationServices trait-use detection with Event/Bus/Notification fake guidance; unused imports and unrelated short trait names do not produce findings. Arbitrary expectsEvents/Jobs/Notifications calls still need receiver-aware manual review.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Closure Validation Rule Messages",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Test repeated fail callbacks and explicit closure return types; callback result semantics are not inferred.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Validation Messages and Closure Rules",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review fail(array) and use key/message arguments; callback identity/result handling is not resolved.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Form Request After Method",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Review FormRequest after overrides against reserved after-validation hook; inherited callback semantics are not validated.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 4
+        },
+        {
+          "heading": "Miscellaneous",
+          "classification": "manual-review",
+          "rule_keys": [],
+          "manual_verification_reason": "Select relevant9.x/10.x skeleton changes; native type adoption is optional.",
+          "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+          "heading_level": 3
+        }
+      ]
+    }
+  ],
+  "package_inventory": [
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "guzzlehttp/guzzle",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-package-guzzle"
+      ],
+      "disposition": "^6.5.5|^7.0.1 preserves framework-supported6.x."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "facade/ignition",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-facade-ignition"
+      ],
+      "disposition": ">=2.3.6<3 guidance."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/framework",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-framework-constraint"
+      ],
+      "disposition": "^8.0; Composer platform proof."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/ui",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-laravel-ui"
+      ],
+      "disposition": "^3.0 guidance for Laravel8 is retained. Separate manifest-backed Laravel9 review accepts UI ^3.4|^4.0; see the target9 UI inventory row."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/ui/blob/b3e804559bf3973ecca160a4ae1068e6c7c167c6/composer.json",
+      "package": "laravel/ui",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-package-laravel-ui"
+      ],
+      "reviewed_package_manifests": [
+        "https://github.com/laravel/ui/blob/b3e804559bf3973ecca160a4ae1068e6c7c167c6/composer.json",
+        "https://github.com/laravel/ui/blob/65ec5c03f7fee2c8ecae785795b829a15be48c2c/composer.json",
+        "https://github.com/laravel/ui/blob/e6291e8083cb5255511eacd6da0ec078210beabd/composer.json"
+      ],
+      "disposition": "Corrected target9 review range to ^3.4|^4.0. UI3.4.0 and3.4.6 explicitly accept Illuminate9; UI3.3.0 does not. Manifest-backed alternatives work with missing lock requirements without changing metadata-preference policy or mandatory package migrations. Laravel10 UI^4 guidance stays separate.",
+      "application_regression": {
+        "repository": "https://github.com/crater-invoice-inc/crater",
+        "commit": "05d5ce26fdd8d9466009163444e944259bc0cc2a",
+        "locked_framework": "8.83.16",
+        "locked_package": "3.4.6",
+        "locked_source": "65ec5c03f7fee2c8ecae785795b829a15be48c2c",
+        "target_major": 9,
+        "expected_ui_version_finding": false,
+        "manual_verification": "Solve the full application dependencies and test generated auth/bootstrap code; accepted package review evidence does not certify runtime compatibility."
+      }
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "nunomaduro/collision",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-collision"
+      ],
+      "disposition": "^5.0 guidance."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "phpunit/phpunit",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-phpunit"
+      ],
+      "disposition": "Guide-recommended9.x; XML/test semantics manual."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/horizon",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-horizon"
+      ],
+      "disposition": "^5.0; prefer exact locked framework requirements."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/passport",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-passport"
+      ],
+      "disposition": "^10.0; prefer locked framework requirements."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/socialite",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-package-socialite"
+      ],
+      "disposition": "Added5.x; prefer locked framework requirements."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/telescope",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-telescope"
+      ],
+      "disposition": "^4.0; prefer locked requirements."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/installer",
+      "classification": "not-applicable",
+      "rule_keys": [],
+      "disposition": "Global development tool outside project dependency graph."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "laravel/legacy-factories",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Optional compatibility choice; do not require class factories automatically."
+    },
+    {
+      "guide_target_major": 8,
+      "source_url": "https://github.com/laravel/docs/blob/13bfbca86689ae71739debd56e83ed6efc840ab2/upgrade.md",
+      "package": "dragonmantank/cron-expression",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Composer3.x; review direct library calls."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "laravel/framework",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-framework-constraint"
+      ],
+      "disposition": "^9.0; PHP^8.0.2."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "nunomaduro/collision",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-collision"
+      ],
+      "disposition": "^6.1 target fallback."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "facade/ignition",
+      "classification": "implemented",
+      "rule_keys": [
+        "advisory-facade-ignition-7-9"
+      ],
+      "disposition": "Replace with spatie/laravel-ignition."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "spatie/laravel-ignition",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-spatie-ignition-8-9"
+      ],
+      "disposition": "^1.0 present-package range."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "pusher/pusher-php-server",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-package-pusher-8-9"
+      ],
+      "disposition": "Corrected guide-only5.x review range to ^5.0|^6.0|^7.0; framework manifest proves6/7 are supported. Runtime broadcasting remains manual."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "laravel/nexmo-notification-channel",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "advisory-nexmo-channel-7-9"
+      ],
+      "disposition": "Replace with Vonage^3.0; API/config manual."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "laravel/vonage-notification-channel",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "advisory-nexmo-channel-7-9"
+      ],
+      "disposition": "Replacement named; newer installed versions Composer-authoritative."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "league/flysystem",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Composer-required3.x; disk behavior/custom drivers need tests."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "league/flysystem-aws-s3-v3",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-flysystem-s3-8-9"
+      ],
+      "disposition": "^3.0."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "league/flysystem-ftp",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-flysystem-ftp-8-9"
+      ],
+      "disposition": "^3.0."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "league/flysystem-sftp-v3",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-flysystem-sftp-v3-8-9"
+      ],
+      "disposition": "^3.0."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "league/flysystem-sftp",
+      "classification": "implemented",
+      "rule_keys": [
+        "advisory-flysystem-sftp-8-9"
+      ],
+      "disposition": "Replace legacy adapter; authentication manual."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "league/flysystem-cached-adapter",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Remove unsupported cached-adapter config; review direct caching use."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "symfony/mailgun-mailer",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Required for actual Mailgun usage; present package does not prove active driver."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "symfony/http-client",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-symfony-constraint"
+      ],
+      "disposition": "Root component range checked; absent transport dependency remains manual."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "wildbit/swiftmailer-postmark",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "advisory-swiftmailer-postmark-7-9"
+      ],
+      "disposition": "Replace with Symfony Postmark/HTTP client."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "symfony/postmark-mailer",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "advisory-swiftmailer-postmark-7-9"
+      ],
+      "disposition": "Replacement named; config remains manual."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "swiftmailer/swiftmailer",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Direct/custom usage needs API migration; transitive removal alone is not incompatibility."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "opis/closure",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Review direct users; transitive lock diff handled by Composer."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "laravel/serializable-closure",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-removed-source-symbols-8-9"
+      ],
+      "disposition": "Replacement guidance for exact active removed queue closure classes; serialized payload behavior still needs application tests."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "fideloper/proxy",
+      "classification": "implemented",
+      "rule_keys": [
+        "advisory-fideloper-proxy-7-9"
+      ],
+      "disposition": "Removal plus inheritance/header review."
+    },
+    {
+      "guide_target_major": 9,
+      "source_url": "https://github.com/laravel/docs/blob/177c095cc802ea0a1fa5f765e870c2cccaae9aa2/upgrade.md",
+      "package": "guzzlehttp/guzzle",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-package-guzzle"
+      ],
+      "disposition": "Framework9.0 suggests^7.2; later exact framework suggests may be stricter."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "laravel/framework",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-framework-constraint"
+      ],
+      "disposition": "^10.0; PHP^8.1, Composer>=2.2."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "laravel/sanctum",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-sanctum-9-10"
+      ],
+      "disposition": "^3.2; own upgrade guide manual."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "doctrine/dbal",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-dbal-9-10"
+      ],
+      "disposition": "Guide^3.0; exact newer manifest may require3.5.1 for schema operations."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "spatie/laravel-ignition",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-ignition-9-10"
+      ],
+      "disposition": "^2.0."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "laravel/passport",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-passport-9-10"
+      ],
+      "disposition": "^11.0; own guide manual."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "laravel/ui",
+      "classification": "implemented",
+      "rule_keys": [
+        "rule-package-ui-9-10"
+      ],
+      "disposition": "^4.0."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "nunomaduro/collision",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-package-collision-9-10"
+      ],
+      "disposition": "Retain6.x with PHPUnit9;7.x optional PHPUnit10 companion."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "phpunit/phpunit",
+      "classification": "patch-correction",
+      "rule_keys": [
+        "rule-package-phpunit-9-10"
+      ],
+      "disposition": "Retain9.5.8+; optional10.0.7+ and XML migration."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "monolog/monolog",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Composer3.x; direct API/handler tests."
+    },
+    {
+      "guide_target_major": 10,
+      "source_url": "https://github.com/laravel/docs/blob/37e19ec52ec0894e9380fb57f3c5d0dd1f85872a/upgrade.md",
+      "package": "BugSnag / Rollbar (vendor mentions; exact Composer package unspecified)",
+      "classification": "manual-review",
+      "rule_keys": [],
+      "disposition": "Record actual rooted vendor package from corpus before making a package/version claim."
+    }
+  ],
+  "constraints": [
+    "Manual-review does not claim runtime checks or implementation. Each row names work the reader still must verify.",
+    "Historical fixtures and signed schemas remain immutable; newly corrected guidance pins reviewed upstream sources.",
+    "Same-major guidance, Illuminate-only/mixed-target staging, schema0.9 and dynamic/container execution remain outside this patch scope."
+  ],
+  "verification": {
+    "heading_coverage": "Pinned guide heading multiset compared to ledger:8.x44/44,9.x79/79,10.x40/40; both duplicate Driver Prerequisites headings retain parent context.",
+    "package_regressions": "Initial25cases:11 intended assertion failures; final29cases green including added Pusher6/7 false-positive regression.",
+    "source_regressions": "Legacy exact-symbol source tests shared with modern audit:27cases109assertions green after7 observed red assertions.",
+    "runtime_claim": "No application runtime upgrade, deployment, transport, or database verification was executed by this audit."
+  }
+}

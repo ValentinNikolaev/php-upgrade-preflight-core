@@ -15,15 +15,13 @@ use PhpUpgradePreflight\Core\Model\StageBlockerEntry;
  * earlier identity, and an attempt that produced feasibility evidence resolves
  * the entries it no longer reports.
  *
- * Insertion order is the serialized order of the report's blocker registry, so
- * entries are keyed by identity and their first-seen order is tracked separately.
+ * Insertion order is the serialized order of the report's blocker registry.
+ * Entries are keyed by identity, preserving their first-seen order.
  */
 final class StageBlockerRegistry
 {
     /** @var array<string, StageBlockerEntry> */
     private array $entries = [];
-    /** @var list<string> */
-    private array $order = [];
 
     /**
      * @param list<Blocker> $blockers
@@ -66,7 +64,6 @@ final class StageBlockerRegistry
             }
 
             $this->entries[$identity] = $candidate;
-            $this->order[] = $identity;
         }
 
         if ($attemptProducedFeasibilityEvidence) {
@@ -108,9 +105,6 @@ final class StageBlockerRegistry
     /** @return list<StageBlockerEntry> */
     public function ordered(): array
     {
-        return array_map(
-            fn (string $identity): StageBlockerEntry => $this->entries[$identity],
-            $this->order
-        );
+        return array_values($this->entries);
     }
 }

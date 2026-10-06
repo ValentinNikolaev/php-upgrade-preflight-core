@@ -4,6 +4,8 @@ This document records the approved Laravel transition rule packs for v0.2.0. The
 
 The machine-readable decision and its exact upstream evidence are in [`laravel-v0.2-transition-matrix.json`](../tests/fixtures/contracts/laravel-v0.2-transition-matrix.json). Every reviewed upstream file is pinned to the official Git commit observed on 2026-08-08 so later branch edits cannot silently change the basis for this scope.
 
+The [v0.3 completion review](laravel-coverage/README.md) supplements this historical decision with full guide accounting, corrected package ranges and source advice, and explicit manual checks. The table below records the original application skeletons, not mandatory upgrade requirements; it is not the current package-review range catalog.
+
 ## Approved matrix
 
 | Source | Target | Target constraint | Minimum target PHP | v0.2 decision          |

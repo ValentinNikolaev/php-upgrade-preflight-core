@@ -28,9 +28,16 @@ final class FrameworkRuleEngine
         $this->frameworks = array_values($frameworks);
     }
 
-    /** @return list<FrameworkIntegration> */
-    public function activeIntegrations(ProjectState $project, UpgradeRequest $request): array
-    {
+    /**
+     * @param list<string> $uncertainties
+     * @return list<FrameworkIntegration>
+     */
+    public function activeIntegrations(
+        ProjectState $project,
+        UpgradeRequest $request,
+        ?EvidenceLedger $evidence = null,
+        array &$uncertainties = []
+    ): array {
         $requested = array_values(array_unique(array_map('strtolower', $request->frameworks())));
         $available = array_map(static fn (FrameworkIntegration $framework): string => strtolower($framework->name()), $this->frameworks);
         $unavailable = array_values(array_diff($requested, $available));
@@ -50,24 +57,58 @@ final class FrameworkRuleEngine
                 continue;
             }
 
-            if ($requested !== [] || $framework->detect($project)->isDetected()) {
+            if ($requested !== []) {
                 $active[] = $framework;
+                continue;
+            }
+
+            try {
+                if ($framework->detect($project)->isDetected()) {
+                    $active[] = $framework;
+                }
+            } catch (\Throwable $exception) {
+                $uncertainties[] = $this->recordCapabilityFailure(
+                    $framework,
+                    'detection_failure',
+                    'detection',
+                    $exception,
+                    $evidence
+                );
             }
         }
 
         return $active;
     }
 
-    /** @param list<FrameworkIntegration> $frameworks @return list<string> */
-    public function sourcePaths(ProjectState $project, UpgradeRequest $request, array $frameworks): array
-    {
+    /**
+     * @param list<FrameworkIntegration> $frameworks
+     * @param list<string> $uncertainties
+     * @return list<string>
+     */
+    public function sourcePaths(
+        ProjectState $project,
+        UpgradeRequest $request,
+        array $frameworks,
+        ?EvidenceLedger $evidence = null,
+        array &$uncertainties = []
+    ): array {
         if ($request->sourcePaths() !== []) {
             return $request->sourcePaths();
         }
 
         $paths = [];
         foreach ($frameworks as $framework) {
-            $paths = array_merge($paths, $framework->defaultSourcePaths($project));
+            try {
+                $paths = array_merge($paths, $framework->defaultSourcePaths($project));
+            } catch (\Throwable $exception) {
+                $uncertainties[] = $this->recordCapabilityFailure(
+                    $framework,
+                    'source_paths_failure',
+                    'default source paths',
+                    $exception,
+                    $evidence
+                );
+            }
         }
 
         return $paths !== [] ? array_values(array_unique($paths)) : ['src', 'app', 'config', 'routes', 'tests'];
@@ -87,21 +128,35 @@ final class FrameworkRuleEngine
 
     /**
      * @param list<FrameworkIntegration> $frameworks
+     * @param list<string> $uncertainties
      * @return list<FrameworkGuidance>
      */
     public function assessTransitions(
         array $frameworks,
         ProjectState $project,
         UpgradeRequest $request,
-        EvidenceLedger $evidence
+        EvidenceLedger $evidence,
+        array &$uncertainties = []
     ): array {
         $guidance = [];
 
         foreach ($frameworks as $framework) {
             if ($framework instanceof FrameworkTransitionProvider) {
-                $assessment = $framework->assessTransition($project, $request, $evidence);
-                if ($assessment !== null) {
-                    $guidance[] = $assessment;
+                $evidenceBefore = $this->registeredEvidenceIds($evidence);
+                try {
+                    $assessment = $framework->assessTransition($project, $request, $evidence);
+                    if ($assessment !== null) {
+                        $guidance[] = $assessment;
+                    }
+                } catch (\Throwable $exception) {
+                    $uncertainties[] = $this->recordCapabilityFailure(
+                        $framework,
+                        'transition_assessment_failure',
+                        'transition guidance',
+                        $exception,
+                        $evidence,
+                        $evidenceBefore
+                    );
                 }
             }
         }
@@ -293,6 +348,41 @@ final class FrameworkRuleEngine
             $framework->name(),
             $rule,
             $references
+        );
+    }
+
+    /** @param array<string, true>|null $evidenceBefore */
+    private function recordCapabilityFailure(
+        FrameworkIntegration $framework,
+        string $reason,
+        string $contribution,
+        \Throwable $exception,
+        ?EvidenceLedger $evidence,
+        ?array $evidenceBefore = null
+    ): string {
+        $references = [];
+        if ($evidence !== null) {
+            $references = $evidenceBefore === null
+                ? []
+                : $this->newEvidenceReferences($evidence, $evidenceBefore);
+            $references[] = $evidence->add(
+                'framework-adapter',
+                Evidence::E2_PACKAGE_METADATA,
+                sprintf('A framework adapter failed while contributing %s.', $contribution),
+                'high',
+                [
+                    'framework' => $framework->name(),
+                    'reason' => $reason,
+                    'error' => $exception->getMessage(),
+                ]
+            )->id();
+        }
+
+        return sprintf(
+            'Framework adapter "%s" failed while contributing %s, so that contribution is missing%s.',
+            $framework->name(),
+            $contribution,
+            $references === [] ? '' : ' (' . implode(', ', $references) . ')'
         );
     }
 

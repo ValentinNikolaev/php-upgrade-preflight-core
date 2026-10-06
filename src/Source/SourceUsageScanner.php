@@ -24,10 +24,17 @@ final class SourceUsageScanner
     private const MAX_CANONICAL_PATH_EXPANSIONS = 64;
 
     private Parser $parser;
+    private SourceScanLimits $limits;
 
-    public function __construct(?Parser $parser = null)
+    public function __construct(?Parser $parser = null, ?SourceScanLimits $limits = null)
     {
         $this->parser = $parser ?? $this->createParser();
+        $this->limits = $limits ?? new SourceScanLimits();
+    }
+
+    public function limits(): SourceScanLimits
+    {
+        return $this->limits;
     }
 
     /**
@@ -38,6 +45,7 @@ final class SourceUsageScanner
      *                                               framework-shaped inspection to every scanned file.
      *                                               An integration that fails is skipped with evidence
      *                                               instead of ending the scan
+     * @param array<string, string> $readDigests hashes of the exact bytes parsed, keyed by selected file path
      * @return list<SourceUsage>
      */
     public function scan(
@@ -46,27 +54,55 @@ final class SourceUsageScanner
         EvidenceLedger $evidence,
         array &$uncertainties = [],
         bool $reportMissingPaths = true,
-        array $frameworks = []
+        array $frameworks = [],
+        array &$readDigests = []
     ): array {
         $usages = [];
         /** @var array<string, int> $usageIndexes */
         $usageIndexes = [];
         /** @var array<string, true> $skippedProviders */
         $skippedProviders = [];
-        $files = $this->phpFiles($project->path(), $paths, $uncertainties, $reportMissingPaths);
+        /** @var array<string, true> $omittedUsageKeys */
+        $omittedUsageKeys = [];
+        $omittedOversizedFiles = 0;
+        $omittedAggregateFiles = 0;
+        $totalBytes = 0;
+        $files = $this->selectedPhpFiles($project, $paths, $uncertainties, $reportMissingPaths, $evidence);
 
         if ($files === []) {
             $uncertainties[] = 'No PHP source files were scanned.';
         }
 
         foreach ($files as $file) {
-            $contents = @file_get_contents($file);
+            $remainingBytes = $this->limits->maxTotalBytes() - $totalBytes;
+            if ($remainingBytes < 1) {
+                ++$omittedAggregateFiles;
+                continue;
+            }
+
+            $readLimit = min($this->limits->maxFileBytes(), $remainingBytes);
+            $handle = @fopen($file, 'rb');
+            $contents = $handle === false ? false : stream_get_contents($handle, $readLimit + 1);
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
             if ($contents === false) {
                 $uncertainties[] = sprintf('Source file "%s" could not be read and was not scanned.', $this->relativePath($project->path(), $file));
                 continue;
             }
 
+            $totalBytes += strlen($contents);
+            if (strlen($contents) > $readLimit) {
+                if ($readLimit === $remainingBytes && $remainingBytes < $this->limits->maxFileBytes()) {
+                    ++$omittedAggregateFiles;
+                } else {
+                    ++$omittedOversizedFiles;
+                }
+                continue;
+            }
+
             $relative = $this->relativePath($project->path(), $file);
+            $readDigests[$file] = hash('sha256', $contents);
             /** @var list<array{provider: string, reason: string}> $providerFailures */
             $providerFailures = [];
 
@@ -109,18 +145,23 @@ final class SourceUsageScanner
             }
 
             foreach ($detectedUsages as $detectedUsage) {
-                $id = $evidence->add('source', Evidence::E3_PROJECT_SOURCE, sprintf('Detected %s in %s.', $detectedUsage['symbol'], $relative), 'high', [
-                    'file' => $relative,
-                    'line' => $detectedUsage['line'],
-                    'usage_type' => $detectedUsage['usage_type'],
-                ])->id();
-
                 $usageKey = serialize([
                     $relative,
                     $detectedUsage['symbol'],
                     $detectedUsage['usage_type'],
                     $detectedUsage['line'],
                 ]);
+                if (!isset($usageIndexes[$usageKey]) && count($usages) >= $this->limits->maxUsages()) {
+                    $omittedUsageKeys[$usageKey] = true;
+                    continue;
+                }
+
+                $id = $evidence->add('source', Evidence::E3_PROJECT_SOURCE, sprintf('Detected %s in %s.', $detectedUsage['symbol'], $relative), 'high', [
+                    'file' => $relative,
+                    'line' => $detectedUsage['line'],
+                    'usage_type' => $detectedUsage['usage_type'],
+                ])->id();
+
                 if (isset($usageIndexes[$usageKey])) {
                     $index = $usageIndexes[$usageKey];
                     $usages[$index] = $usages[$index]->withAdditionalEvidence([$id]);
@@ -139,9 +180,103 @@ final class SourceUsageScanner
             }
         }
 
+        if ($omittedOversizedFiles > 0) {
+            $this->reportLimit(
+                $evidence,
+                $uncertainties,
+                'file_bytes',
+                $this->limits->maxFileBytes(),
+                $omittedOversizedFiles,
+                sprintf(
+                    'Source scanning reached the %d-byte per-file byte limit; %d file(s) were not scanned.',
+                    $this->limits->maxFileBytes(),
+                    $omittedOversizedFiles
+                )
+            );
+        }
+        if ($omittedAggregateFiles > 0) {
+            $this->reportLimit(
+                $evidence,
+                $uncertainties,
+                'total_bytes',
+                $this->limits->maxTotalBytes(),
+                $omittedAggregateFiles,
+                sprintf(
+                    'Source scanning reached the %d-byte aggregate byte limit; %d file(s) were not scanned.',
+                    $this->limits->maxTotalBytes(),
+                    $omittedAggregateFiles
+                )
+            );
+        }
+        if ($omittedUsageKeys !== []) {
+            $this->reportLimit(
+                $evidence,
+                $uncertainties,
+                'usage_count',
+                $this->limits->maxUsages(),
+                count($omittedUsageKeys),
+                sprintf(
+                    'Source scanning reached the %d-usage safety limit; %d additional unique usage(s) were omitted.',
+                    $this->limits->maxUsages(),
+                    count($omittedUsageKeys)
+                )
+            );
+        }
+
         $uncertainties = array_values(array_unique($uncertainties));
 
         return array_values($usages);
+    }
+
+    /**
+     * Shares the scan's exact path selection with input-consistency checks.
+     *
+     * @param list<string> $paths
+     * @param list<string> $uncertainties
+     * @return list<string>
+     */
+    public function selectedPhpFiles(
+        ProjectState $project,
+        array $paths,
+        array &$uncertainties = [],
+        bool $reportMissingPaths = true,
+        ?EvidenceLedger $evidence = null
+    ): array {
+        $files = $this->phpFiles($project->path(), $paths, $uncertainties, $reportMissingPaths);
+        $omitted = count($files) - $this->limits->maxFiles();
+        if ($omitted <= 0) {
+            return $files;
+        }
+
+        $message = sprintf(
+            'Source scanning reached the %d-file safety limit; %d additional PHP file(s) were omitted.',
+            $this->limits->maxFiles(),
+            $omitted
+        );
+        if ($evidence === null) {
+            $uncertainties[] = $message;
+        } else {
+            $this->reportLimit($evidence, $uncertainties, 'file_count', $this->limits->maxFiles(), $omitted, $message);
+        }
+
+        return array_slice($files, 0, $this->limits->maxFiles());
+    }
+
+    /** @param list<string> $uncertainties */
+    private function reportLimit(
+        EvidenceLedger $evidence,
+        array &$uncertainties,
+        string $type,
+        int $limit,
+        int $omitted,
+        string $message
+    ): void {
+        $id = $evidence->add('source-limit', Evidence::E3_PROJECT_SOURCE, 'Source scan output was bounded by an operational safety limit.', 'high', [
+            'limit_type' => $type,
+            'limit' => $limit,
+            'omitted_count' => $omitted,
+        ])->id();
+        $uncertainties[] = sprintf('%s (%s)', $message, $id);
     }
 
     /**

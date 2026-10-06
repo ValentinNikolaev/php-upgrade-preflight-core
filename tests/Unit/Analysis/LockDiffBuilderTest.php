@@ -7,6 +7,7 @@ namespace PhpUpgradePreflight\Core\Tests\Unit\Analysis;
 use PhpUpgradePreflight\Core\Analysis\LockDiffBuilder;
 use PhpUpgradePreflight\Core\Framework\PackageFamilyClassifier;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
+use PhpUpgradePreflight\Core\Model\EvidenceLedger;
 use PHPUnit\Framework\TestCase;
 
 final class LockDiffBuilderTest extends TestCase
@@ -222,6 +223,37 @@ final class LockDiffBuilderTest extends TestCase
         self::assertSame(['alpha', 'shared', 'zeta'], $changes[1]->packageFamilies());
     }
 
+    public function testFailingClassifierIsDisabledForThisDiffAndHealthyFamiliesRemain(): void
+    {
+        $before = $this->lock([
+            ['name' => 'vendor/alpha', 'version' => '1.0.0'],
+            ['name' => 'vendor/beta', 'version' => '1.0.0'],
+        ]);
+        $after = $this->lock([
+            ['name' => 'vendor/alpha', 'version' => '2.0.0'],
+            ['name' => 'vendor/beta', 'version' => '2.0.0'],
+        ]);
+        $broken = new FixtureThrowingPackageFamilyClassifier();
+        $healthy = new FixturePackageFamilyClassifier([
+            'vendor/alpha' => ['healthy'],
+            'vendor/beta' => ['healthy'],
+        ]);
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        $changes = (new LockDiffBuilder())->build($before, $after, [$broken, $healthy], $evidence, $uncertainties)
+            ->packageChanges();
+
+        self::assertCount(2, $changes);
+        self::assertSame(['healthy'], $changes[0]->packageFamilies());
+        self::assertSame(['healthy'], $changes[1]->packageFamilies());
+        self::assertSame(1, $broken->calls);
+        self::assertCount(1, $uncertainties);
+        self::assertStringContainsString('framework-adapter-1', $uncertainties[0]);
+        self::assertSame('package_family_failure', $evidence->all()[0]->context()['reason']);
+        $evidence->validateReferences(['framework-adapter-1']);
+    }
+
     /**
      * @param list<array<string, mixed>> $packages
      * @param list<string> $directPackageNames
@@ -246,5 +278,17 @@ final class FixturePackageFamilyClassifier implements PackageFamilyClassifier
     public function packageFamilies(string $packageName): array
     {
         return $this->families[$packageName] ?? [];
+    }
+}
+
+final class FixtureThrowingPackageFamilyClassifier implements PackageFamilyClassifier
+{
+    public int $calls = 0;
+
+    public function packageFamilies(string $packageName): array
+    {
+        ++$this->calls;
+
+        throw new \RuntimeException('classification failed');
     }
 }

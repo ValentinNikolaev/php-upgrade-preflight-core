@@ -8,11 +8,13 @@ use PhpUpgradePreflight\Core\Analysis\FrameworkRuleEngine;
 use PhpUpgradePreflight\Core\Framework\CompatibilityRule;
 use PhpUpgradePreflight\Core\Framework\FrameworkDetection;
 use PhpUpgradePreflight\Core\Framework\FrameworkIntegration;
+use PhpUpgradePreflight\Core\Framework\FrameworkTransitionProvider;
 use PhpUpgradePreflight\Core\Model\CompatibilityFinding;
 use PhpUpgradePreflight\Core\Model\ComposerJson;
 use PhpUpgradePreflight\Core\Model\ComposerLock;
 use PhpUpgradePreflight\Core\Model\Evidence;
 use PhpUpgradePreflight\Core\Model\EvidenceLedger;
+use PhpUpgradePreflight\Core\Model\FrameworkGuidance;
 use PhpUpgradePreflight\Core\Model\ProjectState;
 use PhpUpgradePreflight\Core\Model\UpgradeRequest;
 use PhpUpgradePreflight\Core\Model\UpgradeTarget;
@@ -79,6 +81,64 @@ final class FrameworkRuleEngineTest extends TestCase
         $this->expectExceptionMessage('missing');
 
         (new FrameworkRuleEngine())->activeIntegrations($this->project(), $this->request(['missing']));
+    }
+
+    public function testFailingDetectionSkipsOnlyThatAdapterAndRecordsUncertainty(): void
+    {
+        $broken = new FixtureFailingCapabilityIntegration('broken', 'detect');
+        $healthy = new FixtureFrameworkIntegration('healthy', true, ['app'], []);
+        $engine = new FrameworkRuleEngine([$broken, $healthy]);
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        $active = $engine->activeIntegrations($this->project(), $this->request(), $evidence, $uncertainties);
+
+        self::assertSame([$healthy], $active);
+        self::assertSame('detection_failure', $this->evidenceContext($evidence, 'framework-adapter-1')['reason']);
+        $this->assertNoOrphanedEvidence($evidence, [], $uncertainties);
+    }
+
+    public function testFailingDefaultPathsUseHealthyPathsOrGenericFallback(): void
+    {
+        $broken = new FixtureFailingCapabilityIntegration('broken', 'paths');
+        $healthy = new FixtureFrameworkIntegration('healthy', true, ['custom'], []);
+        $engine = new FrameworkRuleEngine([$broken, $healthy]);
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        self::assertSame(
+            ['custom'],
+            $engine->sourcePaths($this->project(), $this->request(), [$broken, $healthy], $evidence, $uncertainties)
+        );
+        self::assertSame('source_paths_failure', $this->evidenceContext($evidence, 'framework-adapter-1')['reason']);
+        $this->assertNoOrphanedEvidence($evidence, [], $uncertainties);
+
+        $fallbackEvidence = new EvidenceLedger();
+        $fallbackUncertainties = [];
+        self::assertSame(
+            ['src', 'app', 'config', 'routes', 'tests'],
+            $engine->sourcePaths($this->project(), $this->request(), [$broken], $fallbackEvidence, $fallbackUncertainties)
+        );
+        $this->assertNoOrphanedEvidence($fallbackEvidence, [], $fallbackUncertainties);
+    }
+
+    public function testFailingTransitionAssessmentOmitsItsGuidanceAndReferencesPartialEvidence(): void
+    {
+        $broken = new FixtureFailingCapabilityIntegration('broken', 'transition');
+        $engine = new FrameworkRuleEngine([$broken]);
+        $evidence = new EvidenceLedger();
+        $uncertainties = [];
+
+        self::assertSame([], $engine->assessTransitions(
+            [$broken],
+            $this->project(),
+            $this->request(),
+            $evidence,
+            $uncertainties
+        ));
+        self::assertSame('transition_assessment_failure', $this->evidenceContext($evidence, 'framework-adapter-1')['reason']);
+        self::assertStringContainsString('framework-1', $uncertainties[0]);
+        $this->assertNoOrphanedEvidence($evidence, [], $uncertainties);
     }
 
     public function testItDeduplicatesRepeatedFindingsAndRetainsEveryHopAndEvidenceRecord(): void
@@ -231,7 +291,7 @@ final class FrameworkRuleEngineTest extends TestCase
     }
 }
 
-final class FixtureFrameworkIntegration implements FrameworkIntegration
+class FixtureFrameworkIntegration implements FrameworkIntegration
 {
     private string $name;
     private bool $detected;
@@ -270,6 +330,49 @@ final class FixtureFrameworkIntegration implements FrameworkIntegration
     public function defaultSourcePaths(ProjectState $project): array
     {
         return $this->sourcePaths;
+    }
+}
+
+final class FixtureFailingCapabilityIntegration extends FixtureFrameworkIntegration implements FrameworkTransitionProvider
+{
+    private string $failingCapability;
+
+    public function __construct(string $name, string $failingCapability)
+    {
+        parent::__construct($name, true, ['app'], []);
+        $this->failingCapability = $failingCapability;
+    }
+
+    public function detect(ProjectState $project): FrameworkDetection
+    {
+        if ($this->failingCapability === 'detect') {
+            throw new \RuntimeException('detection failed');
+        }
+
+        return parent::detect($project);
+    }
+
+    public function defaultSourcePaths(ProjectState $project): array
+    {
+        if ($this->failingCapability === 'paths') {
+            throw new \RuntimeException('paths failed');
+        }
+
+        return parent::defaultSourcePaths($project);
+    }
+
+    public function assessTransition(
+        ProjectState $project,
+        UpgradeRequest $request,
+        EvidenceLedger $evidence
+    ): ?FrameworkGuidance {
+        if ($this->failingCapability === 'transition') {
+            $evidence->add('framework', Evidence::E2_PACKAGE_METADATA, 'Partial transition evidence.');
+
+            throw new \RuntimeException('transition failed');
+        }
+
+        return null;
     }
 }
 

@@ -64,6 +64,12 @@ Compatible mode uses the analyzer process's normal global authentication and env
 
 If a credential form is not redacted, stop sharing the report, revoke or rotate the credential, and use the private vulnerability-reporting channel. Include only a synthetic reproduction.
 
+## Laravel guidance does not cover a migration task
+
+Consult the [coverage ledger](laravel-coverage/README.md) for the relevant guide section and its manual action. Database state, deployment library versions, dynamically built names, and custom inherited contracts are not proved by static references. Retaining a Laravel 10 skeleton does not itself require a Laravel 11 skeleton migration.
+
+Illuminate-only, mixed-family, and same-major requests can use direct Composer analysis, but v0.3 does not stage those requests. Preserve all intended targets and inspect the recorded skip reason; do not omit constraints merely to make staged solving available. Family-wide targets and same-major hop identity require the v0.4 contract decision.
+
 ## A scenario times out
 
 Composer scenarios default to a five-minute timeout, configurable with `--composer-timeout`; diagnostics have their own timeout. Check repository availability, authentication prompts, and network access. Composer runs non-interactively. Re-run with `--debug` only when you can safely retain copied manifests for inspection.

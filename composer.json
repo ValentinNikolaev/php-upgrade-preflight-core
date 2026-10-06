@@ -1,6 +1,6 @@
 {
   "name": "php-upgrade-preflight/core",
-  "description": "Deterministic Composer/PHP upgrade analysis core.",
+  "description": "Evidence-linked Composer and PHP upgrade decision reports from read-only preflight analysis.",
   "type": "library",
   "license": "MIT",
   "keywords": [
